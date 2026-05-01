@@ -412,6 +412,62 @@ select option { background: var(--surface2); }
 .ruta-active-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink:0; animation: blink .8s ease-in-out infinite alternate; }
 .ruta-active-name { font-size: 13px; font-weight: 600; color: var(--accent); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .ruta-active-label { font-size: 10px; color: var(--text3); }
+
+/* ── NAVEGACIÓN GUIADA ── */
+.nav-map-wrap {
+  flex: 1; position: relative; background: #0d1f35; overflow: hidden;
+}
+#nav-map {
+  width: 100%; height: 100%; border: none;
+}
+.nav-hud {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  background: linear-gradient(0deg, var(--bg) 0%, rgba(10,22,40,.97) 80%, transparent 100%);
+  padding: 16px 16px 20px;
+  display: flex; flex-direction: column; gap: 10px;
+}
+.nav-stop-card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 14px 16px;
+  display: flex; align-items: center; gap: 12px;
+}
+.nav-stop-num {
+  width: 40px; height: 40px; border-radius: 12px; flex-shrink: 0;
+  background: var(--accent); color: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 16px; font-weight: 800; font-family: var(--mono);
+}
+.nav-stop-num.done { background: var(--green); }
+.nav-stop-info { flex: 1; min-width: 0; }
+.nav-stop-name { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.nav-stop-plus { font-size: 12px; color: var(--text2); font-family: var(--mono); margin-top: 2px; }
+.nav-stop-dist { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.nav-actions { display: flex; gap: 8px; }
+.nav-actions .btn { flex: 1; padding: 12px; font-size: 13px; }
+.nav-progress-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 0 2px;
+}
+.nav-progress-bar { flex: 1; height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.nav-progress-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width .4s; }
+.nav-progress-label { font-size: 11px; color: var(--text3); font-family: var(--mono); white-space: nowrap; }
+
+/* Lista de paradas (pantalla de configuración) */
+.plus-stop-item {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 12px; padding: 12px 14px; position: relative;
+}
+.plus-stop-idx {
+  width: 28px; height: 28px; border-radius: 8px; flex-shrink: 0;
+  background: var(--surface2); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; font-family: var(--mono); color: var(--accent);
+}
+.plus-stop-text { flex: 1; min-width: 0; }
+.plus-stop-code { font-size: 13px; font-weight: 600; font-family: var(--mono); }
+.plus-stop-label { font-size: 11px; color: var(--text3); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.plus-stop-del { color: var(--red); font-size: 18px; cursor: pointer; padding: 4px; flex-shrink: 0; }
 </style>
 </head>
 <body>
@@ -458,10 +514,125 @@ select option { background: var(--surface2); }
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
       Escanear
     </button>
+    <button class="nav-btn" onclick="showScreen('navegacion')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="3 11 22 2 13 21 11 13 3 11"/></svg>
+      Navegar
+    </button>
     <button class="nav-btn" onclick="showScreen('db')">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
       Base datos
     </button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SCREEN: NAVEGACIÓN — CONFIGURAR PARADAS
+══════════════════════════════════════════ -->
+<div class="screen hidden" id="screen-navegacion">
+  <div class="topbar">
+    <button class="topbar-back" onclick="showScreen('home')">←</button>
+    <h2>🗺️ Planear ruta</h2>
+    <span class="topbar-sub" id="nav-stop-count">0 paradas</span>
+  </div>
+  <div class="scroll">
+
+    <!-- Input para agregar Plus Code -->
+    <div style="padding:14px 16px 0;">
+      <div class="field" style="margin-bottom:8px;">
+        <label>Plus Code de Google Maps</label>
+        <div style="display:flex;gap:8px;">
+          <input type="text" id="nav-pluscode-input" placeholder="Ej. 8Q3C+6P Cuautitlán" autocomplete="off"
+            style="flex:1;" onkeydown="if(event.key==='Enter')agregarParada()">
+          <button class="btn btn-accent btn-sm" onclick="agregarParada()" style="white-space:nowrap;">+ Agregar</button>
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:8px;">
+        <button class="btn btn-ghost btn-sm" onclick="pegarDesdeClipboard()" style="flex:1;font-size:12px;">📋 Pegar</button>
+        <button class="btn btn-ghost btn-sm" onclick="limpiarParadas()" style="flex:1;font-size:12px;color:var(--red);">🗑 Limpiar todo</button>
+      </div>
+    </div>
+
+    <!-- Tip -->
+    <div style="margin:0 16px 12px;padding:10px 14px;background:rgba(0,212,255,.06);border:1px solid rgba(0,212,255,.15);border-radius:10px;">
+      <div style="font-size:11px;color:var(--text2);line-height:1.6;">
+        💡 <strong style="color:var(--accent);">Cómo obtener el Plus Code:</strong><br>
+        Google Maps → toca la dirección → aparece el código arriba (ej. <span style="font-family:var(--mono);color:var(--accent);">8Q3C+6P</span>)
+      </div>
+    </div>
+
+    <div class="sec-header">Paradas agregadas</div>
+
+    <!-- Lista de paradas -->
+    <div style="padding:0 16px;display:flex;flex-direction:column;gap:8px;padding-bottom:16px;" id="nav-stops-list">
+      <div class="empty-list" id="nav-stops-empty" style="padding:24px 0;">
+        <div class="ei" style="font-size:36px;">📍</div>
+        <p style="font-size:13px;">Agrega paradas usando<br>Plus Codes de Google Maps</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Botón calcular ruta -->
+  <div style="padding:12px 16px 24px;border-top:1px solid var(--border);background:var(--bg2);flex-shrink:0;">
+    <button class="btn btn-accent" id="btn-calcular-ruta" onclick="calcularYNavegar()" disabled>
+      🧭 Calcular mejor ruta e iniciar
+    </button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SCREEN: NAVEGACIÓN GUIADA
+══════════════════════════════════════════ -->
+<div class="screen hidden" id="screen-nav-guiada">
+  <div class="topbar" style="background:var(--bg);">
+    <button class="topbar-back" onclick="salirNavegacion()">←</button>
+    <h2 id="nav-guiada-title">Navegando...</h2>
+    <span class="topbar-sub" id="nav-guiada-sub"></span>
+  </div>
+
+  <!-- Mapa iframe de Google Maps -->
+  <div class="nav-map-wrap">
+    <iframe id="nav-map" allowfullscreen referrerpolicy="no-referrer-when-downgrade"></iframe>
+    <!-- HUD sobre el mapa -->
+    <div class="nav-hud">
+
+      <!-- Barra de progreso -->
+      <div class="nav-progress-row">
+        <div class="nav-progress-bar">
+          <div class="nav-progress-fill" id="nav-prog-fill" style="width:0%"></div>
+        </div>
+        <div class="nav-progress-label" id="nav-prog-label">0/0</div>
+      </div>
+
+      <!-- Parada actual -->
+      <div class="nav-stop-card" id="nav-current-card">
+        <div class="nav-stop-num" id="nav-current-num">1</div>
+        <div class="nav-stop-info">
+          <div class="nav-stop-name" id="nav-current-name">—</div>
+          <div class="nav-stop-plus" id="nav-current-plus">—</div>
+          <div class="nav-stop-dist" id="nav-current-dist"></div>
+        </div>
+      </div>
+
+      <!-- Siguiente parada (preview) -->
+      <div id="nav-next-preview" style="display:flex;align-items:center;gap:8px;padding:0 4px;">
+        <div style="font-size:11px;color:var(--text3);">Siguiente →</div>
+        <div style="font-size:12px;color:var(--text2);font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="nav-next-name">—</div>
+      </div>
+
+      <!-- Acciones -->
+      <div class="nav-actions">
+        <button class="btn btn-ghost" onclick="abrirEnGoogleMaps()" style="font-size:12px;">
+          🗺️ Abrir en Maps
+        </button>
+        <button class="btn btn-green" onclick="marcarParadaHecha()" style="font-size:13px;">
+          ✓ Entregado
+        </button>
+        <button class="btn btn-ghost" onclick="saltarParada()" style="font-size:12px;color:var(--orange);">
+          ⏭ Saltar
+        </button>
+      </div>
+
+    </div>
   </div>
 </div>
 
@@ -1606,6 +1777,223 @@ window.exportCSV = function() {
   a.download = `seisa_ruta_${new Date().toISOString().slice(0,10)}.csv`;
   a.click();
   showToast(`✓ CSV exportado (${rows.length} registros)`);
+}
+
+// ─── NAVEGACIÓN GUIADA ────────────────────────────────────────────────
+let navParadas = [];       // { plusCode, label, lat, lng, hecha }
+let navParadaActual = 0;
+
+// Resolución de Plus Code a coordenadas vía Open Location Code + Nominatim
+async function resolverPlusCode(plusCode) {
+  // Limpiar el input
+  const code = plusCode.trim();
+  // Intentar con Nominatim (geocoder gratuito)
+  const query = encodeURIComponent(code);
+  const url = `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`;
+  const res = await fetch(url, { headers: { 'Accept-Language': 'es' } });
+  const data = await res.json();
+  if (data && data.length > 0) {
+    return {
+      lat: parseFloat(data[0].lat),
+      lng: parseFloat(data[0].lon),
+      label: data[0].display_name?.split(',').slice(0,3).join(', ') || code
+    };
+  }
+  // Fallback: extraer coordenadas aproximadas del Plus Code manualmente
+  throw new Error('No se pudo resolver el Plus Code');
+}
+
+window.agregarParada = async function() {
+  const input = document.getElementById('nav-pluscode-input');
+  const val = input.value.trim();
+  if (!val) return;
+
+  input.disabled = true;
+  input.value = '⏳ Buscando...';
+
+  try {
+    const geo = await resolverPlusCode(val);
+    navParadas.push({
+      plusCode: val,
+      label: geo.label,
+      lat: geo.lat,
+      lng: geo.lng,
+      hecha: false
+    });
+    input.value = '';
+    renderNavStops();
+    showToast(`📍 Parada ${navParadas.length} agregada`);
+  } catch(e) {
+    showToast('⚠️ No se encontró ese Plus Code, intenta incluir la ciudad');
+    input.value = val;
+  }
+  input.disabled = false;
+  input.focus();
+}
+
+window.pegarDesdeClipboard = async function() {
+  try {
+    const text = await navigator.clipboard.readText();
+    document.getElementById('nav-pluscode-input').value = text.trim();
+    document.getElementById('nav-pluscode-input').focus();
+  } catch(e) {
+    showToast('Pega el código manualmente en el campo');
+  }
+}
+
+window.eliminarParada = function(idx) {
+  navParadas.splice(idx, 1);
+  renderNavStops();
+}
+
+window.limpiarParadas = function() {
+  navParadas = [];
+  renderNavStops();
+  showToast('🗑 Paradas eliminadas');
+}
+
+function renderNavStops() {
+  const list = document.getElementById('nav-stops-list');
+  const empty = document.getElementById('nav-stops-empty');
+  const btn = document.getElementById('btn-calcular-ruta');
+  const counter = document.getElementById('nav-stop-count');
+
+  counter.textContent = `${navParadas.length} paradas`;
+  btn.disabled = navParadas.length < 2;
+
+  if (navParadas.length === 0) {
+    list.innerHTML = '';
+    list.appendChild(empty);
+    empty.style.display = 'block';
+    return;
+  }
+  empty.style.display = 'none';
+
+  list.innerHTML = navParadas.map((p, i) => `
+    <div class="plus-stop-item">
+      <div class="plus-stop-idx">${i + 1}</div>
+      <div class="plus-stop-text">
+        <div class="plus-stop-code">${p.plusCode}</div>
+        <div class="plus-stop-label">${p.label}</div>
+      </div>
+      <div class="plus-stop-del" onclick="eliminarParada(${i})">✕</div>
+    </div>
+  `).join('');
+}
+
+// Algoritmo TSP simple: nearest neighbor desde parada 0
+function optimizarRuta(paradas) {
+  if (paradas.length <= 2) return [...paradas];
+  const dist = (a, b) => Math.hypot(a.lat - b.lat, a.lng - b.lng);
+  const result = [paradas[0]];
+  const remaining = paradas.slice(1);
+  while (remaining.length > 0) {
+    const last = result[result.length - 1];
+    let minDist = Infinity, minIdx = 0;
+    remaining.forEach((p, i) => {
+      const d = dist(last, p);
+      if (d < minDist) { minDist = d; minIdx = i; }
+    });
+    result.push(remaining.splice(minIdx, 1)[0]);
+  }
+  return result;
+}
+
+window.calcularYNavegar = function() {
+  if (navParadas.length < 2) return;
+  // Optimizar ruta
+  const optimized = optimizarRuta([...navParadas]);
+  navParadas = optimized.map(p => ({ ...p, hecha: false }));
+  navParadaActual = 0;
+  showScreen('nav-guiada');
+  renderNavGuiada();
+}
+
+function renderNavGuiada() {
+  const total = navParadas.length;
+  const actual = navParadaActual;
+  const parada = navParadas[actual];
+  const siguiente = navParadas[actual + 1];
+
+  // Topbar
+  document.getElementById('nav-guiada-title').textContent = `Parada ${actual + 1} de ${total}`;
+  document.getElementById('nav-guiada-sub').textContent = `${navParadas.filter(p=>p.hecha).length} ✓`;
+
+  // Progreso
+  const pct = Math.round((actual / total) * 100);
+  document.getElementById('nav-prog-fill').style.width = pct + '%';
+  document.getElementById('nav-prog-label').textContent = `${actual}/${total}`;
+
+  // Card parada actual
+  document.getElementById('nav-current-num').textContent = actual + 1;
+  document.getElementById('nav-current-name').textContent = parada.label.split(',')[0];
+  document.getElementById('nav-current-plus').textContent = parada.plusCode;
+
+  // Siguiente
+  if (siguiente) {
+    document.getElementById('nav-next-preview').style.display = 'flex';
+    document.getElementById('nav-next-name').textContent = siguiente.label.split(',')[0];
+  } else {
+    document.getElementById('nav-next-preview').style.display = 'none';
+  }
+
+  // Mapa iframe con la parada actual centrada
+  const mapUrl = `https://maps.google.com/maps?q=${parada.lat},${parada.lng}&z=16&output=embed&hl=es`;
+  document.getElementById('nav-map').src = mapUrl;
+}
+
+window.abrirEnGoogleMaps = function() {
+  const parada = navParadas[navParadaActual];
+  if (!parada) return;
+  // Construir URL con todas las paradas restantes para navegación completa
+  const restantes = navParadas.slice(navParadaActual);
+  if (restantes.length === 1) {
+    window.open(`https://www.google.com/maps/dir/?api=1&destination=${parada.lat},${parada.lng}&travelmode=driving`, '_blank');
+  } else {
+    const waypoints = restantes.slice(1, -1).map(p => `${p.lat},${p.lng}`).join('|');
+    const dest = restantes[restantes.length - 1];
+    const origin = restantes[0];
+    let url = `https://www.google.com/maps/dir/?api=1&origin=${origin.lat},${origin.lng}&destination=${dest.lat},${dest.lng}&travelmode=driving`;
+    if (waypoints) url += `&waypoints=${waypoints}`;
+    window.open(url, '_blank');
+  }
+}
+
+window.marcarParadaHecha = function() {
+  navParadas[navParadaActual].hecha = true;
+  navParadaActual++;
+  if (navParadaActual >= navParadas.length) {
+    // Ruta completada
+    showToast('🎉 ¡Ruta completada!');
+    document.getElementById('nav-guiada-title').textContent = '✅ Ruta completada';
+    document.getElementById('nav-guiada-sub').textContent = `${navParadas.length}/${navParadas.length}`;
+    document.getElementById('nav-prog-fill').style.width = '100%';
+    document.getElementById('nav-prog-label').textContent = `${navParadas.length}/${navParadas.length}`;
+    document.getElementById('nav-current-card').style.background = 'rgba(0,230,118,.1)';
+    document.getElementById('nav-current-card').style.borderColor = 'rgba(0,230,118,.3)';
+    document.getElementById('nav-current-num').style.background = 'var(--green)';
+    document.getElementById('nav-current-name').textContent = '¡Todas las entregas completadas!';
+    document.getElementById('nav-current-plus').textContent = '';
+    document.getElementById('nav-next-preview').style.display = 'none';
+    return;
+  }
+  renderNavGuiada();
+  showToast(`✓ Parada ${navParadaActual} de ${navParadas.length}`);
+}
+
+window.saltarParada = function() {
+  navParadaActual++;
+  if (navParadaActual >= navParadas.length) {
+    navParadaActual = navParadas.length - 1;
+    showToast('Ya estás en la última parada');
+    return;
+  }
+  renderNavGuiada();
+  showToast('⏭ Saltando a siguiente parada');
+}
+
+window.salirNavegacion = function() {
+  showScreen('navegacion');
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────
