@@ -2014,7 +2014,6 @@ window.limpiarParadas = function() {
 
 function renderNavStops() {
   const list = document.getElementById('nav-stops-list');
-  const empty = document.getElementById('nav-stops-empty');
   const btn = document.getElementById('btn-calcular-ruta');
   const counter = document.getElementById('nav-stop-count');
 
@@ -2022,12 +2021,13 @@ function renderNavStops() {
   btn.disabled = navParadas.length < 2;
 
   if (navParadas.length === 0) {
-    list.innerHTML = '';
-    list.appendChild(empty);
-    empty.style.display = 'block';
+    list.innerHTML = `
+      <div class="empty-list" style="padding:24px 0;">
+        <div class="ei">📍</div>
+        <p>Agrega paradas usando<br>Plus Codes de Google Maps</p>
+      </div>`;
     return;
   }
-  empty.style.display = 'none';
 
   list.innerHTML = navParadas.map((p, i) => `
     <div class="plus-stop-item">
