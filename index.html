@@ -1783,24 +1783,175 @@ window.exportCSV = function() {
 let navParadas = [];       // { plusCode, label, lat, lng, hecha }
 let navParadaActual = 0;
 
-// Resolución de Plus Code a coordenadas vía Open Location Code + Nominatim
-async function resolverPlusCode(plusCode) {
-  // Limpiar el input
-  const code = plusCode.trim();
-  // Intentar con Nominatim (geocoder gratuito)
-  const query = encodeURIComponent(code);
-  const url = `https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1`;
-  const res = await fetch(url, { headers: { 'Accept-Language': 'es' } });
+// ── Open Location Code (Plus Codes) decoder ──────────────────────────
+// Implementación mínima del estándar OLC para decodificar Plus Codes
+const OLC = (() => {
+  const CHARSET = '23456789CFGHJMPQRVWX';
+  const SEP = '+';
+  const PAD = '0';
+  const PAIR_LEN = 10;
+  const GRID_COLS = 4;
+  const GRID_ROWS = 5;
+  const LAT_MAX = 90;
+  const LNG_MAX = 180;
+
+  function isShort(code) {
+    const sep = code.indexOf(SEP);
+    return sep >= 0 && sep < 8;
+  }
+
+  function isFull(code) {
+    const sep = code.indexOf(SEP);
+    if (sep !== 8 && sep !== 6) return false;
+    return !isShort(code);
+  }
+
+  function decode(code) {
+    const clean = code.toUpperCase().replace(/\s/g, '');
+    const sepIdx = clean.indexOf(SEP);
+    let digits = clean.replace(/\+/g, '').replace(/0+$/, '');
+
+    let lat = -LAT_MAX;
+    let lng = -LNG_MAX;
+    let latRes = 400;
+    let lngRes = 400;
+
+    for (let i = 0; i < Math.min(digits.length, PAIR_LEN); i += 2) {
+      latRes /= 20;
+      lngRes /= 20;
+      if (i < digits.length) lat += CHARSET.indexOf(digits[i]) * latRes;
+      if (i + 1 < digits.length) lng += CHARSET.indexOf(digits[i + 1]) * lngRes;
+    }
+
+    if (digits.length > PAIR_LEN) {
+      let gridLat = 0, gridLng = 0;
+      let gridLatRes = latRes;
+      let gridLngRes = lngRes;
+      for (let i = PAIR_LEN; i < digits.length; i++) {
+        gridLatRes /= GRID_ROWS;
+        gridLngRes /= GRID_COLS;
+        const idx = CHARSET.indexOf(digits[i]);
+        gridLat += Math.floor(idx / GRID_COLS) * gridLatRes;
+        gridLng += (idx % GRID_COLS) * gridLngRes;
+      }
+      lat += gridLat;
+      lng += gridLng;
+      latRes = gridLatRes;
+      lngRes = gridLngRes;
+    }
+
+    return {
+      latLo: lat, lngLo: lng,
+      latHi: lat + latRes, lngHi: lng + lngRes,
+      lat: lat + latRes / 2,
+      lng: lng + lngRes / 2
+    };
+  }
+
+  // Recuperar ciudad de referencia de un código corto (ej. "8FGC+XQ Ciudad de Mexico")
+  async function recoverFull(shortCode) {
+    // Si el usuario incluyó una referencia de ciudad después del código
+    const parts = shortCode.trim().split(/\s+/);
+    const codeOnly = parts[0];
+    const cityRef = parts.slice(1).join(' ');
+
+    if (!cityRef) throw new Error('Código corto sin referencia de ciudad');
+
+    // Buscar la ciudad en Nominatim para obtener sus coordenadas
+    const q = encodeURIComponent(cityRef);
+    const r = await fetch(`https://nominatim.openstreetmap.org/search?q=${q}&format=json&limit=1`, {
+      headers: { 'Accept-Language': 'es' }
+    });
+    const d = await r.json();
+    if (!d || d.length === 0) throw new Error('Ciudad de referencia no encontrada');
+
+    const refLat = parseFloat(d[0].lat);
+    const refLng = parseFloat(d[0].lon);
+
+    // Expandir código corto con el área de referencia
+    // Un código de 4 dígitos cubre 1° (~111km), 2 dígitos cubre 20°
+    const padNeeded = 8 - codeOnly.indexOf(SEP);
+    const latRef = Math.floor(refLat / 20) * 20;
+    const lngRef = Math.floor(refLng / 20) * 20;
+
+    // Reconstruir prefijo usando coordenadas de referencia
+    const latIdx = Math.floor((refLat + LAT_MAX) / 20);
+    const lngIdx = Math.floor((refLng + LNG_MAX) / 20);
+    const latChar = CHARSET[latIdx] || CHARSET[0];
+    const lngChar = CHARSET[lngIdx] || CHARSET[0];
+
+    // Construir código completo añadiendo el prefijo necesario
+    let prefix = '';
+    let tmpLat = refLat + LAT_MAX;
+    let tmpLng = refLng + LNG_MAX;
+    let res = 400;
+    const prefixDigits = padNeeded;
+    for (let i = 0; i < prefixDigits; i += 2) {
+      res /= 20;
+      prefix += CHARSET[Math.floor(tmpLat / res) % 20];
+      prefix += CHARSET[Math.floor(tmpLng / res) % 20];
+      tmpLat %= res;
+      tmpLng %= res;
+    }
+
+    const fullCode = prefix + codeOnly;
+    return fullCode;
+  }
+
+  return { decode, isFull, isShort, recoverFull };
+})();
+
+// Resolución de Plus Code a coordenadas
+async function resolverPlusCode(rawInput) {
+  const input = rawInput.trim();
+
+  // Separar el código del texto de referencia (ej. "8FGC+XQ Zumpango" → code="8FGC+XQ", ref="Zumpango")
+  const parts = input.split(/\s+/);
+  const codeCandidate = parts[0].toUpperCase();
+
+  // ¿Es un código largo completo? (ej. "85QQHV9G+45")
+  if (OLC.isFull(codeCandidate)) {
+    try {
+      const geo = OLC.decode(codeCandidate);
+      // Obtener nombre del lugar vía reverse geocoding
+      const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${geo.lat}&lon=${geo.lng}&format=json`, {
+        headers: { 'Accept-Language': 'es' }
+      });
+      const d = await r.json();
+      const label = d.display_name?.split(',').slice(0, 3).join(', ') || codeCandidate;
+      return { lat: geo.lat, lng: geo.lng, label };
+    } catch(e) { /* continuar */ }
+  }
+
+  // ¿Es un código corto con referencia? (ej. "8FGC+XQ Zumpango")
+  if (OLC.isShort(codeCandidate) && parts.length > 1) {
+    try {
+      const fullCode = await OLC.recoverFull(input);
+      const geo = OLC.decode(fullCode);
+      const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${geo.lat}&lon=${geo.lng}&format=json`, {
+        headers: { 'Accept-Language': 'es' }
+      });
+      const d = await r.json();
+      const label = d.display_name?.split(',').slice(0, 3).join(', ') || input;
+      return { lat: geo.lat, lng: geo.lng, label };
+    } catch(e) { /* continuar */ }
+  }
+
+  // Fallback: buscar el texto completo como dirección en Nominatim
+  const query = encodeURIComponent(input);
+  const res = await fetch(`https://nominatim.openstreetmap.org/search?q=${query}&format=json&limit=1&countrycodes=mx`, {
+    headers: { 'Accept-Language': 'es' }
+  });
   const data = await res.json();
   if (data && data.length > 0) {
     return {
       lat: parseFloat(data[0].lat),
       lng: parseFloat(data[0].lon),
-      label: data[0].display_name?.split(',').slice(0,3).join(', ') || code
+      label: data[0].display_name?.split(',').slice(0, 3).join(', ') || input
     };
   }
-  // Fallback: extraer coordenadas aproximadas del Plus Code manualmente
-  throw new Error('No se pudo resolver el Plus Code');
+
+  throw new Error('No se pudo resolver el Plus Code. Verifica el formato o agrega una ciudad de referencia (ej: 8FGC+XQ Zumpango)');
 }
 
 window.agregarParada = async function() {
@@ -1824,7 +1975,7 @@ window.agregarParada = async function() {
     renderNavStops();
     showToast(`📍 Parada ${navParadas.length} agregada`);
   } catch(e) {
-    showToast('⚠️ No se encontró ese Plus Code, intenta incluir la ciudad');
+    showToast('⚠️ No encontrado. Usa formato completo (ej: 85QR3C2Q+3G) o corto con ciudad (ej: 8FGC+XQ Zumpango)');
     input.value = val;
   }
   input.disabled = false;
