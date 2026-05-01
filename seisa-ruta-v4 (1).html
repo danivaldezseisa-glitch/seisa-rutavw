@@ -1,0 +1,1616 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0a1628">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<title>SEISA Rutas</title>
+<link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #0a1628;
+  --bg2: #0f1e35;
+  --surface: #152240;
+  --surface2: #1c2d50;
+  --border: #1e3560;
+  --accent: #00d4ff;
+  --accent2: #0099cc;
+  --green: #00e676;
+  --orange: #ff9100;
+  --red: #ff5252;
+  --yellow: #ffd740;
+  --text: #e8f4ff;
+  --text2: #7a9cc4;
+  --text3: #3d5a80;
+  --radius: 12px;
+  --mono: 'Space Mono', monospace;
+  --sans: 'Outfit', sans-serif;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overflow: hidden; font-family: var(--sans); background: var(--bg); color: var(--text); }
+
+/* ── SCREENS ── */
+.screen { position: fixed; inset: 0; display: flex; flex-direction: column; transition: transform .35s cubic-bezier(.4,0,.2,1), opacity .35s; }
+.screen.hidden { transform: translateX(100%); opacity: 0; pointer-events: none; }
+.screen.slide-left { transform: translateX(-100%); opacity: 0; pointer-events: none; }
+
+/* ── TOPBAR ── */
+.topbar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 14px 16px 10px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
+}
+.topbar-back {
+  width: 36px; height: 36px; border-radius: 10px;
+  border: 1px solid var(--border); background: transparent;
+  color: var(--text2); font-size: 18px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+}
+.topbar h2 { font-size: 16px; font-weight: 600; flex: 1; }
+.topbar-sub { font-size: 11px; color: var(--text2); font-family: var(--mono); }
+
+/* ── SCROLL AREA ── */
+.scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+.scroll::-webkit-scrollbar { display: none; }
+
+/* ── BOTTOM NAV ── */
+.bottom-nav {
+  display: flex; background: var(--bg2);
+  border-top: 1px solid var(--border); flex-shrink: 0;
+}
+.nav-btn {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  gap: 3px; padding: 10px 4px; cursor: pointer;
+  border: none; background: transparent; color: var(--text3);
+  font-size: 10px; font-family: var(--sans); transition: color .15s;
+}
+.nav-btn.active { color: var(--accent); }
+.nav-btn svg { width: 22px; height: 22px; }
+
+/* ── BUTTONS ── */
+.btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 14px 20px; border-radius: var(--radius); font-size: 15px;
+  font-weight: 600; cursor: pointer; border: none; font-family: var(--sans);
+  transition: all .15s; width: 100%;
+}
+.btn-accent { background: var(--accent); color: var(--bg); }
+.btn-accent:active { opacity: .85; transform: scale(.98); }
+.btn-green { background: var(--green); color: var(--bg); }
+.btn-green:active { opacity: .85; }
+.btn-orange { background: var(--orange); color: var(--bg); }
+.btn-ghost { background: var(--surface2); color: var(--text); border: 1px solid var(--border); }
+.btn-ghost:active { background: var(--surface); }
+.btn-red { background: var(--red); color: #fff; }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn-sm { padding: 9px 14px; font-size: 13px; width: auto; }
+
+/* ── CARDS ── */
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px;
+}
+.card + .card { margin-top: 10px; }
+
+/* ── BADGE ── */
+.badge {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 3px 9px; border-radius: 99px; font-size: 11px; font-weight: 600;
+}
+.badge-green { background: rgba(0,230,118,.15); color: var(--green); }
+.badge-orange { background: rgba(255,145,0,.15); color: var(--orange); }
+.badge-blue { background: rgba(0,212,255,.15); color: var(--accent); }
+.badge-red { background: rgba(255,82,82,.15); color: var(--red); }
+
+/* ── FORM ── */
+.field { margin-bottom: 12px; }
+.field label { font-size: 11px; color: var(--text2); text-transform: uppercase; letter-spacing: .07em; display: block; margin-bottom: 5px; }
+.field input, .field select, .field textarea {
+  width: 100%; background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 10px; padding: 11px 13px; color: var(--text);
+  font-size: 14px; font-family: var(--sans); outline: none;
+  transition: border-color .15s;
+}
+.field input:focus, .field select:focus, .field textarea:focus { border-color: var(--accent); }
+.field textarea { resize: none; height: 80px; }
+select option { background: var(--surface2); }
+
+/* ── TOGGLE ── */
+.toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; }
+.toggle-row span { font-size: 14px; font-weight: 500; }
+.toggle { width: 48px; height: 26px; background: var(--border); border-radius: 13px; position: relative; cursor: pointer; transition: background .2s; flex-shrink: 0; }
+.toggle.on { background: var(--accent); }
+.toggle::after { content:''; position: absolute; width: 20px; height: 20px; border-radius: 50%; background: #fff; top: 3px; left: 3px; transition: left .2s; }
+.toggle.on::after { left: 25px; }
+
+/* ── SECTION HEADER ── */
+.sec-header { font-size: 11px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: .1em; padding: 16px 16px 8px; }
+
+/* ── DIVIDER ── */
+.divider { height: 1px; background: var(--border); margin: 8px 0; }
+
+/* ────────────────────────────────────────
+   SCREEN 1: DASHBOARD
+──────────────────────────────────────── */
+#screen-home { background: var(--bg); }
+.home-header {
+  padding: 20px 16px 16px;
+  background: linear-gradient(180deg, var(--bg2) 0%, transparent 100%);
+  flex-shrink: 0;
+}
+.home-greeting { font-size: 12px; color: var(--text2); margin-bottom: 2px; }
+.home-name { font-size: 22px; font-weight: 700; letter-spacing: -.5px; }
+.home-name span { color: var(--accent); }
+.stats-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding: 0 16px 16px; }
+.stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 10px; text-align: center; }
+.stat-n { font-size: 24px; font-weight: 700; font-family: var(--mono); color: var(--accent); }
+.stat-l { font-size: 10px; color: var(--text2); margin-top: 2px; }
+
+/* ── ROUTE LIST ── */
+.route-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 13px 16px; border-bottom: 1px solid var(--border);
+  cursor: pointer; transition: background .1s; position: relative;
+}
+.route-item:active { background: var(--surface); }
+.route-num {
+  width: 36px; height: 36px; border-radius: 10px;
+  background: var(--surface2); border: 1px solid var(--border);
+  display: flex; align-items: center; justify-content: center;
+  font-family: var(--mono); font-size: 13px; font-weight: 700; color: var(--accent);
+  flex-shrink: 0;
+}
+.route-num.done { background: rgba(0,230,118,.1); border-color: rgba(0,230,118,.3); color: var(--green); }
+.route-info { flex: 1; min-width: 0; }
+.route-name { font-size: 14px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.route-addr { font-size: 12px; color: var(--text2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-top: 2px; }
+.route-arrow { color: var(--text3); font-size: 18px; }
+.empty-list { padding: 48px 20px; text-align: center; color: var(--text3); }
+.empty-list .ei { font-size: 48px; margin-bottom: 12px; }
+.empty-list p { font-size: 14px; line-height: 1.6; }
+
+/* ────────────────────────────────────────
+   SCREEN 2: SCAN (carga masiva)
+──────────────────────────────────────── */
+#screen-scan {}
+.upload-zone {
+  margin: 16px; border: 2px dashed var(--border);
+  border-radius: var(--radius); padding: 28px 16px;
+  text-align: center; cursor: pointer; position: relative;
+  transition: all .2s;
+}
+.upload-zone:active, .upload-zone.drag { border-color: var(--accent); background: rgba(0,212,255,.05); }
+.upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.upload-zone .uz-icon { font-size: 36px; margin-bottom: 10px; }
+.upload-zone p { font-size: 14px; color: var(--text2); }
+.upload-zone strong { color: var(--accent); }
+.queue-wrap { padding: 0 16px 16px; display: flex; flex-direction: column; gap: 8px; }
+.qi {
+  display: flex; align-items: center; gap: 10px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 10px 12px;
+}
+.qi.done { border-color: rgba(0,230,118,.3); }
+.qi.error { border-color: rgba(255,82,82,.3); }
+.qi.proc { border-color: rgba(0,212,255,.3); }
+.qi-thumb { width: 44px; height: 44px; border-radius: 8px; object-fit: cover; flex-shrink: 0; }
+.qi-info { flex: 1; min-width: 0; }
+.qi-name { font-size: 12px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.qi-status { font-size: 11px; color: var(--text3); margin-top: 2px; }
+.qi-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+.dot-wait { background: var(--border); }
+.dot-proc { background: var(--accent); animation: blink .7s ease-in-out infinite alternate; }
+.dot-done { background: var(--green); }
+.dot-err  { background: var(--red); }
+@keyframes blink { from { opacity: .3; } to { opacity: 1; } }
+.prog-wrap { margin: 0 16px 12px; }
+.prog-bar { height: 4px; background: var(--border); border-radius: 2px; overflow: hidden; }
+.prog-fill { height: 100%; background: var(--accent); border-radius: 2px; transition: width .3s; }
+.prog-label { font-size: 12px; color: var(--text2); margin-bottom: 5px; display: flex; justify-content: space-between; }
+
+/* ────────────────────────────────────────
+   SCREEN 3: DETALLE CLIENTE
+──────────────────────────────────────── */
+#screen-client {}
+.client-hero {
+  padding: 16px;
+  background: linear-gradient(135deg, var(--bg2) 0%, var(--surface) 100%);
+  border-bottom: 1px solid var(--border);
+}
+.client-name { font-size: 20px; font-weight: 700; letter-spacing: -.3px; margin-bottom: 6px; }
+.client-addr { font-size: 13px; color: var(--text2); line-height: 1.5; }
+.data-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; padding: 16px; }
+.data-cell { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 11px 12px; }
+.data-cell .dl { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: .07em; margin-bottom: 4px; }
+.data-cell .dv { font-size: 13px; font-weight: 500; font-family: var(--mono); color: var(--text); word-break: break-all; }
+.data-cell.full { grid-column: 1 / -1; }
+.action-list { padding: 0 16px 16px; display: flex; flex-direction: column; gap: 10px; }
+
+/* ────────────────────────────────────────
+   SCREEN 4: CAMARA / ENTREGA
+──────────────────────────────────────── */
+#screen-camera { background: #000; }
+#camera-preview { width: 100%; flex: 1; object-fit: cover; display: block; }
+.camera-ui {
+  position: absolute; inset: 0; display: flex; flex-direction: column;
+  pointer-events: none;
+}
+.camera-top {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 14px 16px; background: linear-gradient(180deg, rgba(0,0,0,.7) 0%, transparent 100%);
+  pointer-events: all;
+}
+.camera-bottom {
+  margin-top: auto; padding: 20px 24px 32px;
+  background: linear-gradient(0deg, rgba(0,0,0,.85) 0%, transparent 100%);
+  pointer-events: all; display: flex; flex-direction: column; gap: 14px;
+}
+.cam-options { display: flex; gap: 10px; }
+.cam-opt {
+  flex: 1; padding: 10px 8px; border-radius: 10px; text-align: center;
+  font-size: 12px; font-weight: 600; cursor: pointer; border: 2px solid rgba(255,255,255,.2);
+  background: rgba(255,255,255,.1); color: #fff; transition: all .15s;
+}
+.cam-opt.active { border-color: var(--accent); background: rgba(0,212,255,.2); color: var(--accent); }
+.cam-opt2 { display: flex; gap: 10px; }
+.cam-opt2 .cam-opt { font-size: 11px; }
+.camera-actions { display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.shutter {
+  width: 72px; height: 72px; border-radius: 50%;
+  border: 3px solid #fff; background: transparent;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: transform .1s; flex-shrink: 0;
+}
+.shutter:active { transform: scale(.93); }
+.shutter-inner { width: 56px; height: 56px; border-radius: 50%; background: #fff; }
+.cam-action-btn {
+  flex: 1; padding: 12px 10px; border-radius: 10px;
+  font-size: 12px; font-weight: 600; cursor: pointer;
+  border: 1px solid rgba(255,255,255,.3); background: rgba(255,255,255,.1);
+  color: #fff; font-family: var(--sans);
+}
+.cam-action-btn.green { border-color: var(--green); background: rgba(0,230,118,.2); color: var(--green); }
+
+/* ────────────────────────────────────────
+   SCREEN 5: DB / TABLA
+──────────────────────────────────────── */
+#screen-db {}
+.db-toolbar { display: flex; gap: 8px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.search-box {
+  flex: 1; display: flex; align-items: center; gap: 8px;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 8px 12px;
+}
+.search-box input { background: transparent; border: none; outline: none; color: var(--text); font-size: 13px; flex: 1; font-family: var(--sans); }
+.search-box input::placeholder { color: var(--text3); }
+.db-item {
+  padding: 13px 16px; border-bottom: 1px solid var(--border);
+  cursor: pointer; transition: background .1s;
+}
+.db-item:active { background: var(--surface); }
+.db-item-top { display: flex; align-items: center; justify-content: space-between; margin-bottom: 4px; }
+.db-item-name { font-size: 14px; font-weight: 600; }
+.db-item-track { font-size: 11px; font-family: var(--mono); color: var(--text3); }
+.db-item-addr { font-size: 12px; color: var(--text2); }
+
+/* ── MODAL ── */
+.modal-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.7);
+  z-index: 500; display: none; align-items: flex-end; justify-content: center;
+}
+.modal-overlay.open { display: flex; }
+.modal {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 20px 20px 0 0; padding: 20px 16px 32px;
+  width: 100%; max-height: 90vh; overflow-y: auto;
+}
+.modal-handle { width: 40px; height: 4px; background: var(--border); border-radius: 2px; margin: 0 auto 20px; }
+.modal h3 { font-size: 17px; font-weight: 700; margin-bottom: 16px; }
+
+/* ── TOAST ── */
+.toast {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(20px);
+  background: var(--surface2); border: 1px solid var(--border);
+  border-radius: 99px; padding: 10px 20px; font-size: 13px; font-weight: 500;
+  z-index: 999; opacity: 0; transition: all .3s; white-space: nowrap;
+  pointer-events: none;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ── FAB ── */
+.fab {
+  position: fixed; bottom: 80px; right: 16px; z-index: 100;
+  width: 56px; height: 56px; border-radius: 50%;
+  background: var(--accent); border: none; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 24px; box-shadow: 0 4px 20px rgba(0,212,255,.4);
+  transition: transform .15s;
+}
+.fab:active { transform: scale(.93); }
+
+/* ── DAY SECTION ── */
+.day-section { }
+.day-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 10px 16px 6px;
+  background: var(--bg2);
+  border-bottom: 1px solid var(--border);
+  border-top: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 10;
+}
+.day-title {
+  font-size: 11px; font-weight: 700; color: var(--accent);
+  text-transform: uppercase; letter-spacing: .1em;
+  font-family: var(--mono);
+}
+.day-stats { font-size: 10px; color: var(--text3); }
+
+/* ── PHOTO CAPTURE MODAL ── */
+.photo-capture-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,.92);
+  z-index: 600; display: none; flex-direction: column;
+  align-items: center; justify-content: center; padding: 20px;
+}
+.photo-capture-overlay.open { display: flex; }
+.photo-capture-box {
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 20px; padding: 20px; width: 100%; max-width: 400px;
+  display: flex; flex-direction: column; gap: 14px;
+}
+.photo-capture-box h3 { font-size: 17px; font-weight: 700; }
+.photo-preview-area {
+  width: 100%; aspect-ratio: 4/3; border-radius: 12px;
+  background: var(--surface); border: 2px dashed var(--border);
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; position: relative;
+}
+.photo-preview-area img {
+  width: 100%; height: 100%; object-fit: cover; border-radius: 10px;
+}
+.photo-placeholder { text-align: center; color: var(--text3); }
+.photo-placeholder .ph-icon { font-size: 40px; margin-bottom: 8px; }
+.photo-placeholder p { font-size: 13px; }
+.photo-capture-btns { display: flex; gap: 8px; }
+.photo-capture-btns .btn { flex: 1; }
+
+/* ── NUEVA RUTA SCREEN ── */
+.nueva-ruta-hero {
+  padding: 32px 20px 24px;
+  display: flex; flex-direction: column; align-items: center;
+  text-align: center; gap: 8px;
+}
+.nueva-ruta-icon {
+  width: 72px; height: 72px; border-radius: 20px;
+  background: rgba(0,212,255,.12); border: 1.5px solid rgba(0,212,255,.3);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 34px; margin-bottom: 8px;
+}
+.nueva-ruta-title { font-size: 22px; font-weight: 700; letter-spacing: -.4px; }
+.nueva-ruta-sub { font-size: 14px; color: var(--text2); line-height: 1.5; }
+.ruta-name-input {
+  font-size: 20px; font-weight: 700; text-align: center;
+  letter-spacing: -.3px; padding: 16px;
+}
+.ruta-suggestions { display: flex; flex-wrap: wrap; gap: 8px; padding: 0 16px 20px; }
+.ruta-chip {
+  padding: 8px 14px; border-radius: 99px;
+  background: var(--surface2); border: 1px solid var(--border);
+  font-size: 13px; color: var(--text2); cursor: pointer;
+  transition: all .15s;
+}
+.ruta-chip:active { background: var(--surface); border-color: var(--accent); color: var(--accent); }
+.ruta-active-bar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px; margin: 0 16px 12px;
+  background: rgba(0,212,255,.07); border: 1px solid rgba(0,212,255,.2);
+  border-radius: 12px;
+}
+.ruta-active-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink:0; animation: blink .8s ease-in-out infinite alternate; }
+.ruta-active-name { font-size: 13px; font-weight: 600; color: var(--accent); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.ruta-active-label { font-size: 10px; color: var(--text3); }
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════
+     SCREEN: HOME / RUTA
+══════════════════════════════════════════ -->
+<div class="screen" id="screen-home">
+  <div class="home-header">
+    <div class="home-greeting">Bienvenido,</div>
+    <div class="home-name">Daniel <span>Ulises</span></div>
+  </div>
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-n" id="stat-total">0</div><div class="stat-l">Total</div></div>
+    <div class="stat-card"><div class="stat-n" id="stat-done" style="color:var(--green)">0</div><div class="stat-l">Entregados</div></div>
+    <div class="stat-card"><div class="stat-n" id="stat-pending" style="color:var(--orange)">0</div><div class="stat-l">Pendientes</div></div>
+  </div>
+  <div style="padding:0 16px 10px; display:flex; gap:8px;">
+    <button class="btn btn-accent" onclick="showScreen('nueva-ruta')" style="flex:1;">
+      🗺️ Nueva Ruta
+    </button>
+    <button class="btn btn-green" onclick="enviarMasivo()" style="flex:1;">
+      💬 Enviar a pendientes
+    </button>
+  </div>
+  <div id="ruta-activa-bar" style="display:none;" class="ruta-active-bar" onclick="showScreen('nueva-ruta')">
+    <div class="ruta-active-dot"></div>
+    <div class="ruta-active-name" id="ruta-activa-nombre">—</div>
+    <div class="ruta-active-label">Ruta activa ›</div>
+  </div>
+  <div class="scroll" id="route-list-wrap">
+    <div class="empty-list" id="route-empty">
+      <div class="ei">📦</div>
+      <p>No hay paquetes en ruta.<br>Ve a <strong>Escanear</strong> para cargar etiquetas.</p>
+    </div>
+    <div id="route-list"></div>
+  </div>
+  <div class="bottom-nav">
+    <button class="nav-btn active" onclick="showScreen('home')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+      Ruta
+    </button>
+    <button class="nav-btn" onclick="showScreen('scan')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="3" y1="15" x2="21" y2="15"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="15" y1="3" x2="15" y2="21"/></svg>
+      Escanear
+    </button>
+    <button class="nav-btn" onclick="showScreen('db')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+      Base datos
+    </button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SCREEN: NUEVA RUTA
+══════════════════════════════════════════ -->
+<div class="screen hidden" id="screen-nueva-ruta">
+  <div class="topbar">
+    <button class="topbar-back" onclick="showScreen('home')">←</button>
+    <h2>Nueva Ruta</h2>
+    <span class="topbar-sub" id="nr-fecha-label"></span>
+  </div>
+  <div class="scroll">
+    <div class="nueva-ruta-hero">
+      <div class="nueva-ruta-icon">🗺️</div>
+      <div class="nueva-ruta-title">¿Cómo se llama esta ruta?</div>
+      <div class="nueva-ruta-sub">Dale un nombre para identificarla<br>en la lista de paquetes</div>
+    </div>
+
+    <div style="padding: 0 16px 12px;">
+      <div class="field">
+        <label>Nombre de la ruta</label>
+        <input type="text" id="nr-nombre" class="ruta-name-input" placeholder="Ej. Ruta Norte Mañana"
+          oninput="updateNRPreview()" autocomplete="off" maxlength="40">
+      </div>
+    </div>
+
+    <div class="sec-header">Sugerencias rápidas</div>
+    <div class="ruta-suggestions">
+      <div class="ruta-chip" onclick="setRutaName('Ruta Norte')">🧭 Ruta Norte</div>
+      <div class="ruta-chip" onclick="setRutaName('Ruta Sur')">🧭 Ruta Sur</div>
+      <div class="ruta-chip" onclick="setRutaName('Ruta Centro')">🧭 Ruta Centro</div>
+      <div class="ruta-chip" onclick="setRutaName('Ruta Oriente')">🧭 Ruta Oriente</div>
+      <div class="ruta-chip" onclick="setRutaName('Ruta Poniente')">🧭 Ruta Poniente</div>
+      <div class="ruta-chip" onclick="setRutaName('Ruta Mañana')">🌅 Ruta Mañana</div>
+      <div class="ruta-chip" onclick="setRutaName('Ruta Tarde')">🌇 Ruta Tarde</div>
+      <div class="ruta-chip" onclick="setRutaName('Ruta Extra')">⭐ Ruta Extra</div>
+    </div>
+
+    <div style="padding: 0 16px 8px;">
+      <div id="nr-preview" style="
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: 12px; padding: 14px 16px; margin-bottom: 14px;
+        display: flex; align-items: center; gap: 12px; opacity: .5;
+        transition: opacity .2s;
+      ">
+        <span style="font-size: 24px;">🗺️</span>
+        <div>
+          <div id="nr-preview-nombre" style="font-size:15px;font-weight:700;">—</div>
+          <div id="nr-preview-fecha" style="font-size:11px;color:var(--text3);margin-top:2px;font-family:var(--mono);"></div>
+        </div>
+      </div>
+
+      <button class="btn btn-accent" id="btn-iniciar-escaneo" onclick="iniciarNuevaRuta()" disabled>
+        📷 Iniciar escaneo de etiquetas
+      </button>
+      <div style="height:10px;"></div>
+      <button class="btn btn-ghost" onclick="showScreen('home')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SCREEN: SCAN MASIVO
+══════════════════════════════════════════ -->
+<div class="screen hidden" id="screen-scan">
+  <div class="topbar">
+    <button class="topbar-back" onclick="showScreen('home')">←</button>
+    <h2 id="scan-ruta-title">Escanear etiquetas</h2>
+    <span class="topbar-sub" id="scan-count">0 imgs</span>
+  </div>
+  <div class="scroll">
+    <label class="upload-zone" id="drop-zone">
+      <input type="file" id="file-input" accept="image/*" multiple>
+      <div class="uz-icon">📷</div>
+      <p><strong>Toca para seleccionar</strong><br>o arrastra múltiples fotos</p>
+    </label>
+    <div style="padding: 0 16px 12px; display:flex; gap:8px;">
+      <button class="btn btn-accent" id="btn-scan" disabled>▶ Procesar etiquetas</button>
+      <button class="btn btn-ghost btn-sm" id="btn-clear-queue" onclick="clearQueue()" style="white-space:nowrap;">🗑 Limpiar</button>
+    </div>
+    <div class="prog-wrap" id="prog-wrap" style="display:none;">
+      <div class="prog-label"><span id="prog-label-text">Procesando...</span><span id="prog-count">0/0</span></div>
+      <div class="prog-bar"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
+    </div>
+    <div class="queue-wrap" id="queue"></div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SCREEN: DETALLE CLIENTE
+══════════════════════════════════════════ -->
+<div class="screen hidden" id="screen-client">
+  <div class="topbar">
+    <button class="topbar-back" onclick="showScreen('home')">←</button>
+    <h2 id="client-topbar-name">Cliente</h2>
+    <span id="client-status-badge"></span>
+  </div>
+  <div class="scroll">
+    <div class="client-hero">
+      <div class="client-name" id="c-nombre">—</div>
+      <div class="client-addr" id="c-addr">—</div>
+    </div>
+    <div class="data-grid">
+      <div class="data-cell">
+        <div class="dl">Teléfono</div>
+        <div class="dv" id="c-tel">—</div>
+      </div>
+      <div class="data-cell">
+        <div class="dl">CP</div>
+        <div class="dv" id="c-cp">—</div>
+      </div>
+      <div class="data-cell full">
+        <div class="dl">Shipment Order</div>
+        <div class="dv" id="c-order">—</div>
+      </div>
+      <div class="data-cell full">
+        <div class="dl">Tracking #</div>
+        <div class="dv" id="c-tracking">—</div>
+      </div>
+      <div class="data-cell full">
+        <div class="dl">📅 Fecha PDD</div>
+        <div class="dv" id="c-pdd">—</div>
+      </div>
+      <div class="data-cell full" id="c-foto-wrap" style="display:none;">
+        <div class="dl">📦 Foto del artículo</div>
+        <div id="c-foto-loading" style="display:none;text-align:center;padding:20px;color:var(--text3);font-size:13px;">⏳ Cargando foto...</div>
+        <img id="c-foto" src="" alt="Artículo" style="width:100%;border-radius:8px;margin-top:6px;max-height:260px;object-fit:cover;cursor:zoom-in;" onclick="verFotoCompleta(this.src)">
+      </div>
+    </div>
+
+    <div class="sec-header">Acciones</div>
+    <div class="action-list">
+      <button class="btn btn-accent" id="btn-whatsapp-intro">
+        💬 Enviar mensaje de presentación
+      </button>
+      <button class="btn btn-ghost" id="btn-whatsapp-camino">
+        🚗 Avisar que voy en camino
+      </button>
+      <button class="btn btn-green" id="btn-open-camera">
+        📸 Abrir cámara de entrega
+      </button>
+      <button class="btn btn-ghost" id="btn-edit-client">
+        ✏️ Editar datos
+      </button>
+      <button class="btn btn-red" id="btn-mark-done" style="margin-top:4px;">
+        ✓ Marcar como entregado
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- SCREEN: ENTREGA -->
+<div class="screen hidden" id="screen-camera">
+  <div class="topbar">
+    <button class="topbar-back" onclick="showScreen('client')">←</button>
+    <h2>📸 Registrar entrega</h2>
+    <div id="cam-client-name" style="font-size:12px;color:var(--accent);font-weight:600;"></div>
+  </div>
+  <div class="scroll">
+    <input type="file" id="cam-file-input" accept="image/*" multiple style="display:none;">
+    <div style="padding:16px;display:flex;flex-direction:column;gap:14px;">
+
+      <div class="card">
+        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Quién recibe</div>
+        <div style="display:flex;gap:10px;">
+          <div id="opt-cliente" onclick="setCamOpt('receptor','cliente')" style="flex:1;padding:14px 8px;border-radius:10px;text-align:center;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--accent);background:rgba(0,212,255,.15);color:var(--accent);">👤 Cliente</div>
+          <div id="opt-familiar" onclick="setCamOpt('receptor','familiar')" style="flex:1;padding:14px 8px;border-radius:10px;text-align:center;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--border);background:var(--surface2);color:var(--text2);">👨‍👩‍👦 Familiar</div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Método de verificación</div>
+        <div style="display:flex;flex-direction:column;gap:8px;">
+          <div id="opt-nopedido" onclick="setCamOpt('verificacion','nopedido')" style="padding:13px 14px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--accent);background:rgba(0,212,255,.15);color:var(--accent);">🔢 Validación de No. de pedido</div>
+          <div id="opt-ine" onclick="setCamOpt('verificacion','ine')" style="padding:13px 14px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--border);background:var(--surface2);color:var(--text2);">🪪 Validación por INE</div>
+          <div id="opt-wapedido" onclick="setCamOpt('verificacion','wapedido')" style="padding:13px 14px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--border);background:var(--surface2);color:var(--text2);">📲 Envío de No. de pedido por WhatsApp</div>
+        </div>
+      </div>
+
+      <div id="photos-preview" style="display:none;" class="card">
+        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Fotos capturadas</div>
+        <div id="photos-thumbs" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+      </div>
+
+      <button class="btn btn-accent" onclick="openTimestamp()">📷 Abrir Timestamp Camera</button>
+      <button class="btn btn-ghost" onclick="openNativeCamera()" style="font-size:13px;">🖼️ Seleccionar de galería</button>
+      <button class="btn btn-green" id="btn-send-photos" onclick="sendPhotosToWhatsApp()" style="display:none;">📤 Enviar a WhatsApp</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SCREEN: BASE DE DATOS
+══════════════════════════════════════════ -->
+<div class="screen hidden" id="screen-db">
+  <div class="topbar">
+    <button class="topbar-back" onclick="showScreen('home')">←</button>
+    <h2>Base de datos</h2>
+    <span class="topbar-sub" id="db-count-label">0 reg.</span>
+  </div>
+  <div class="db-toolbar">
+    <div class="search-box">
+      <span style="color:var(--text3);">🔍</span>
+      <input type="text" id="db-search" placeholder="Buscar nombre, tracking...">
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="exportCSV()">↓ CSV</button>
+  </div>
+  <div class="scroll" id="db-list"></div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     MODAL: EDITAR CLIENTE
+══════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-edit">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h3>✏️ Editar datos</h3>
+    <input type="hidden" id="edit-id">
+    <div class="field"><label>Nombre</label><input type="text" id="edit-nombre"></div>
+    <div class="field"><label>Teléfono</label><input type="tel" id="edit-tel"></div>
+    <div class="field"><label>Calle</label><input type="text" id="edit-calle"></div>
+    <div class="field"><label>Número</label><input type="text" id="edit-numero"></div>
+    <div class="field"><label>Colonia</label><input type="text" id="edit-colonia"></div>
+    <div class="field"><label>CP</label><input type="text" id="edit-cp"></div>
+    <div class="field"><label>Shipment Order</label><input type="text" id="edit-order"></div>
+    <div class="field"><label>Tracking</label><input type="text" id="edit-tracking"></div>
+    <div style="display:flex;gap:10px;margin-top:8px;">
+      <button class="btn btn-accent" onclick="saveEdit()">Guardar</button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-edit')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: ENVÍO MASIVO -->
+<div class="modal-overlay" id="modal-masivo">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h3>💬 Envío masivo de presentación</h3>
+    <div id="masivo-info" style="font-size:14px;color:var(--text2);margin-bottom:16px;line-height:1.6;"></div>
+    <div id="masivo-progress" style="display:none;margin-bottom:16px;">
+      <div style="font-size:13px;color:var(--text2);margin-bottom:6px;display:flex;justify-content:space-between;">
+        <span id="masivo-label">Enviando...</span>
+        <span id="masivo-count">0/0</span>
+      </div>
+      <div class="prog-bar"><div class="prog-fill" id="masivo-fill" style="width:0%;"></div></div>
+      <div id="masivo-list" style="margin-top:12px;display:flex;flex-direction:column;gap:6px;max-height:200px;overflow-y:auto;"></div>
+    </div>
+    <div style="display:flex;gap:10px;" id="masivo-btns">
+      <button class="btn btn-green" id="btn-masivo-start" onclick="iniciarMasivo()">📤 Iniciar envío</button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-masivo')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: FOTO ARTÍCULO FULLSCREEN -->
+<div id="modal-foto-fullscreen" style="
+  display:none; position:fixed; inset:0; background:rgba(0,0,0,.95);
+  z-index:800; flex-direction:column; align-items:center; justify-content:center;
+" onclick="this.style.display='none'">
+  <div style="position:absolute;top:16px;right:16px;color:#fff;font-size:28px;cursor:pointer;line-height:1;">✕</div>
+  <img id="foto-fullscreen-img" src="" style="max-width:100%;max-height:90vh;object-fit:contain;border-radius:8px;">
+  <div style="color:rgba(255,255,255,.4);font-size:12px;margin-top:12px;">Toca para cerrar</div>
+</div>
+
+<!-- MODAL: FOTO DEL ARTÍCULO -->
+<div class="photo-capture-overlay" id="modal-foto-articulo">
+  <div class="photo-capture-box">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <h3>📦 Foto del artículo</h3>
+      <span style="font-size:11px;color:var(--text3);font-family:var(--mono);" id="foto-file-label"></span>
+    </div>
+    <p style="font-size:13px;color:var(--text2);margin-top:-6px;">Toma una foto del paquete antes de guardarlo</p>
+    <div class="photo-preview-area" id="foto-preview-area">
+      <div class="photo-placeholder">
+        <div class="ph-icon">📷</div>
+        <p>Sin foto aún</p>
+      </div>
+    </div>
+    <input type="file" id="foto-articulo-input" accept="image/*" style="display:none;">
+    <div class="photo-capture-btns">
+      <button class="btn btn-ghost" onclick="document.getElementById('foto-articulo-input').click()">📷 Tomar foto</button>
+      <button class="btn btn-accent" id="btn-guardar-con-foto" onclick="confirmarGuardadoConFoto()">💾 Guardar</button>
+    </div>
+    <button class="btn btn-ghost" style="color:var(--red);border-color:var(--red);" onclick="confirmarGuardadoConFoto(true)">Guardar sin foto</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+
+<div class="toast" id="toast"></div>
+
+<!-- Firebase -->
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
+
+// ─── FIREBASE CONFIG ────────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey: "AIzaSyAGsOfVDl73CXEVPSb1UUXbreVJC-GmBcY",
+  authDomain: "seisa-logistica.firebaseapp.com",
+  projectId: "seisa-logistica",
+  storageBucket: "seisa-logistica.firebasestorage.app",
+  messagingSenderId: "551931147212",
+  appId: "1:551931147212:web:d8074296fbccf32f4f2369"
+};
+const fireApp = initializeApp(firebaseConfig);
+const db = getFirestore(fireApp);
+const storage = getStorage(fireApp);
+const COL = 'paquetes';
+
+// ─── GROQ KEY ────────────────────────────────────────────────────────
+const GROQ_KEY = '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';
+
+// ─── MESSAGES ────────────────────────────────────────────────────────
+const MSG_PRESENTACION = `¡ Hola ! Soy Daniel Ulises Valdes Torres de paqueteria y estare a cargo de la ruta que te entregara tu pedido de Grupo Walmart. Te avisare cuando vaya en camino a tu domicilio. Es importante que muestres tu orden de compra, ya sea impresa o digital. Te agradeceria que nos compartas referencias o indicaciones adicionales sobre tu direccion si es necesario. Si requieres asistencia, puedes comunicarte con nuestro equipo de atencion a clientes al 800 WALMART (9256278)`;
+
+const MSG_CAMINO = `Ya voy camino a su domicilio, *recuerde que es importante mostrar su numero de pedido al momento de entrega*, le mando mensaje cuando este afuera de su domicilio`;
+
+// ─── STATE ───────────────────────────────────────────────────────────
+let allRecords = [];
+let currentClientId = null;
+let currentScreen = 'home';
+let capturedPhotos = [];
+let camReceptor = 'cliente';
+let camVerificacion = 'nopedido';
+let files = [];
+let rutaActiva = localStorage.getItem('rutaActiva') || '';
+
+// ─── NUEVA RUTA ───────────────────────────────────────────────────────
+window.showScreen = function(name) {
+  document.querySelectorAll('.screen').forEach(s => {
+    s.classList.add('hidden');
+    s.classList.remove('slide-left');
+  });
+  document.getElementById('screen-' + name).classList.remove('hidden');
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  const nb = document.querySelector(`.nav-btn[onclick="showScreen('${name}')"]`);
+  if (nb) nb.classList.add('active');
+  currentScreen = name;
+  if (name === 'db') renderDB();
+  if (name === 'home') renderRoute();
+  if (name === 'nueva-ruta') initNuevaRutaScreen();
+}
+
+function initNuevaRutaScreen() {
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2,'0');
+  const mm = String(now.getMonth()+1).padStart(2,'0');
+  const yyyy = now.getFullYear();
+  document.getElementById('nr-fecha-label').textContent = `${dd}/${mm}/${yyyy}`;
+  document.getElementById('nr-preview-fecha').textContent = `📅 ${dd}/${mm}/${yyyy}`;
+  const input = document.getElementById('nr-nombre');
+  input.value = rutaActiva || '';
+  updateNRPreview();
+}
+
+window.updateNRPreview = function() {
+  const val = document.getElementById('nr-nombre').value.trim();
+  const preview = document.getElementById('nr-preview');
+  const btn = document.getElementById('btn-iniciar-escaneo');
+  document.getElementById('nr-preview-nombre').textContent = val || '—';
+  if (val) {
+    preview.style.opacity = '1';
+    btn.disabled = false;
+  } else {
+    preview.style.opacity = '.5';
+    btn.disabled = true;
+  }
+}
+
+window.setRutaName = function(nombre) {
+  document.getElementById('nr-nombre').value = nombre;
+  updateNRPreview();
+}
+
+window.iniciarNuevaRuta = function() {
+  const nombre = document.getElementById('nr-nombre').value.trim();
+  if (!nombre) return;
+  rutaActiva = nombre;
+  localStorage.setItem('rutaActiva', nombre);
+  // Mostrar barra activa en home
+  document.getElementById('ruta-activa-nombre').textContent = nombre;
+  document.getElementById('ruta-activa-bar').style.display = 'flex';
+  // Actualizar topbar del scan
+  document.getElementById('scan-ruta-title').textContent = nombre;
+  // Limpiar cola y pasar a scan
+  clearQueue();
+  showScreen('scan');
+}
+
+function updateRutaActivaBar() {
+  if (rutaActiva) {
+    document.getElementById('ruta-activa-nombre').textContent = rutaActiva;
+    document.getElementById('ruta-activa-bar').style.display = 'flex';
+    document.getElementById('scan-ruta-title').textContent = rutaActiva;
+  }
+}
+
+window.verFotoCompleta = function(src) {
+  const modal = document.getElementById('modal-foto-fullscreen');
+  document.getElementById('foto-fullscreen-img').src = src;
+  modal.style.display = 'flex';
+}
+
+// ─── TOAST ───────────────────────────────────────────────────────────
+let toastTimer;
+window.showToast = function(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 3000);
+}
+
+// ─── FIREBASE CRUD ───────────────────────────────────────────────────
+async function loadRecords() {
+  try {
+    const q = query(collection(db, COL), orderBy('createdAt', 'desc'));
+    const snap = await getDocs(q);
+    allRecords = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  } catch(e) {
+    // fallback sin ordenamiento
+    const snap = await getDocs(collection(db, COL));
+    allRecords = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+  }
+  renderRoute();
+  updateStats();
+}
+
+async function saveRecord(data) {
+  data.createdAt = Date.now();
+  data.entregado = false;
+  // Guardar fecha del día en formato dd/mm/yyyy
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2,'0');
+  const mm = String(now.getMonth()+1).padStart(2,'0');
+  const yyyy = now.getFullYear();
+  data.fechaDia = `${dd}/${mm}/${yyyy}`;
+  // Guardar nombre de ruta activa
+  if (rutaActiva) data.rutaNombre = rutaActiva;
+  const ref = await addDoc(collection(db, COL), data);
+  data.id = ref.id;
+  allRecords.unshift(data);
+  renderRoute();
+  updateStats();
+}
+
+async function updateRecord(id, data) {
+  await updateDoc(doc(db, COL, id), data);
+  const idx = allRecords.findIndex(r => r.id === id);
+  if (idx >= 0) allRecords[idx] = { ...allRecords[idx], ...data };
+  renderRoute();
+  updateStats();
+}
+
+// ─── STATS ───────────────────────────────────────────────────────────
+function updateStats() {
+  const total = allRecords.length;
+  const done = allRecords.filter(r => r.entregado).length;
+  document.getElementById('stat-total').textContent = total;
+  document.getElementById('stat-done').textContent = done;
+  document.getElementById('stat-pending').textContent = total - done;
+}
+
+// ─── ROUTE LIST ──────────────────────────────────────────────────────
+function renderRoute() {
+  const list = document.getElementById('route-list');
+  const empty = document.getElementById('route-empty');
+  const pending = allRecords.filter(r => !r.entregado);
+  const done = allRecords.filter(r => r.entregado);
+  const all = [...pending, ...done];
+
+  if (all.length === 0) { empty.style.display = 'block'; list.innerHTML = ''; return; }
+  empty.style.display = 'none';
+
+  // Agrupar por fechaDia
+  const byDay = {};
+  all.forEach((r, i) => {
+    const day = r.fechaDia || 'Sin fecha';
+    if (!byDay[day]) byDay[day] = [];
+    byDay[day].push({ ...r, _idx: i });
+  });
+
+  // Ordenar días (más reciente primero)
+  const sortedDays = Object.keys(byDay).sort((a, b) => {
+    // Parse dd/mm/yyyy
+    const parseDay = s => {
+      if (s === 'Sin fecha') return 0;
+      const [d, m, y] = s.split('/');
+      return new Date(y, m-1, d).getTime();
+    };
+    return parseDay(b) - parseDay(a);
+  });
+
+  let globalIdx = 0;
+  list.innerHTML = sortedDays.map(day => {
+    const records = byDay[day];
+    const dayPending = records.filter(r => !r.entregado).length;
+    const dayDone = records.filter(r => r.entregado).length;
+
+    // Formatear título del día
+    let dayLabel = day;
+    if (day !== 'Sin fecha') {
+      const [dd, mm, yyyy] = day.split('/');
+      const dt = new Date(yyyy, mm-1, dd);
+      const today = new Date();
+      const yesterday = new Date(); yesterday.setDate(yesterday.getDate()-1);
+      if (dt.toDateString() === today.toDateString()) dayLabel = `📅 Hoy · ${day}`;
+      else if (dt.toDateString() === yesterday.toDateString()) dayLabel = `📅 Ayer · ${day}`;
+      else dayLabel = `📅 ${day}`;
+    }
+
+    const items = records.map(r => {
+      const num = r.entregado ? '✓' : (++globalIdx);
+      return `
+        <div class="route-item" onclick="openClient('${r.id}')">
+          <div class="route-num ${r.entregado ? 'done' : ''}">${num}</div>
+          <div class="route-info">
+            <div class="route-name">${r.nombre || 'Sin nombre'}</div>
+            <div class="route-addr">${[r.calle, r.numero, r.colonia].filter(Boolean).join(', ')}</div>
+          </div>
+          <div class="route-arrow">›</div>
+        </div>`;
+    }).join('');
+
+    // Nombre de ruta (primer registro del día que tenga rutaNombre)
+    const rutaDelDia = records.find(r => r.rutaNombre)?.rutaNombre || '';
+
+    return `
+      <div class="day-section">
+        <div class="day-header">
+          <div>
+            <div class="day-title">${dayLabel}</div>
+            ${rutaDelDia ? `<div style="font-size:10px;color:var(--text2);margin-top:1px;">🗺️ ${rutaDelDia}</div>` : ''}
+          </div>
+          <span class="day-stats">${dayDone}/${records.length} entregados</span>
+        </div>
+        ${items}
+      </div>`;
+  }).join('');
+}
+
+// ─── OPEN CLIENT ─────────────────────────────────────────────────────
+window.openClient = function(id) {
+  const r = allRecords.find(x => x.id === id);
+  if (!r) return;
+  currentClientId = id;
+  document.getElementById('c-nombre').textContent = r.nombre || '—';
+  document.getElementById('client-topbar-name').textContent = r.nombre?.split(' ')[0] || 'Cliente';
+  document.getElementById('c-addr').textContent = [r.calle, r.numero, r.colonia, r.cp].filter(Boolean).join(', ');
+  document.getElementById('c-tel').textContent = r.telefono || '—';
+  document.getElementById('c-cp').textContent = r.cp || '—';
+  document.getElementById('c-order').textContent = r.shipment_order || '—';
+  document.getElementById('c-tracking').textContent = r.tracking || '—';
+  document.getElementById('c-pdd').textContent = r.pdd || '—';
+  const fotoWrap = document.getElementById('c-foto-wrap');
+  const fotoImg = document.getElementById('c-foto');
+  const fotoLoading = document.getElementById('c-foto-loading');
+  const fotoUrl = r.fotoArticuloUrl || r.fotoArticulo || null;
+  if (fotoUrl) {
+    fotoWrap.style.display = 'block';
+    fotoImg.style.display = 'none';
+    fotoLoading.style.display = 'block';
+    fotoImg.onload = () => { fotoLoading.style.display = 'none'; fotoImg.style.display = 'block'; };
+    fotoImg.onerror = () => { fotoLoading.textContent = '⚠️ No se pudo cargar la foto'; };
+    fotoImg.src = fotoUrl;
+  } else {
+    fotoWrap.style.display = 'none';
+  }
+  const badge = document.getElementById('client-status-badge');
+  badge.innerHTML = r.entregado
+    ? '<span class="badge badge-green">✓ Entregado</span>'
+    : '<span class="badge badge-orange">Pendiente</span>';
+  showScreen('client');
+}
+
+// ─── ENVÍO MASIVO ────────────────────────────────────────────────────
+let masivoQueue = [];
+let masivoIndex = 0;
+
+window.enviarMasivo = function() {
+  const pendientes = allRecords.filter(r => !r.entregado && r.telefono);
+  const sinTel = allRecords.filter(r => !r.entregado && !r.telefono);
+  if (pendientes.length === 0) {
+    showToast('No hay pendientes con número de teléfono');
+    return;
+  }
+  masivoQueue = pendientes;
+  masivoIndex = 0;
+  document.getElementById('masivo-info').innerHTML =
+    `Se enviará el mensaje de presentación a <strong style="color:var(--accent)">${pendientes.length} clientes</strong> pendientes.` +
+    (sinTel.length > 0 ? `<br><span style="color:var(--orange);">⚠️ ${sinTel.length} sin teléfono serán omitidos.</span>` : '') +
+    `<br><br>WhatsApp se abrirá una vez por cada cliente. <strong>Envía el mensaje y regresa a la app</strong> para continuar con el siguiente.`;
+  document.getElementById('masivo-progress').style.display = 'none';
+  document.getElementById('masivo-list').innerHTML = '';
+  document.getElementById('masivo-btns').style.display = 'flex';
+  document.getElementById('modal-masivo').classList.add('open');
+};
+
+window.iniciarMasivo = function() {
+  document.getElementById('masivo-btns').style.display = 'none';
+  document.getElementById('masivo-progress').style.display = 'block';
+  document.getElementById('masivo-count').textContent = `0/${masivoQueue.length}`;
+  document.getElementById('masivo-fill').style.width = '0%';
+  enviarSiguiente();
+};
+
+function enviarSiguiente() {
+  if (masivoIndex >= masivoQueue.length) {
+    document.getElementById('masivo-label').textContent = '✓ Envío completado';
+    document.getElementById('masivo-fill').style.width = '100%';
+    document.getElementById('masivo-btns').style.display = 'flex';
+    document.getElementById('btn-masivo-start').style.display = 'none';
+    showToast(`✓ ${masivoQueue.length} mensajes enviados`);
+    return;
+  }
+  const r = masivoQueue[masivoIndex];
+  const tel = r.telefono.replace(/\D/g, '');
+  const num = tel.startsWith('52') ? tel : '52' + tel;
+
+  // Actualizar progreso
+  const pct = Math.round((masivoIndex / masivoQueue.length) * 100);
+  document.getElementById('masivo-fill').style.width = pct + '%';
+  document.getElementById('masivo-count').textContent = `${masivoIndex + 1}/${masivoQueue.length}`;
+  document.getElementById('masivo-label').textContent = r.nombre?.split(' ')[0] || 'Cliente';
+
+  // Agregar item a la lista
+  const item = document.createElement('div');
+  item.style.cssText = 'display:flex;align-items:center;gap:8px;font-size:13px;padding:6px 10px;background:var(--surface);border-radius:8px;border:1px solid var(--border);';
+  item.innerHTML = `<span style="color:var(--green);">✓</span> <span>${r.nombre || '—'}</span> <span style="color:var(--text3);font-size:11px;margin-left:auto;">${r.telefono}</span>`;
+  document.getElementById('masivo-list').appendChild(item);
+  document.getElementById('masivo-list').scrollTop = 9999;
+
+  // Abrir WhatsApp
+  const url = `https://wa.me/${num}?text=${encodeURIComponent(MSG_PRESENTACION)}`;
+  window.open(url, '_blank');
+
+  masivoIndex++;
+
+  // Esperar 4 segundos antes del siguiente para dar tiempo de enviar
+  setTimeout(enviarSiguiente, 4000);
+}
+
+// ─── WHATSAPP ────────────────────────────────────────────────────────
+document.getElementById('btn-whatsapp-intro').addEventListener('click', () => {
+  const r = allRecords.find(x => x.id === currentClientId);
+  if (!r?.telefono) { showToast('No hay número de teléfono'); return; }
+  const tel = r.telefono.replace(/\D/g, '');
+  const num = tel.startsWith('52') ? tel : '52' + tel;
+  const url = `https://wa.me/${num}?text=${encodeURIComponent(MSG_PRESENTACION)}`;
+  window.open(url, '_blank');
+});
+
+document.getElementById('btn-whatsapp-camino').addEventListener('click', () => {
+  const r = allRecords.find(x => x.id === currentClientId);
+  if (!r?.telefono) { showToast('No hay número de teléfono'); return; }
+  const tel = r.telefono.replace(/\D/g, '');
+  const num = tel.startsWith('52') ? tel : '52' + tel;
+  const url = `https://wa.me/${num}?text=${encodeURIComponent(MSG_CAMINO)}`;
+  window.open(url, '_blank');
+});
+
+// ─── MARK DONE ───────────────────────────────────────────────────────
+document.getElementById('btn-mark-done').addEventListener('click', async () => {
+  if (!currentClientId) return;
+  await updateRecord(currentClientId, { entregado: true });
+  showToast('✓ Marcado como entregado');
+  showScreen('home');
+});
+
+// ─── EDIT CLIENT ─────────────────────────────────────────────────────
+document.getElementById('btn-edit-client').addEventListener('click', () => {
+  const r = allRecords.find(x => x.id === currentClientId);
+  if (!r) return;
+  document.getElementById('edit-id').value = r.id;
+  document.getElementById('edit-nombre').value = r.nombre || '';
+  document.getElementById('edit-tel').value = r.telefono || '';
+  document.getElementById('edit-calle').value = r.calle || '';
+  document.getElementById('edit-numero').value = r.numero || '';
+  document.getElementById('edit-colonia').value = r.colonia || '';
+  document.getElementById('edit-cp').value = r.cp || '';
+  document.getElementById('edit-order').value = r.shipment_order || '';
+  document.getElementById('edit-tracking').value = r.tracking || '';
+  document.getElementById('modal-edit').classList.add('open');
+});
+
+window.closeModal = function(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+window.saveEdit = async function() {
+  const id = document.getElementById('edit-id').value;
+  const data = {
+    nombre: document.getElementById('edit-nombre').value,
+    telefono: document.getElementById('edit-tel').value,
+    calle: document.getElementById('edit-calle').value,
+    numero: document.getElementById('edit-numero').value,
+    colonia: document.getElementById('edit-colonia').value,
+    cp: document.getElementById('edit-cp').value,
+    shipment_order: document.getElementById('edit-order').value,
+    tracking: document.getElementById('edit-tracking').value,
+  };
+  await updateRecord(id, data);
+  closeModal('modal-edit');
+  openClient(id);
+  showToast('✓ Datos actualizados');
+}
+
+// ─── CAMERA (nativa) ─────────────────────────────────────────────────
+document.getElementById('btn-open-camera').addEventListener('click', () => {
+  const r = allRecords.find(x => x.id === currentClientId);
+  document.getElementById('cam-client-name').textContent = r?.nombre?.split(' ')[0] || '';
+  camReceptor = 'cliente';
+  camVerificacion = 'nopedido';
+  capturedPhotos = [];
+  document.getElementById('photos-thumbs').innerHTML = '';
+  document.getElementById('photos-preview').style.display = 'none';
+  document.getElementById('btn-send-photos').style.display = 'none';
+  setCamOpt('receptor', 'cliente');
+  setCamOpt('verificacion', 'nopedido');
+  showScreen('camera');
+});
+
+window.openTimestamp = function() {
+  const a = document.createElement('a');
+  a.href = 'intent://open/#Intent;package=com.jeyluta.timestampcamerafree;scheme=https;action=android.intent.action.MAIN;category=android.intent.category.LAUNCHER;end';
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+};
+
+window.openNativeCamera = function() {
+  document.getElementById('cam-file-input').click();
+};
+
+document.getElementById('cam-file-input').addEventListener('change', function() {
+  const files = Array.from(this.files);
+  if (!files.length) return;
+  files.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      const dataUrl = e.target.result;
+      capturedPhotos.push({ dataUrl, receptor: camReceptor, verificacion: camVerificacion, ts: Date.now() });
+      const img = document.createElement('img');
+      img.src = dataUrl;
+      img.style.cssText = 'width:72px;height:72px;object-fit:cover;border-radius:8px;border:2px solid var(--border);';
+      document.getElementById('photos-thumbs').appendChild(img);
+      document.getElementById('photos-preview').style.display = 'block';
+      document.getElementById('btn-send-photos').style.display = 'block';
+      showToast(`📸 ${capturedPhotos.length} foto(s) lista(s)`);
+    };
+    reader.readAsDataURL(file);
+  });
+  this.value = '';
+});
+
+window.setCamOpt = function(group, val) {
+  const activeStyle = 'border:2px solid var(--accent);background:rgba(0,212,255,.15);color:var(--accent);';
+  const inactiveStyle = 'border:2px solid var(--border);background:var(--surface2);color:var(--text2);';
+  if (group === 'receptor') {
+    camReceptor = val;
+    document.getElementById('opt-cliente').style.cssText += val === 'cliente' ? activeStyle : inactiveStyle;
+    document.getElementById('opt-familiar').style.cssText += val === 'familiar' ? activeStyle : inactiveStyle;
+  } else if (group === 'verificacion') {
+    camVerificacion = val;
+    ['nopedido','ine','wapedido'].forEach(id => {
+      document.getElementById('opt-' + id).style.cssText += val === id ? activeStyle : inactiveStyle;
+    });
+  }
+}
+
+window.sendPhotosToWhatsApp = async function() {
+  if (capturedPhotos.length === 0) { showToast('Toma al menos una foto'); return; }
+  const r = allRecords.find(x => x.id === currentClientId);
+  const nombre = r?.nombre || 'Cliente';
+  const tracking = r?.tracking || '';
+  const orden = r?.shipment_order || '';
+  const direccion = [r?.calle, r?.numero, r?.colonia, r?.cp].filter(Boolean).join(', ');
+
+  const receptorTexto = camReceptor === 'familiar' ? '👨‍👩‍👦 Familiar del cliente' : '👤 Cliente titular';
+  let metodoTexto = '';
+  if (camVerificacion === 'ine') {
+    metodoTexto = '🪪 Validación por INE';
+  } else if (camVerificacion === 'wapedido') {
+    metodoTexto = '📲 Envío de No. de pedido por WhatsApp';
+  } else {
+    metodoTexto = '🔢 Validación de No. de pedido';
+  }
+
+  const texto =
+`✅ *ENTREGA REALIZADA*
+━━━━━━━━━━━━━━━━━━━
+👤 *Cliente:* ${nombre}
+🏠 *Dirección:* ${direccion}
+📦 *Núm. Pedido:* ${orden}
+🔖 *Guía:* ${tracking}
+━━━━━━━━━━━━━━━━━━━
+📬 *Recibe:* ${receptorTexto}
+✔️ *Verificación:* ${metodoTexto}
+━━━━━━━━━━━━━━━━━━━
+📸 ${capturedPhotos.length} foto(s) adjunta(s)`;
+
+  // Convertir fotos de base64 a File objects
+  const archivos = capturedPhotos.map((p, i) => {
+    const arr = p.dataUrl.split(',');
+    const mime = arr[0].match(/:(.*?);/)[1];
+    const bstr = atob(arr[1]);
+    const u8 = new Uint8Array(bstr.length);
+    for (let j = 0; j < bstr.length; j++) u8[j] = bstr.charCodeAt(j);
+    return new File([u8], `entrega_${tracking || 'foto'}_${i + 1}.jpg`, { type: mime });
+  });
+
+  // Intentar Web Share API con archivos
+  if (navigator.canShare && navigator.canShare({ files: archivos, text: texto })) {
+    try {
+      await navigator.share({ files: archivos, text: texto });
+      showToast('✓ Compartido correctamente');
+    } catch(e) {
+      if (e.name !== 'AbortError') {
+        // Fallback: solo texto
+        window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
+      }
+      return;
+    }
+  } else {
+    // Fallback si no soporta archivos: abrir WhatsApp solo con texto
+    window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
+    showToast('Comparte las fotos manualmente desde galería');
+  }
+
+  capturedPhotos = [];
+  document.getElementById('photos-thumbs').innerHTML = '';
+  document.getElementById('photos-preview').style.display = 'none';
+  document.getElementById('btn-send-photos').style.display = 'none';
+}
+
+// ─── SCAN / UPLOAD ───────────────────────────────────────────────────
+const fileInput = document.getElementById('file-input');
+const dropZone  = document.getElementById('drop-zone');
+const btnScan   = document.getElementById('btn-scan');
+
+fileInput.addEventListener('change', e => addFiles(Array.from(e.target.files)));
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag'); addFiles(Array.from(e.dataTransfer.files)); });
+
+function addFiles(newFiles) {
+  newFiles.forEach(f => {
+    if (!files.find(x => x.name === f.name && x.size === f.size)) {
+      files.push(f);
+      renderQueueItem(f);
+    }
+  });
+  document.getElementById('scan-count').textContent = `${files.length} imgs`;
+  btnScan.disabled = files.length === 0;
+  fileInput.value = '';
+}
+
+window.clearQueue = function() {
+  files = [];
+  document.getElementById('queue').innerHTML = '';
+  document.getElementById('scan-count').textContent = '0 imgs';
+  document.getElementById('prog-wrap').style.display = 'none';
+  document.getElementById('prog-fill').style.width = '0%';
+  document.getElementById('prog-count').textContent = '0/0';
+  btnScan.disabled = true;
+  showToast('🗑 Cola limpiada');
+}
+
+function safeId(name) { return name.replace(/[^a-zA-Z0-9]/g, '_'); }
+
+function renderQueueItem(f) {
+  const id = safeId(f.name);
+  const item = document.createElement('div');
+  item.className = 'qi'; item.id = 'qi-' + id;
+  const img = document.createElement('img');
+  img.src = URL.createObjectURL(f); img.className = 'qi-thumb';
+  const info = document.createElement('div'); info.className = 'qi-info';
+  info.innerHTML = `<div class="qi-name">${f.name}</div><div class="qi-status" id="qs-${id}">En cola</div>`;
+  const dot = document.createElement('div'); dot.className = 'qi-dot dot-wait'; dot.id = 'qd-' + id;
+  item.appendChild(img); item.appendChild(info); item.appendChild(dot);
+  document.getElementById('queue').appendChild(item);
+}
+
+function updateQI(f, status) {
+  const id = safeId(f.name);
+  const dot = document.getElementById('qd-' + id);
+  const qs  = document.getElementById('qs-' + id);
+  const qi  = document.getElementById('qi-' + id);
+  if (dot) dot.className = `qi-dot dot-${status}`;
+  if (qs)  qs.textContent = { wait:'En cola', proc:'Procesando...', done:'✓ Guardado', err:'✗ Error' }[status];
+  if (qi)  qi.className = `qi ${status}`;
+}
+
+// ─── FOTO ARTÍCULO ────────────────────────────────────────────────────
+let pendingRecordData = null;
+let pendingFileRef = null;
+let capturedArticuloPhoto = null;  // base64 para preview
+let capturedArticuloFile = null;   // File original para subir a Storage
+
+document.getElementById('foto-articulo-input').addEventListener('change', function() {
+  const file = this.files[0];
+  if (!file) return;
+  capturedArticuloFile = file;
+  const reader = new FileReader();
+  reader.onload = e => {
+    capturedArticuloPhoto = e.target.result;
+    const area = document.getElementById('foto-preview-area');
+    area.innerHTML = `<img src="${capturedArticuloPhoto}" alt="Artículo">`;
+    document.getElementById('btn-guardar-con-foto').textContent = '💾 Guardar con foto';
+  };
+  reader.readAsDataURL(file);
+  this.value = '';
+});
+
+function showFotoArticuloModal(result, fileRef, fileName) {
+  pendingRecordData = result;
+  pendingFileRef = fileRef;
+  capturedArticuloPhoto = null;
+  capturedArticuloFile = null;
+  document.getElementById('foto-preview-area').innerHTML = `
+    <div class="photo-placeholder">
+      <div class="ph-icon">📷</div>
+      <p>Sin foto aún</p>
+    </div>`;
+  document.getElementById('foto-file-label').textContent = fileName?.substring(0,20) || '';
+  document.getElementById('btn-guardar-con-foto').textContent = '💾 Guardar';
+  document.getElementById('btn-guardar-con-foto').disabled = false;
+  document.getElementById('modal-foto-articulo').classList.add('open');
+}
+
+window.confirmarGuardadoConFoto = async function(sinFoto = false) {
+  if (!pendingRecordData) return;
+
+  const data = { ...pendingRecordData };
+  const btnGuardar = document.getElementById('btn-guardar-con-foto');
+
+  // Si hay foto, subirla a Firebase Storage primero
+  if (!sinFoto && capturedArticuloFile) {
+    try {
+      btnGuardar.disabled = true;
+      btnGuardar.textContent = '⏳ Subiendo foto...';
+
+      // Nombre único en Storage
+      const ts = Date.now();
+      const tracking = data.tracking || 'sin-tracking';
+      const path = `articulos/${tracking}_${ts}.jpg`;
+      const ref = storageRef(storage, path);
+
+      // Subir el File directamente (sin convertir)
+      await uploadBytes(ref, capturedArticuloFile, { contentType: capturedArticuloFile.type || 'image/jpeg' });
+
+      // Obtener URL pública
+      const url = await getDownloadURL(ref);
+      data.fotoArticuloUrl = url;
+
+      btnGuardar.disabled = false;
+      btnGuardar.textContent = '💾 Guardar con foto';
+    } catch(e) {
+      console.error('Error subiendo foto:', e);
+      showToast('⚠️ Error al subir foto, guardando sin ella');
+      btnGuardar.disabled = false;
+      btnGuardar.textContent = '💾 Guardar';
+    }
+  }
+
+  document.getElementById('modal-foto-articulo').classList.remove('open');
+
+  try {
+    await saveRecord(data);
+    if (pendingFileRef) {
+      pendingFileRef._done = true;
+      updateQI(pendingFileRef, 'done');
+    }
+  } catch(e) {
+    console.error(e);
+    if (pendingFileRef) updateQI(pendingFileRef, 'err');
+  }
+
+  pendingRecordData = null;
+  pendingFileRef = null;
+  capturedArticuloPhoto = null;
+  capturedArticuloFile = null;
+
+  const remaining = files.filter(f => !f._done);
+  if (remaining.length === 0) {
+    btnScan.disabled = false;
+    showToast(`✓ Todas las etiquetas guardadas`);
+    updateStats();
+  } else {
+    procesarSiguienteArchivo();
+  }
+}
+
+let processingQueue = [];
+let processingIndex = 0;
+
+btnScan.addEventListener('click', async () => {
+  btnScan.disabled = true;
+  const progWrap = document.getElementById('prog-wrap');
+  progWrap.style.display = 'block';
+  processingQueue = files.filter(f => !f._done);
+  processingIndex = 0;
+  if (processingQueue.length === 0) { btnScan.disabled = false; return; }
+  document.getElementById('prog-fill').style.width = '0%';
+  document.getElementById('prog-count').textContent = `0/${processingQueue.length}`;
+  procesarSiguienteArchivo();
+});
+
+async function procesarSiguienteArchivo() {
+  const done = processingQueue.filter(f => f._done).length;
+  document.getElementById('prog-fill').style.width = Math.round(done / processingQueue.length * 100) + '%';
+  document.getElementById('prog-count').textContent = `${done}/${processingQueue.length}`;
+
+  const next = processingQueue.find(f => !f._done);
+  if (!next) {
+    btnScan.disabled = false;
+    showToast(`✓ ${done} etiquetas procesadas y guardadas`);
+    updateStats();
+    return;
+  }
+
+  updateQI(next, 'proc');
+  document.getElementById('prog-label-text').textContent = next.name.substring(0, 25) + '...';
+  try {
+    let mt = next.type || 'image/jpeg';
+    if (mt === 'image/jpg') mt = 'image/jpeg';
+    if (!['image/jpeg','image/png','image/gif','image/webp'].includes(mt)) mt = 'image/jpeg';
+    const b64 = await fileToBase64(next);
+    const result = await extractLabel(b64, mt);
+    // Mostrar modal de foto del artículo
+    showFotoArticuloModal(result, next, next.name);
+  } catch(e) {
+    console.error(e);
+    updateQI(next, 'err');
+    next._done = true;
+    procesarSiguienteArchivo();
+  }
+}
+
+async function extractLabel(b64, mt) {
+  const prompt = `Eres un extractor de datos de etiquetas de paquetería de Walmart México / Bodega Aurrera. Analiza la imagen con mucho cuidado.
+
+Extrae ÚNICAMENTE estos 9 campos marcados en la etiqueta:
+
+1. "nombre" — Nombre completo del destinatario. Aparece después de "Para". Ejemplo: "Maribel Navarro Filio"
+2. "telefono" — Número telefónico del destinatario (10 dígitos). Ejemplo: "5540308632"
+3. "calle" — Nombre de la calle. Ejemplo: "jasminez"
+4. "numero" — Número exterior de la dirección. Ejemplo: "8"
+5. "colonia" — Nombre de la colonia o fraccionamiento en MAYÚSCULAS. Ejemplo: "SAN MATEO CUAUTEPEC"
+6. "cp" — Código postal de 5 dígitos. Ejemplo: "54948"
+7. "shipment_order" — Número junto a "Shipment Order No #:". Son 15 dígitos que empiezan con 6. Ejemplo: "600000080442428"
+8. "tracking" — Número alfanumérico debajo de "Tracking #:" y del código de barras. Ejemplo: "MXFDDWM18460169"
+9. "pdd" — Fecha junto a "PDD :" en formato YYYY-MM-DD. Ejemplo: "2026-04-27"
+
+REGLAS IMPORTANTES:
+- Extrae SOLO lo que ves claramente en la imagen. Si un campo no aparece, devuelve cadena vacía "".
+- El shipment_order son exactamente 15 dígitos. Si ves más, toma los últimos 15.
+- El tracking empieza con letras (ej: MXFDD...) y está bajo el código de barras grande.
+- NO inventes datos. NO agregues campos extra.
+
+Responde ÚNICAMENTE con JSON válido, sin markdown, sin explicaciones:
+{
+  "nombre": "",
+  "telefono": "",
+  "calle": "",
+  "numero": "",
+  "colonia": "",
+  "cp": "",
+  "shipment_order": "",
+  "tracking": "",
+  "pdd": ""
+}
+Solo JSON, nada más.`;
+
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
+    body: JSON.stringify({
+      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+      temperature: 0, max_tokens: 500,
+      messages: [{ role: 'user', content: [
+        { type: 'image_url', image_url: { url: `data:${mt};base64,${b64}` } },
+        { type: 'text', text: prompt }
+      ]}]
+    })
+  });
+  if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e?.error?.message || res.status); }
+  const data = await res.json();
+  const text = data.choices?.[0]?.message?.content || '{}';
+  return JSON.parse(text.replace(/```json|```/g,'').trim());
+}
+
+function fileToBase64(f) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result.split(',')[1]);
+    r.onerror = rej;
+    r.readAsDataURL(f);
+  });
+}
+
+// ─── DB SCREEN ───────────────────────────────────────────────────────
+function renderDB() {
+  const q = document.getElementById('db-search').value.toLowerCase();
+  const filtered = allRecords.filter(r => {
+    if (!q) return true;
+    return [r.nombre, r.telefono, r.tracking, r.colonia, r.calle, r.shipment_order].some(v => (v||'').toLowerCase().includes(q));
+  });
+  document.getElementById('db-count-label').textContent = `${filtered.length} reg.`;
+  const list = document.getElementById('db-list');
+  if (filtered.length === 0) {
+    list.innerHTML = '<div class="empty-list"><div class="ei">🗃️</div><p>Sin registros</p></div>';
+    return;
+  }
+  list.innerHTML = filtered.map(r => `
+    <div class="db-item" onclick="openClient('${r.id}')">
+      <div class="db-item-top">
+        <div class="db-item-name">${r.nombre || '—'}</div>
+        <span class="badge ${r.entregado ? 'badge-green' : 'badge-orange'}">${r.entregado ? '✓ Entregado' : 'Pendiente'}</span>
+      </div>
+      <div class="db-item-addr">${[r.calle, r.numero, r.colonia, r.cp].filter(Boolean).join(', ')}</div>
+      <div class="db-item-track">${r.tracking || ''}${r.fechaDia ? ' · 📅 ' + r.fechaDia : ''}</div>
+    </div>
+  `).join('');
+}
+
+document.getElementById('db-search').addEventListener('input', renderDB);
+
+window.exportCSV = function() {
+  const cols = ['Nombre','Telefono','Calle','Numero','Colonia','CP','Shipment_Order','Tracking','PDD','Entregado'];
+  const rows = allRecords.map(r =>
+    [r.nombre,r.telefono,r.calle,r.numero,r.colonia,r.cp,r.shipment_order,r.tracking,r.pdd,r.entregado?'Sí':'No']
+    .map(v => `"${(v||'').toString().replace(/"/g,'""')}"`)
+    .join(',')
+  );
+  const csv = [cols.join(','), ...rows].join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(csv);
+  a.download = `seisa_ruta_${new Date().toISOString().slice(0,10)}.csv`;
+  a.click();
+  showToast(`✓ CSV exportado (${rows.length} registros)`);
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────
+loadRecords();
+updateRutaActivaBar();
+</script>
+</body>
+</html>
