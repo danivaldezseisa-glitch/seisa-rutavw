@@ -1894,39 +1894,41 @@ async function resolverPlusCode(rawInput) {
   const codePart = parts[0].toUpperCase();
 
   // ── Caso 1: Código completo (ej. 76FQHP7G+QP) ──
+  // La decodificación OLC es local y no puede fallar por red.
+  // El reverse geocoding es solo para el label y es opcional.
   if (OLC.isFullCode(codePart)) {
-    try {
-      const geo = OLC.decode(codePart);
-      const label = await reverseGeocode(geo.lat, geo.lng) || codePart;
+    const geo = OLC.decode(codePart);
+    // Verificar que las coordenadas son sensatas
+    if (geo.lat >= -90 && geo.lat <= 90 && geo.lng >= -180 && geo.lng <= 180) {
+      let label = codePart;
+      try { label = (await reverseGeocode(geo.lat, geo.lng)) || codePart; } catch(e) {}
       return { lat: geo.lat, lng: geo.lng, label };
-    } catch(e) { /* continuar */ }
+    }
   }
 
   // ── Caso 2: Código corto + referencia ciudad (ej. HP7G+QP Zumpango) ──
   if (OLC.isShortCode(codePart) && parts.length > 1) {
     const cityRef = parts.slice(1).join(' ');
-    try {
-      const city = await forwardGeocode(cityRef);
-      if (city) {
-        const fullCode = OLC.expandShort(codePart, parseFloat(city.lat), parseFloat(city.lon));
-        const geo = OLC.decode(fullCode);
-        const label = await reverseGeocode(geo.lat, geo.lng) || `${codePart}, ${cityRef}`;
-        return { lat: geo.lat, lng: geo.lng, label };
-      }
-    } catch(e) { /* continuar */ }
+    const city = await forwardGeocode(cityRef);
+    if (city) {
+      const fullCode = OLC.expandShort(codePart, parseFloat(city.lat), parseFloat(city.lon));
+      const geo = OLC.decode(fullCode);
+      let label = `${codePart}, ${cityRef}`;
+      try { label = (await reverseGeocode(geo.lat, geo.lng)) || label; } catch(e) {}
+      return { lat: geo.lat, lng: geo.lng, label };
+    }
   }
 
-  // ── Caso 3: Código corto solo — intentar con ciudad por defecto (Zumpango) ──
+  // ── Caso 3: Código corto solo — intentar con Zumpango como referencia ──
   if (OLC.isShortCode(codePart)) {
-    try {
-      const city = await forwardGeocode('Zumpango Estado de Mexico');
-      if (city) {
-        const fullCode = OLC.expandShort(codePart, parseFloat(city.lat), parseFloat(city.lon));
-        const geo = OLC.decode(fullCode);
-        const label = await reverseGeocode(geo.lat, geo.lng) || codePart;
-        return { lat: geo.lat, lng: geo.lng, label };
-      }
-    } catch(e) { /* continuar */ }
+    const city = await forwardGeocode('Zumpango Estado de Mexico');
+    if (city) {
+      const fullCode = OLC.expandShort(codePart, parseFloat(city.lat), parseFloat(city.lon));
+      const geo = OLC.decode(fullCode);
+      let label = codePart;
+      try { label = (await reverseGeocode(geo.lat, geo.lng)) || label; } catch(e) {}
+      return { lat: geo.lat, lng: geo.lng, label };
+    }
   }
 
   // ── Caso 4: Texto libre como dirección ──
@@ -1939,7 +1941,7 @@ async function resolverPlusCode(rawInput) {
     };
   }
 
-  throw new Error('No se pudo localizar. Usa código completo (ej: 76FQHP7G+QP) o código corto con ciudad (ej: HP7G+QP Zumpango)');
+  throw new Error('No se pudo localizar. Intenta con el formato completo (ej: 76FQHP7G+QP) o código corto + ciudad (ej: HP7G+QP Zumpango)');
 }
 
 window.agregarParada = async function() {
@@ -1963,7 +1965,8 @@ window.agregarParada = async function() {
     renderNavStops();
     showToast(`📍 Parada ${navParadas.length} agregada`);
   } catch(e) {
-    showToast('⚠️ No encontrado. Usa formato completo (ej: 85QR3C2Q+3G) o corto con ciudad (ej: 8FGC+XQ Zumpango)');
+    const msg = e && e.message ? e.message : 'Error desconocido';
+    showToast('⚠️ ' + msg);
     input.value = val;
   }
   input.disabled = false;
