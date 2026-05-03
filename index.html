@@ -829,14 +829,30 @@ select option { background: var(--surface2); }
         <div class="dl">Tracking #</div>
         <div class="dv" id="c-tracking">—</div>
       </div>
+      <div class="data-cell full" id="c-trackings-extra-wrap" style="display:none;">
+        <div class="dl">📦 Paquetes adicionales</div>
+        <div id="c-trackings-extra"></div>
+      </div>
       <div class="data-cell full">
         <div class="dl">📅 Fecha PDD</div>
         <div class="dv" id="c-pdd">—</div>
       </div>
       <div class="data-cell full" id="c-foto-wrap" style="display:none;">
-        <div class="dl">📦 Foto del artículo</div>
-        <div id="c-foto-loading" style="display:none;text-align:center;padding:20px;color:var(--text3);font-size:13px;">⏳ Cargando foto...</div>
-        <img id="c-foto" src="" alt="Artículo" style="width:100%;border-radius:8px;margin-top:6px;max-height:260px;object-fit:cover;cursor:zoom-in;" onclick="verFotoCompleta(this.src)">
+        <div class="dl">📷 Fotos del escaneo</div>
+        <div style="display:flex;gap:10px;margin-top:8px;" id="c-fotos-row">
+          <!-- Foto 1: etiqueta -->
+          <div style="flex:1;display:flex;flex-direction:column;gap:5px;" id="c-foto1-wrap">
+            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600;">Etiqueta</div>
+            <div id="c-foto1-loading" style="display:none;text-align:center;padding:16px;color:var(--text3);font-size:12px;background:var(--surface);border-radius:8px;">⏳</div>
+            <img id="c-foto1" src="" alt="Etiqueta" style="display:none;width:100%;border-radius:8px;max-height:180px;object-fit:cover;cursor:zoom-in;" onclick="verFotoCompleta(this.src)">
+          </div>
+          <!-- Foto 2: producto -->
+          <div style="flex:1;display:flex;flex-direction:column;gap:5px;" id="c-foto2-wrap">
+            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600;">Producto</div>
+            <div id="c-foto2-loading" style="display:none;text-align:center;padding:16px;color:var(--text3);font-size:12px;background:var(--surface);border-radius:8px;">⏳</div>
+            <img id="c-foto2" src="" alt="Producto" style="display:none;width:100%;border-radius:8px;max-height:180px;object-fit:cover;cursor:zoom-in;" onclick="verFotoCompleta(this.src)">
+          </div>
+        </div>
       </div>
     </div>
 
@@ -1177,14 +1193,90 @@ async function loadRecords() {
 async function saveRecord(data) {
   data.createdAt = Date.now();
   data.entregado = false;
-  // Guardar fecha del día en formato dd/mm/yyyy
+
+  // Fecha del día — se calcula PRIMERO para que la búsqueda de duplicados la use
   const now = new Date();
-  const dd = String(now.getDate()).padStart(2,'0');
-  const mm = String(now.getMonth()+1).padStart(2,'0');
+  const dd   = String(now.getDate()).padStart(2,'0');
+  const mm   = String(now.getMonth()+1).padStart(2,'0');
   const yyyy = now.getFullYear();
   data.fechaDia = `${dd}/${mm}/${yyyy}`;
-  // Guardar nombre de ruta activa
   if (rutaActiva) data.rutaNombre = rutaActiva;
+
+  // Normalizar nombre: minúsculas, sin tildes, sin espacios dobles
+  const normNombre = s => (s || '')
+    .trim()
+    .toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // quitar tildes
+    .replace(/\s+/g, ' ');
+
+  const nombreNuevo = normNombre(data.nombre);
+
+  // Buscar duplicado: mismo día, mismo nombre normalizado, nombre no vacío
+  const existing = nombreNuevo
+    ? allRecords.find(r =>
+        r.fechaDia === data.fechaDia &&
+        normNombre(r.nombre) === nombreNuevo
+      )
+    : null;
+
+  if (existing) {
+    const mergeData = {};
+
+    // ── Trackings ──
+    const prevTrackings = Array.isArray(existing.trackings)
+      ? existing.trackings
+      : (existing.tracking ? [existing.tracking] : []);
+    const newTracking = (data.tracking || '').trim();
+    if (newTracking && !prevTrackings.includes(newTracking)) {
+      mergeData.trackings = [...prevTrackings, newTracking];
+    } else {
+      mergeData.trackings = prevTrackings;
+    }
+
+    // ── Shipment orders ──
+    const prevOrders = Array.isArray(existing.shipmentOrders)
+      ? existing.shipmentOrders
+      : (existing.shipment_order ? [existing.shipment_order] : []);
+    const newOrder = (data.shipment_order || '').trim();
+    if (newOrder && !prevOrders.includes(newOrder)) {
+      mergeData.shipmentOrders = [...prevOrders, newOrder];
+    } else {
+      mergeData.shipmentOrders = prevOrders;
+    }
+
+    // ── Fotos etiqueta ──
+    const prevFE = Array.isArray(existing.fotosEtiqueta)
+      ? existing.fotosEtiqueta
+      : (existing.fotoEtiquetaUrl ? [existing.fotoEtiquetaUrl] : (existing.fotoArticuloUrl ? [existing.fotoArticuloUrl] : []));
+    if (data.fotoEtiquetaUrl) mergeData.fotosEtiqueta = [...prevFE, data.fotoEtiquetaUrl];
+
+    // ── Fotos producto ──
+    const prevFP = Array.isArray(existing.fotosProducto)
+      ? existing.fotosProducto
+      : (existing.fotoProductoUrl ? [existing.fotoProductoUrl] : []);
+    if (data.fotoProductoUrl) mergeData.fotosProducto = [...prevFP, data.fotoProductoUrl];
+
+    // ── PDD más próximo ──
+    if (data.pdd && (!existing.pdd || data.pdd < existing.pdd)) mergeData.pdd = data.pdd;
+
+    // Actualizar Firestore Y memoria local juntos
+    await updateDoc(doc(db, COL, existing.id), mergeData);
+    const idx = allRecords.findIndex(r => r.id === existing.id);
+    if (idx >= 0) allRecords[idx] = { ...allRecords[idx], ...mergeData };
+
+    renderRoute();
+    updateStats();
+    showToast(`📦 Unificado con ${existing.nombre?.split(' ')[0] || 'cliente'} · ${mergeData.trackings?.length || 1} paquetes`);
+    return;
+  }
+
+  // ── Registro NUEVO ──
+  // Guardar siempre como arrays desde el inicio
+  data.trackings      = data.tracking       ? [data.tracking]       : [];
+  data.shipmentOrders = data.shipment_order ? [data.shipment_order] : [];
+  data.fotosEtiqueta  = data.fotoEtiquetaUrl  ? [data.fotoEtiquetaUrl]  : [];
+  data.fotosProducto  = data.fotoProductoUrl  ? [data.fotoProductoUrl]  : [];
+
   const ref = await addDoc(collection(db, COL), data);
   data.id = ref.id;
   allRecords.unshift(data);
@@ -1345,23 +1437,67 @@ window.openClient = function(id) {
   document.getElementById('c-addr').textContent = [r.calle, r.numero, r.colonia, r.cp].filter(Boolean).join(', ');
   document.getElementById('c-tel').textContent = r.telefono || '—';
   document.getElementById('c-cp').textContent = r.cp || '—';
-  document.getElementById('c-order').textContent = r.shipment_order || '—';
-  document.getElementById('c-tracking').textContent = r.tracking || '—';
   document.getElementById('c-pdd').textContent = r.pdd || '—';
+
+  // ── TRACKING(S) ──
+  const trackings = r.trackings || (r.tracking ? [r.tracking] : []);
+  document.getElementById('c-tracking').textContent = trackings[0] || '—';
+  const extraWrap = document.getElementById('c-trackings-extra-wrap');
+  const extraDiv  = document.getElementById('c-trackings-extra');
+  if (trackings.length > 1) {
+    extraWrap.style.display = 'block';
+    const orders = r.shipmentOrders || (r.shipment_order ? [r.shipment_order] : []);
+    extraDiv.innerHTML = trackings.slice(1).map((t, i) => `
+      <div style="padding:8px 0;border-top:1px solid var(--border);margin-top:6px;">
+        <div style="font-size:12px;font-family:var(--mono);color:var(--accent);">📦 Paquete ${i + 2}</div>
+        <div style="font-size:13px;font-weight:600;margin-top:3px;">${t}</div>
+        ${orders[i + 1] ? `<div style="font-size:11px;color:var(--text3);margin-top:2px;">SO: ${orders[i + 1]}</div>` : ''}
+      </div>`).join('');
+  } else {
+    extraWrap.style.display = 'none';
+  }
+
+  // ── SHIPMENT ORDER (primer paquete) ──
+  const orders = r.shipmentOrders || (r.shipment_order ? [r.shipment_order] : []);
+  document.getElementById('c-order').textContent = orders[0] || '—';
+
+  // ── FOTOS (etiqueta + producto) ──
+  const fotosEtiqueta = Array.isArray(r.fotosEtiqueta) && r.fotosEtiqueta.length
+    ? r.fotosEtiqueta
+    : (r.fotoEtiquetaUrl ? [r.fotoEtiquetaUrl] : (r.fotoArticuloUrl ? [r.fotoArticuloUrl] : []));
+  const fotosProducto = Array.isArray(r.fotosProducto) && r.fotosProducto.length
+    ? r.fotosProducto
+    : (r.fotoProductoUrl ? [r.fotoProductoUrl] : []);
   const fotoWrap = document.getElementById('c-foto-wrap');
-  const fotoImg = document.getElementById('c-foto');
-  const fotoLoading = document.getElementById('c-foto-loading');
-  const fotoUrl = r.fotoArticuloUrl || r.fotoArticulo || null;
-  if (fotoUrl) {
+
+  function loadFoto(imgId, loadingId, url) {
+    const img = document.getElementById(imgId);
+    const loading = document.getElementById(loadingId);
+    img.src = '';
+    img.style.display = 'none';
+    loading.style.display = 'none';
+    loading.textContent = '⏳';
+    if (url) {
+      loading.style.display = 'block';
+      img.onload = () => { loading.style.display = 'none'; img.style.display = 'block'; };
+      img.onerror = () => { loading.textContent = '⚠️ No se pudo cargar'; };
+      img.src = url;
+    }
+  }
+
+  const tiene1 = !!fotosEtiqueta[0];
+  const tiene2 = !!fotosProducto[0];
+
+  if (tiene1 || tiene2) {
     fotoWrap.style.display = 'block';
-    fotoImg.style.display = 'none';
-    fotoLoading.style.display = 'block';
-    fotoImg.onload = () => { fotoLoading.style.display = 'none'; fotoImg.style.display = 'block'; };
-    fotoImg.onerror = () => { fotoLoading.textContent = '⚠️ No se pudo cargar la foto'; };
-    fotoImg.src = fotoUrl;
+    document.getElementById('c-foto1-wrap').style.display = tiene1 ? 'flex' : 'none';
+    document.getElementById('c-foto2-wrap').style.display = tiene2 ? 'flex' : 'none';
+    loadFoto('c-foto1', 'c-foto1-loading', fotosEtiqueta[0] || null);
+    loadFoto('c-foto2', 'c-foto2-loading', fotosProducto[0] || null);
   } else {
     fotoWrap.style.display = 'none';
   }
+
   const badge = document.getElementById('client-status-badge');
   badge.innerHTML = r.entregado
     ? '<span class="badge badge-green">✓ Entregado</span>'
