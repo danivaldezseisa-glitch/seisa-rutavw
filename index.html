@@ -839,20 +839,7 @@ select option { background: var(--surface2); }
       </div>
       <div class="data-cell full" id="c-foto-wrap" style="display:none;">
         <div class="dl">📷 Fotos del escaneo</div>
-        <div style="display:flex;gap:10px;margin-top:8px;" id="c-fotos-row">
-          <!-- Foto 1: etiqueta -->
-          <div style="flex:1;display:flex;flex-direction:column;gap:5px;" id="c-foto1-wrap">
-            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600;">Etiqueta</div>
-            <div id="c-foto1-loading" style="display:none;text-align:center;padding:16px;color:var(--text3);font-size:12px;background:var(--surface);border-radius:8px;">⏳</div>
-            <img id="c-foto1" src="" alt="Etiqueta" style="display:none;width:100%;border-radius:8px;max-height:180px;object-fit:cover;cursor:zoom-in;" onclick="verFotoCompleta(this.src)">
-          </div>
-          <!-- Foto 2: producto -->
-          <div style="flex:1;display:flex;flex-direction:column;gap:5px;" id="c-foto2-wrap">
-            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600;">Producto</div>
-            <div id="c-foto2-loading" style="display:none;text-align:center;padding:16px;color:var(--text3);font-size:12px;background:var(--surface);border-radius:8px;">⏳</div>
-            <img id="c-foto2" src="" alt="Producto" style="display:none;width:100%;border-radius:8px;max-height:180px;object-fit:cover;cursor:zoom-in;" onclick="verFotoCompleta(this.src)">
-          </div>
-        </div>
+        <div id="c-fotos-paquetes"></div>
       </div>
     </div>
 
@@ -1467,41 +1454,53 @@ window.openClient = function(id) {
   const orders = r.shipmentOrders || (r.shipment_order ? [r.shipment_order] : []);
   document.getElementById('c-order').textContent = orders[0] || '—';
 
-  // ── FOTOS (etiqueta + producto) ──
+  // ── FOTOS ESCANEO: una sección por paquete ──
   const fotosEtiqueta = Array.isArray(r.fotosEtiqueta) && r.fotosEtiqueta.length
     ? r.fotosEtiqueta
     : (r.fotoEtiquetaUrl ? [r.fotoEtiquetaUrl] : (r.fotoArticuloUrl ? [r.fotoArticuloUrl] : []));
   const fotosProducto = Array.isArray(r.fotosProducto) && r.fotosProducto.length
     ? r.fotosProducto
     : (r.fotoProductoUrl ? [r.fotoProductoUrl] : []);
+
   const fotoWrap = document.getElementById('c-foto-wrap');
+  const fotosPaquetesDiv = document.getElementById('c-fotos-paquetes');
+  const totalPaquetes = Math.max(fotosEtiqueta.length, fotosProducto.length, trackings.length || 1);
+  const hayFotos = fotosEtiqueta.length > 0 || fotosProducto.length > 0;
 
-  function loadFoto(imgId, loadingId, url) {
-    const img = document.getElementById(imgId);
-    const loading = document.getElementById(loadingId);
-    img.src = '';
-    img.style.display = 'none';
-    loading.style.display = 'none';
-    loading.textContent = '⏳';
-    if (url) {
-      loading.style.display = 'block';
-      img.onload = () => { loading.style.display = 'none'; img.style.display = 'block'; };
-      img.onerror = () => { loading.textContent = '⚠️ No se pudo cargar'; };
-      img.src = url;
-    }
-  }
-
-  const tiene1 = !!fotosEtiqueta[0];
-  const tiene2 = !!fotosProducto[0];
-
-  if (tiene1 || tiene2) {
+  if (hayFotos) {
     fotoWrap.style.display = 'block';
-    document.getElementById('c-foto1-wrap').style.display = tiene1 ? 'flex' : 'none';
-    document.getElementById('c-foto2-wrap').style.display = tiene2 ? 'flex' : 'none';
-    loadFoto('c-foto1', 'c-foto1-loading', fotosEtiqueta[0] || null);
-    loadFoto('c-foto2', 'c-foto2-loading', fotosProducto[0] || null);
+    // Determinar cuántos paquetes mostrar (al menos los que tengan fotos)
+    const numPaquetes = Math.max(fotosEtiqueta.length, fotosProducto.length);
+    fotosPaquetesDiv.innerHTML = Array.from({ length: numPaquetes }, (_, i) => {
+      const urlEtiqueta = fotosEtiqueta[i] || null;
+      const urlProducto = fotosProducto[i] || null;
+      const trackingPaq = trackings[i] || '';
+      const encabezado = numPaquetes > 1
+        ? `<div style="font-size:11px;font-weight:700;color:var(--accent);font-family:var(--mono);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border);">📦 Paquete ${i + 1}${trackingPaq ? ' · ' + trackingPaq : ''}</div>`
+        : '';
+      const fotoEtiq = urlEtiqueta
+        ? `<div style="flex:1;display:flex;flex-direction:column;gap:5px;">
+            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600;">Etiqueta</div>
+            <img src="${urlEtiqueta}" onclick="verFotoCompleta('${urlEtiqueta}')"
+              style="width:100%;border-radius:8px;max-height:160px;object-fit:cover;cursor:zoom-in;border:1px solid var(--border);">
+          </div>`
+        : '';
+      const fotoProd = urlProducto
+        ? `<div style="flex:1;display:flex;flex-direction:column;gap:5px;">
+            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;font-weight:600;">Producto</div>
+            <img src="${urlProducto}" onclick="verFotoCompleta('${urlProducto}')"
+              style="width:100%;border-radius:8px;max-height:160px;object-fit:cover;cursor:zoom-in;border:1px solid var(--border);">
+          </div>`
+        : '';
+      if (!fotoEtiq && !fotoProd) return '';
+      return `<div style="margin-top:${i > 0 ? '12px' : '8px'};padding:${i > 0 ? '12px 0 0' : '0'};${i > 0 ? 'border-top:1px solid var(--border);' : ''}">
+        ${encabezado}
+        <div style="display:flex;gap:10px;">${fotoEtiq}${fotoProd}</div>
+      </div>`;
+    }).join('');
   } else {
     fotoWrap.style.display = 'none';
+    fotosPaquetesDiv.innerHTML = '';
   }
 
   // ── FOTOS DE ENTREGA ──
