@@ -843,8 +843,18 @@ select option { background: var(--surface2); }
       </div>
     </div>
 
-    <div id="c-fotos-entrega-wrap" style="display:none;">
-      <div class="sec-header">📸 Fotos de producto entregado</div>
+    <div id="c-fotos-entrega-wrap">
+      <div class="sec-header" style="display:flex;align-items:center;justify-content:space-between;padding-right:16px;">
+        <span>📸 Fotos de producto entregado</span>
+        <label for="c-entrega-file-input" style="
+          display:inline-flex;align-items:center;gap:5px;
+          padding:5px 12px;border-radius:99px;font-size:12px;font-weight:600;
+          background:rgba(0,212,255,.12);border:1px solid rgba(0,212,255,.3);
+          color:var(--accent);cursor:pointer;">
+          ＋ Agregar
+        </label>
+      </div>
+      <input type="file" id="c-entrega-file-input" accept="image/*" multiple style="display:none;">
       <div id="c-fotos-entrega-grid" style="display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 16px;"></div>
     </div>
 
@@ -1505,18 +1515,8 @@ window.openClient = function(id) {
 
   // ── FOTOS DE ENTREGA ──
   const fotosEntrega = Array.isArray(r.fotosEntrega) ? r.fotosEntrega : [];
-  const entregaWrap = document.getElementById('c-fotos-entrega-wrap');
   const entregaGrid = document.getElementById('c-fotos-entrega-grid');
-  if (fotosEntrega.length > 0) {
-    entregaWrap.style.display = 'block';
-    entregaGrid.innerHTML = fotosEntrega.map(url => `
-      <img src="${url}" onclick="verFotoCompleta('${url}')"
-        style="width:calc(50% - 4px);aspect-ratio:4/3;object-fit:cover;border-radius:10px;cursor:zoom-in;border:1px solid var(--border);">`
-    ).join('');
-  } else {
-    entregaWrap.style.display = 'none';
-    entregaGrid.innerHTML = '';
-  }
+  renderFotosEntregaGrid(fotosEntrega);
 
   const badge = document.getElementById('client-status-badge');
   badge.innerHTML = r.entregado
@@ -1524,6 +1524,65 @@ window.openClient = function(id) {
     : '<span class="badge badge-orange">Pendiente</span>';
   showScreen('client');
 }
+
+// ─── FOTOS ENTREGA DESDE PANEL CLIENTE ───────────────────────────────
+
+function renderFotosEntregaGrid(fotos) {
+  const grid = document.getElementById('c-fotos-entrega-grid');
+  if (!fotos.length) {
+    grid.innerHTML = `<div style="width:100%;padding:12px 0;font-size:13px;color:var(--text3);text-align:center;">Sin fotos aún. Toca <strong style="color:var(--accent);">＋ Agregar</strong> para añadir.</div>`;
+    return;
+  }
+  grid.innerHTML = fotos.map((url, i) => `
+    <div style="position:relative;width:calc(50% - 4px);">
+      <img src="${url}" onclick="verFotoCompleta('${url}')"
+        style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:10px;cursor:zoom-in;border:1px solid var(--border);display:block;">
+      <button onclick="eliminarFotoEntrega(${i})" style="
+        position:absolute;top:5px;right:5px;
+        width:24px;height:24px;border-radius:50%;
+        background:rgba(0,0,0,.65);border:none;color:#fff;
+        font-size:13px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;">✕</button>
+    </div>`
+  ).join('');
+}
+
+window.eliminarFotoEntrega = async function(idx) {
+  const r = allRecords.find(x => x.id === currentClientId);
+  if (!r) return;
+  const fotos = Array.isArray(r.fotosEntrega) ? [...r.fotosEntrega] : [];
+  fotos.splice(idx, 1);
+  try {
+    await updateDoc(doc(db, COL, currentClientId), { fotosEntrega: fotos });
+    const i = allRecords.findIndex(x => x.id === currentClientId);
+    if (i >= 0) allRecords[i].fotosEntrega = fotos;
+    renderFotosEntregaGrid(fotos);
+    showToast('🗑 Foto eliminada');
+  } catch(e) { showToast('⚠️ Error al eliminar foto'); }
+};
+
+document.getElementById('c-entrega-file-input').addEventListener('change', async function() {
+  const files = Array.from(this.files);
+  if (!files.length || !currentClientId) return;
+  const r = allRecords.find(x => x.id === currentClientId);
+  showToast('⏳ Subiendo foto...');
+  for (const file of files) {
+    try {
+      const tracking = r?.tracking || r?.trackings?.[0] || 'sin-tracking';
+      const path = `entregas/${tracking}_panel_${Date.now()}.jpg`;
+      const ref = storageRef(storage, path);
+      await uploadBytes(ref, file, { contentType: file.type || 'image/jpeg' });
+      const url = await getDownloadURL(ref);
+      const prevFotos = Array.isArray(r?.fotosEntrega) ? r.fotosEntrega : [];
+      const merged = [...prevFotos, url];
+      await updateDoc(doc(db, COL, currentClientId), { fotosEntrega: merged });
+      const idx = allRecords.findIndex(x => x.id === currentClientId);
+      if (idx >= 0) allRecords[idx].fotosEntrega = merged;
+      renderFotosEntregaGrid(merged);
+      showToast(`📸 Foto ${merged.length} guardada`);
+    } catch(e) { showToast('⚠️ Error al subir foto'); }
+  }
+  this.value = '';
+});
 
 // ─── ENVÍO MASIVO ────────────────────────────────────────────────────
 let masivoQueue = [];
@@ -1753,9 +1812,18 @@ window.sendPhotosToWhatsApp = async function() {
   if (capturedPhotos.length === 0) { showToast('Toma al menos una foto'); return; }
   const r = allRecords.find(x => x.id === currentClientId);
   const nombre = r?.nombre || 'Cliente';
-  const tracking = r?.tracking || '';
-  const orden = r?.shipment_order || '';
-  const direccion = [r?.calle, r?.numero, r?.colonia, r?.cp].filter(Boolean).join(', ');
+  const tracking = (r?.trackings?.[0] || r?.tracking || '—');
+  const orden = (r?.shipmentOrders?.[0] || r?.shipment_order || '—');
+
+  const receptorTexto = camReceptor === 'familiar' ? '👨‍👩‍👦 Familiar del cliente' : '👤 Cliente titular';
+  let verificacionTexto = '';
+  if (camVerificacion === 'ine') {
+    verificacionTexto = '🪪 Validación por INE';
+  } else if (camVerificacion === 'wapedido') {
+    verificacionTexto = '📲 No. de pedido por WhatsApp';
+  } else {
+    verificacionTexto = '🔢 Validación de No. de pedido';
+  }
 
   const texto =
 `✅ *ENTREGA REALIZADA*
@@ -1763,6 +1831,8 @@ window.sendPhotosToWhatsApp = async function() {
 👤 *Cliente:* ${nombre}
 📦 *Núm. Pedido:* ${orden}
 🔖 *Guía:* ${tracking}
+📬 *Recibe:* ${receptorTexto}
+✔️ *Verificación:* ${verificacionTexto}
 ━━━━━━━━━━━━━━━━━━━`;
 
   // Convertir fotos de base64 a File objects
