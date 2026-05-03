@@ -918,6 +918,7 @@ select option { background: var(--surface2); }
       <button class="btn btn-accent" onclick="openTimestamp()">📷 Abrir Timestamp Camera</button>
       <button class="btn btn-ghost" onclick="openNativeCamera()" style="font-size:13px;">🖼️ Seleccionar de galería</button>
       <button class="btn btn-green" id="btn-send-photos" onclick="sendPhotosToWhatsApp()" style="display:none;">📤 Enviar a WhatsApp</button>
+      <button class="btn btn-green" id="btn-mark-done-camera" onclick="marcarEntregadoDesdeCamera()" style="display:none;background:var(--green);color:var(--bg);font-size:16px;padding:16px;">✅ Marcar como entregado</button>
     </div>
   </div>
 </div>
@@ -1667,6 +1668,7 @@ document.getElementById('btn-open-camera').addEventListener('click', () => {
   document.getElementById('photos-thumbs').innerHTML = '';
   document.getElementById('photos-preview').style.display = 'none';
   document.getElementById('btn-send-photos').style.display = 'none';
+  document.getElementById('btn-mark-done-camera').style.display = 'none';
   setCamOpt('receptor', 'cliente');
   setCamOpt('verificacion', 'nopedido');
   showScreen('camera');
@@ -1756,28 +1758,13 @@ window.sendPhotosToWhatsApp = async function() {
   const orden = r?.shipment_order || '';
   const direccion = [r?.calle, r?.numero, r?.colonia, r?.cp].filter(Boolean).join(', ');
 
-  const receptorTexto = camReceptor === 'familiar' ? '👨‍👩‍👦 Familiar del cliente' : '👤 Cliente titular';
-  let metodoTexto = '';
-  if (camVerificacion === 'ine') {
-    metodoTexto = '🪪 Validación por INE';
-  } else if (camVerificacion === 'wapedido') {
-    metodoTexto = '📲 Envío de No. de pedido por WhatsApp';
-  } else {
-    metodoTexto = '🔢 Validación de No. de pedido';
-  }
-
   const texto =
 `✅ *ENTREGA REALIZADA*
 ━━━━━━━━━━━━━━━━━━━
 👤 *Cliente:* ${nombre}
-🏠 *Dirección:* ${direccion}
 📦 *Núm. Pedido:* ${orden}
 🔖 *Guía:* ${tracking}
-━━━━━━━━━━━━━━━━━━━
-📬 *Recibe:* ${receptorTexto}
-✔️ *Verificación:* ${metodoTexto}
-━━━━━━━━━━━━━━━━━━━
-📸 ${capturedPhotos.length} foto(s) adjunta(s)`;
+━━━━━━━━━━━━━━━━━━━`;
 
   // Convertir fotos de base64 a File objects
   const archivos = capturedPhotos.map((p, i) => {
@@ -1811,6 +1798,27 @@ window.sendPhotosToWhatsApp = async function() {
   document.getElementById('photos-thumbs').innerHTML = '';
   document.getElementById('photos-preview').style.display = 'none';
   document.getElementById('btn-send-photos').style.display = 'none';
+  // Mostrar botón de marcar como entregado al regresar de WhatsApp
+  document.getElementById('btn-mark-done-camera').style.display = 'flex';
+}
+
+// ─── MARCAR ENTREGADO DESDE CÁMARA ────────────────────────────────────
+window.marcarEntregadoDesdeCamera = async function() {
+  if (!currentClientId) return;
+  try {
+    await updateDoc(doc(db, COL, currentClientId), { entregado: true });
+    const idx = allRecords.findIndex(x => x.id === currentClientId);
+    if (idx >= 0) allRecords[idx].entregado = true;
+    document.getElementById('btn-mark-done-camera').style.display = 'none';
+    showToast('✅ Marcado como entregado');
+    renderRouteList();
+    showScreen('client');
+    // Actualizar badge en pantalla de cliente
+    const badge = document.getElementById('client-status-badge');
+    if (badge) badge.innerHTML = '<span class="badge badge-green">✓ Entregado</span>';
+  } catch(e) {
+    showToast('⚠️ Error al marcar como entregado');
+  }
 }
 
 // ─── SCAN / UPLOAD ───────────────────────────────────────────────────
