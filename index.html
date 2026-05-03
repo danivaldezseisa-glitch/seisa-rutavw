@@ -1542,8 +1542,11 @@ window.openClient = function(id) {
     : '<span class="badge badge-orange">Pendiente</span>';
 
   // ── PLUS CODES ──
-  renderPlusCodesCliente(Array.isArray(r.plusCodes) ? r.plusCodes : []);
+  const plusCodes = Array.isArray(r.plusCodes) ? r.plusCodes : [];
+  renderPlusCodesCliente(plusCodes);
   document.getElementById('c-pluscode-input').value = '';
+  // Sincronizar a navParadas si ya tiene códigos guardados
+  if (plusCodes.length > 0) sincronizarNavParadas(plusCodes, r);
 
   showScreen('client');
 }
@@ -2832,8 +2835,10 @@ window.agregarPlusCodeCliente = async function() {
     const idx = allRecords.findIndex(x => x.id === currentClientId);
     if (idx >= 0) allRecords[idx].plusCodes = updated;
     renderPlusCodesCliente(updated);
+    // ── Sincronizar a navParadas en tiempo real ──
+    await sincronizarNavParadas(updated, r);
     input.value = '';
-    showToast(`📍 Plus Code ${updated.length} guardado`);
+    showToast(`📍 Plus Code ${updated.length} agregado a la ruta`);
   } catch(e) {
     showToast('⚠️ Error al guardar');
     input.value = val;
@@ -2851,39 +2856,61 @@ window.eliminarPlusCodeCliente = async function(idx) {
     const i = allRecords.findIndex(x => x.id === currentClientId);
     if (i >= 0) allRecords[i].plusCodes = updated;
     renderPlusCodesCliente(updated);
+    await sincronizarNavParadas(updated, r);
     showToast('🗑 Plus Code eliminado');
   } catch(e) { showToast('⚠️ Error al eliminar'); }
 };
 
+// ── Sincroniza plusCodes del cliente actual con navParadas ──
+async function sincronizarNavParadas(plusCodes, r) {
+  if (!plusCodes || plusCodes.length === 0) {
+    // Quitar solo las paradas de este cliente que ya no estén
+    navParadas = navParadas.filter(p => !p.clienteId || p.clienteId !== currentClientId);
+    renderNavStops();
+    return;
+  }
+  // Resolver todos los plus codes del cliente
+  const nombre = r?.nombre?.split(' ')[0] || 'Cliente';
+  const resueltos = [];
+  for (const pc of plusCodes) {
+    // Si ya existe en navParadas con mismo código, reutilizar coords
+    const existing = navParadas.find(p => p.plusCode === pc);
+    if (existing) { resueltos.push({ ...existing, clienteId: currentClientId, clienteNombre: nombre }); continue; }
+    try {
+      const geo = await resolverPlusCode(pc);
+      resueltos.push({ plusCode: pc, label: `${nombre} · ${geo.label}`, lat: geo.lat, lng: geo.lng, hecha: false, clienteId: currentClientId, clienteNombre: nombre });
+    } catch(e) { /* skip si falla */ }
+  }
+  // Reemplazar paradas de este cliente en navParadas
+  navParadas = [
+    ...navParadas.filter(p => p.clienteId !== currentClientId),
+    ...resueltos
+  ];
+  renderNavStops();
+  document.getElementById('nav-stop-count').textContent = `${navParadas.length} paradas`;
+}
+
 // ─── IR A RUTA ────────────────────────────────────────────────────────
 
-let irRutaParadas = []; // [{plusCode, lat, lng, label}] ordenadas
+let irRutaParadas = [];
 
 window.irARuta = async function() {
   const r = allRecords.find(x => x.id === currentClientId);
   if (!r || !Array.isArray(r.plusCodes) || r.plusCodes.length === 0) {
     showToast('Agrega al menos un Plus Code'); return;
   }
-  showToast('⏳ Calculando ruta...');
-  // Resolver coordenadas de cada plus code
-  const resueltos = [];
-  for (const pc of r.plusCodes) {
-    try {
-      const geo = await resolverPlusCode(pc);
-      resueltos.push({ plusCode: pc, lat: geo.lat, lng: geo.lng, label: geo.label });
-    } catch(e) {
-      showToast(`⚠️ No se pudo resolver: ${pc}`); return;
-    }
-  }
-  // Ordenar por proximidad (nearest neighbor desde ubicación actual si disponible)
-  irRutaParadas = await ordenarParadasDesdeUbicacion(resueltos);
+  // Asegurar que navParadas esté sincronizado antes de navegar
+  await sincronizarNavParadas(r.plusCodes, r);
+  if (navParadas.length === 0) { showToast('⚠️ No se pudieron resolver los Plus Codes'); return; }
 
-  // Renderizar pantalla
-  document.getElementById('ir-ruta-title').textContent = `🗺️ ${r.nombre?.split(' ')[0] || 'Ruta'}`;
-  document.getElementById('ir-ruta-sub').textContent = `${irRutaParadas.length} paradas`;
-  renderIrRutaStops();
-  cargarMapaRutaCompleta();
-  showScreen('ir-ruta');
+  showToast('⏳ Calculando ruta...');
+  // Ordenar desde ubicación actual y calcular
+  const optimized = await ordenarParadasDesdeUbicacion([...navParadas]);
+  navParadas = optimized.map(p => ({ ...p, hecha: false }));
+  navParadaActual = 0;
+  renderNavStops();
+  showScreen('nav-guiada');
+  renderNavGuiada();
 };
 
 async function ordenarParadasDesdeUbicacion(paradas) {
