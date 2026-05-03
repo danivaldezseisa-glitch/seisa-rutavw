@@ -712,11 +712,67 @@ select option { background: var(--surface2); }
         </button>
       </div>
 
+      <!-- Botón de navegación integrada -->
+      <button class="btn btn-accent" id="btn-navegar-integrado" onclick="toggleNavegacionIntegrada()" style="font-size:13px;">
+        🧭 Navegar a esta parada
+      </button>
+
+  </div>
+</div>
+
+<!-- ══ PANEL NAVEGACIÓN INTEGRADA (overlay sobre nav-guiada) ══ -->
+<div id="panel-nav-integrada" style="
+  display:none; position:fixed; inset:0; z-index:200;
+  flex-direction:column; background:var(--bg);
+">
+  <!-- Topbar del panel -->
+  <div style="
+    display:flex; align-items:center; gap:10px;
+    padding:14px 16px 10px; background:var(--bg2);
+    border-bottom:1px solid var(--border); flex-shrink:0;
+  ">
+    <button onclick="cerrarNavegacionIntegrada()" style="
+      width:36px;height:36px;border-radius:10px;border:1px solid var(--border);
+      background:transparent;color:var(--text2);font-size:18px;cursor:pointer;
+      display:flex;align-items:center;justify-content:center;
+    ">✕</button>
+    <div style="flex:1;min-width:0;">
+      <div style="font-size:14px;font-weight:700;" id="nav-int-titulo">Navegando...</div>
+      <div style="font-size:11px;color:var(--text2);font-family:var(--mono);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="nav-int-plus"></div>
+    </div>
+    <button onclick="marcarParadaHechaDesdeNav()" style="
+      padding:8px 14px;border-radius:10px;border:none;
+      background:var(--green);color:var(--bg);font-size:12px;font-weight:700;
+      cursor:pointer;white-space:nowrap;
+    ">✓ Entregado</button>
+  </div>
+
+  <!-- Iframe Google Maps navegación -->
+  <iframe id="nav-int-iframe"
+    src="about:blank"
+    style="flex:1;border:none;width:100%;min-height:0;"
+    allow="geolocation"
+    loading="lazy">
+  </iframe>
+
+  <!-- Barra inferior con parada siguiente -->
+  <div id="nav-int-siguiente" style="
+    display:none; align-items:center; gap:10px;
+    padding:10px 16px; background:var(--bg2);
+    border-top:1px solid var(--border); flex-shrink:0;
+  ">
+    <div style="font-size:11px;color:var(--text3);">Siguiente →</div>
+    <div style="flex:1;font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="nav-int-next-name"></div>
+    <button onclick="saltarParadaDesdeNav()" style="
+      padding:7px 12px;border-radius:8px;border:1px solid var(--border);
+      background:var(--surface2);color:var(--orange);font-size:12px;font-weight:600;cursor:pointer;
+    ">Saltar →</button>
   </div>
 </div>
 
 <!-- ══════════════════════════════════════════
      SCREEN: NUEVA RUTA
+══════════════════════════════════════════ -->
 ══════════════════════════════════════════ -->
 <div class="screen hidden" id="screen-nueva-ruta">
   <div class="topbar">
@@ -2840,9 +2896,98 @@ window.reanudarNavegacion = function() {
 }
 
 window.salirNavegacion = function() {
+  cerrarNavegacionIntegrada();
   document.getElementById('nav-lista-panel').style.display = 'none';
   if (navMap) { navMap.remove(); navMap = null; navMapLayer = null; navMapRouteLine = null; navMapAllMarkers = []; navMapPosMarker = null; }
   showScreen('navegacion');
+}
+
+// ── NAVEGACIÓN INTEGRADA (Google Maps iframe) ─────────────────────────
+let navIntegradaActiva = false;
+
+window.toggleNavegacionIntegrada = function() {
+  if (navIntegradaActiva) {
+    cerrarNavegacionIntegrada();
+  } else {
+    abrirNavegacionIntegrada();
+  }
+}
+
+function abrirNavegacionIntegrada() {
+  const parada = navParadas[navParadaActual];
+  if (!parada) return;
+
+  navIntegradaActiva = true;
+  const panel = document.getElementById('panel-nav-integrada');
+  panel.style.display = 'flex';
+
+  document.getElementById('nav-int-titulo').textContent = `${navParadaActual + 1}. ${parada.label.split(',')[0]}`;
+  document.getElementById('nav-int-plus').textContent = parada.plusCode;
+
+  // Siguiente parada
+  const siguiente = navParadas[navParadaActual + 1];
+  const barSig = document.getElementById('nav-int-siguiente');
+  if (siguiente) {
+    barSig.style.display = 'flex';
+    document.getElementById('nav-int-next-name').textContent = siguiente.label.split(',')[0];
+  } else {
+    barSig.style.display = 'none';
+  }
+
+  // Google Maps embed navegación — intenta geolocation para origen automático
+  const dest = `${parada.lat},${parada.lng}`;
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(pos => {
+      const orig = `${pos.coords.latitude},${pos.coords.longitude}`;
+      cargarIframeNav(orig, dest);
+    }, () => {
+      cargarIframeNav(null, dest);
+    }, { timeout: 5000, maximumAge: 30000 });
+  } else {
+    cargarIframeNav(null, dest);
+  }
+
+  document.getElementById('btn-navegar-integrado').textContent = '✕ Cerrar navegación';
+  document.getElementById('btn-navegar-integrado').style.background = 'var(--surface2)';
+}
+
+function cargarIframeNav(orig, dest) {
+  const iframe = document.getElementById('nav-int-iframe');
+  // Google Maps directions sin API key (funciona en móvil y desktop)
+  let url;
+  if (orig) {
+    url = `https://maps.google.com/maps?saddr=${orig}&daddr=${dest}&dirflg=d&output=embed&hl=es`;
+  } else {
+    url = `https://maps.google.com/maps?q=${dest}&output=embed&hl=es`;
+  }
+  iframe.src = url;
+}
+
+window.cerrarNavegacionIntegrada = function() {
+  navIntegradaActiva = false;
+  const panel = document.getElementById('panel-nav-integrada');
+  panel.style.display = 'none';
+  document.getElementById('nav-int-iframe').src = 'about:blank';
+  const btn = document.getElementById('btn-navegar-integrado');
+  if (btn) {
+    btn.textContent = '🧭 Navegar a esta parada';
+    btn.style.background = '';
+  }
+}
+
+window.marcarParadaHechaDesdeNav = function() {
+  cerrarNavegacionIntegrada();
+  marcarParadaHecha();
+  // Auto-abrir siguiente parada si hay
+  if (navParadaActual < navParadas.length) {
+    setTimeout(abrirNavegacionIntegrada, 400);
+  }
+}
+
+window.saltarParadaDesdeNav = function() {
+  cerrarNavegacionIntegrada();
+  saltarParada();
+  setTimeout(abrirNavegacionIntegrada, 400);
 }
 
 // ─── PLUS CODE POR CLIENTE ────────────────────────────────────────────
