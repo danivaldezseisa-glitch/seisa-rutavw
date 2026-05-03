@@ -856,6 +856,11 @@ select option { background: var(--surface2); }
       </div>
     </div>
 
+    <div id="c-fotos-entrega-wrap" style="display:none;">
+      <div class="sec-header">📸 Fotos de producto entregado</div>
+      <div id="c-fotos-entrega-grid" style="display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 16px;"></div>
+    </div>
+
     <div class="sec-header">Acciones</div>
     <div class="action-list">
       <button class="btn btn-accent" id="btn-whatsapp-intro">
@@ -1498,6 +1503,21 @@ window.openClient = function(id) {
     fotoWrap.style.display = 'none';
   }
 
+  // ── FOTOS DE ENTREGA ──
+  const fotosEntrega = Array.isArray(r.fotosEntrega) ? r.fotosEntrega : [];
+  const entregaWrap = document.getElementById('c-fotos-entrega-wrap');
+  const entregaGrid = document.getElementById('c-fotos-entrega-grid');
+  if (fotosEntrega.length > 0) {
+    entregaWrap.style.display = 'block';
+    entregaGrid.innerHTML = fotosEntrega.map(url => `
+      <img src="${url}" onclick="verFotoCompleta('${url}')"
+        style="width:calc(50% - 4px);aspect-ratio:4/3;object-fit:cover;border-radius:10px;cursor:zoom-in;border:1px solid var(--border);">`
+    ).join('');
+  } else {
+    entregaWrap.style.display = 'none';
+    entregaGrid.innerHTML = '';
+  }
+
   const badge = document.getElementById('client-status-badge');
   badge.innerHTML = r.entregado
     ? '<span class="badge badge-green">✓ Entregado</span>'
@@ -1664,24 +1684,52 @@ window.openNativeCamera = function() {
   document.getElementById('cam-file-input').click();
 };
 
-document.getElementById('cam-file-input').addEventListener('change', function() {
+document.getElementById('cam-file-input').addEventListener('change', async function() {
   const files = Array.from(this.files);
   if (!files.length) return;
-  files.forEach(file => {
+
+  for (const file of files) {
     const reader = new FileReader();
-    reader.onload = function(e) {
-      const dataUrl = e.target.result;
-      capturedPhotos.push({ dataUrl, receptor: camReceptor, verificacion: camVerificacion, ts: Date.now() });
-      const img = document.createElement('img');
-      img.src = dataUrl;
-      img.style.cssText = 'width:72px;height:72px;object-fit:cover;border-radius:8px;border:2px solid var(--border);';
-      document.getElementById('photos-thumbs').appendChild(img);
-      document.getElementById('photos-preview').style.display = 'block';
-      document.getElementById('btn-send-photos').style.display = 'block';
-      showToast(`📸 ${capturedPhotos.length} foto(s) lista(s)`);
-    };
-    reader.readAsDataURL(file);
-  });
+    const dataUrl = await new Promise(res => {
+      reader.onload = e => res(e.target.result);
+      reader.readAsDataURL(file);
+    });
+
+    capturedPhotos.push({ dataUrl, receptor: camReceptor, verificacion: camVerificacion, ts: Date.now() });
+
+    // Miniatura en pantalla
+    const img = document.createElement('img');
+    img.src = dataUrl;
+    img.style.cssText = 'width:72px;height:72px;object-fit:cover;border-radius:8px;border:2px solid var(--border);';
+    document.getElementById('photos-thumbs').appendChild(img);
+    document.getElementById('photos-preview').style.display = 'block';
+    document.getElementById('btn-send-photos').style.display = 'block';
+
+    // Subir a Firebase Storage y guardar URL en el registro
+    if (currentClientId) {
+      try {
+        const r = allRecords.find(x => x.id === currentClientId);
+        const tracking = r?.tracking || r?.trackings?.[0] || 'sin-tracking';
+        const ts = Date.now();
+        const path = `entregas/${tracking}_${ts}.jpg`;
+        const ref = storageRef(storage, path);
+        await uploadBytes(ref, file, { contentType: file.type || 'image/jpeg' });
+        const url = await getDownloadURL(ref);
+
+        // Agregar al array fotosEntrega del registro
+        const prevFotos = Array.isArray(r?.fotosEntrega) ? r.fotosEntrega : [];
+        const mergedFotos = [...prevFotos, url];
+        await updateDoc(doc(db, COL, currentClientId), { fotosEntrega: mergedFotos });
+        const idx = allRecords.findIndex(x => x.id === currentClientId);
+        if (idx >= 0) allRecords[idx] = { ...allRecords[idx], fotosEntrega: mergedFotos };
+
+        showToast(`📸 Foto ${mergedFotos.length} guardada`);
+      } catch(e) {
+        console.error('Error subiendo foto de entrega:', e);
+        showToast('⚠️ Foto local lista, error al subir');
+      }
+    }
+  }
   this.value = '';
 });
 
