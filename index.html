@@ -858,6 +858,22 @@ select option { background: var(--surface2); }
       <div id="c-fotos-entrega-grid" style="display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 16px;"></div>
     </div>
 
+    <div class="sec-header" style="display:flex;align-items:center;justify-content:space-between;padding-right:16px;">
+      <span>📍 Plus Code de entrega</span>
+    </div>
+    <div style="padding:0 16px 14px;display:flex;flex-direction:column;gap:8px;">
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="c-pluscode-input" placeholder="Ej. 8Q3C+6P Cuautitlán" autocomplete="off"
+          style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--text);font-size:13px;font-family:var(--sans);outline:none;"
+          onkeydown="if(event.key==='Enter')agregarPlusCodeCliente()">
+        <button class="btn btn-accent btn-sm" onclick="agregarPlusCodeCliente()" style="white-space:nowrap;flex-shrink:0;">＋ Agregar</button>
+      </div>
+      <div id="c-pluscode-list" style="display:flex;flex-direction:column;gap:6px;"></div>
+      <button class="btn btn-accent" id="btn-ir-ruta" onclick="irARuta()" style="display:none;margin-top:4px;">
+        🗺️ Calcular e ir a ruta
+      </button>
+    </div>
+
     <div class="sec-header">Acciones</div>
     <div class="action-list">
       <button class="btn btn-accent" id="btn-whatsapp-intro">
@@ -1522,6 +1538,11 @@ window.openClient = function(id) {
   badge.innerHTML = r.entregado
     ? '<span class="badge badge-green">✓ Entregado</span>'
     : '<span class="badge badge-orange">Pendiente</span>';
+
+  // ── PLUS CODES ──
+  renderPlusCodesCliente(Array.isArray(r.plusCodes) ? r.plusCodes : []);
+  document.getElementById('c-pluscode-input').value = '';
+
   showScreen('client');
 }
 
@@ -2744,9 +2765,210 @@ window.salirNavegacion = function() {
   showScreen('navegacion');
 }
 
+// ─── PLUS CODE POR CLIENTE ────────────────────────────────────────────
+
+function renderPlusCodesCliente(plusCodes) {
+  const list = document.getElementById('c-pluscode-list');
+  const btnRuta = document.getElementById('btn-ir-ruta');
+  if (!list) return;
+  if (!plusCodes || plusCodes.length === 0) {
+    list.innerHTML = `<div style="font-size:12px;color:var(--text3);padding:4px 0;">Sin Plus Codes registrados.</div>`;
+    btnRuta.style.display = 'none';
+    return;
+  }
+  list.innerHTML = plusCodes.map((pc, i) => `
+    <div style="display:flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:9px 12px;">
+      <div style="width:24px;height:24px;border-radius:7px;background:var(--accent);color:var(--bg);font-size:12px;font-weight:800;font-family:var(--mono);display:flex;align-items:center;justify-content:center;flex-shrink:0;">${i + 1}</div>
+      <div style="flex:1;font-size:13px;font-family:var(--mono);font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${pc}</div>
+      <button onclick="eliminarPlusCodeCliente(${i})" style="background:transparent;border:none;color:var(--red);font-size:16px;cursor:pointer;padding:2px 4px;flex-shrink:0;">✕</button>
+    </div>`).join('');
+  btnRuta.style.display = plusCodes.length >= 1 ? 'flex' : 'none';
+}
+
+window.agregarPlusCodeCliente = async function() {
+  const input = document.getElementById('c-pluscode-input');
+  const val = input.value.trim();
+  if (!val || !currentClientId) return;
+  const r = allRecords.find(x => x.id === currentClientId);
+  if (!r) return;
+  const prev = Array.isArray(r.plusCodes) ? r.plusCodes : [];
+  if (prev.includes(val)) { showToast('⚠️ Ya existe ese Plus Code'); return; }
+  input.disabled = true;
+  input.value = '⏳ Guardando...';
+  try {
+    const updated = [...prev, val];
+    await updateDoc(doc(db, COL, currentClientId), { plusCodes: updated });
+    const idx = allRecords.findIndex(x => x.id === currentClientId);
+    if (idx >= 0) allRecords[idx].plusCodes = updated;
+    renderPlusCodesCliente(updated);
+    input.value = '';
+    showToast(`📍 Plus Code ${updated.length} guardado`);
+  } catch(e) {
+    showToast('⚠️ Error al guardar');
+    input.value = val;
+  }
+  input.disabled = false;
+  input.focus();
+};
+
+window.eliminarPlusCodeCliente = async function(idx) {
+  const r = allRecords.find(x => x.id === currentClientId);
+  if (!r) return;
+  const updated = (Array.isArray(r.plusCodes) ? [...r.plusCodes] : []).filter((_, i) => i !== idx);
+  try {
+    await updateDoc(doc(db, COL, currentClientId), { plusCodes: updated });
+    const i = allRecords.findIndex(x => x.id === currentClientId);
+    if (i >= 0) allRecords[i].plusCodes = updated;
+    renderPlusCodesCliente(updated);
+    showToast('🗑 Plus Code eliminado');
+  } catch(e) { showToast('⚠️ Error al eliminar'); }
+};
+
+// ─── IR A RUTA ────────────────────────────────────────────────────────
+
+let irRutaParadas = []; // [{plusCode, lat, lng, label}] ordenadas
+
+window.irARuta = async function() {
+  const r = allRecords.find(x => x.id === currentClientId);
+  if (!r || !Array.isArray(r.plusCodes) || r.plusCodes.length === 0) {
+    showToast('Agrega al menos un Plus Code'); return;
+  }
+  showToast('⏳ Calculando ruta...');
+  // Resolver coordenadas de cada plus code
+  const resueltos = [];
+  for (const pc of r.plusCodes) {
+    try {
+      const geo = await resolverPlusCode(pc);
+      resueltos.push({ plusCode: pc, lat: geo.lat, lng: geo.lng, label: geo.label });
+    } catch(e) {
+      showToast(`⚠️ No se pudo resolver: ${pc}`); return;
+    }
+  }
+  // Ordenar por proximidad (nearest neighbor desde ubicación actual si disponible)
+  irRutaParadas = await ordenarParadasDesdeUbicacion(resueltos);
+
+  // Renderizar pantalla
+  document.getElementById('ir-ruta-title').textContent = `🗺️ ${r.nombre?.split(' ')[0] || 'Ruta'}`;
+  document.getElementById('ir-ruta-sub').textContent = `${irRutaParadas.length} paradas`;
+  renderIrRutaStops();
+  cargarMapaRutaCompleta();
+  showScreen('ir-ruta');
+};
+
+async function ordenarParadasDesdeUbicacion(paradas) {
+  return new Promise(resolve => {
+    if (!navigator.geolocation) { resolve(ordenarNearestNeighbor(paradas, null, null)); return; }
+    navigator.geolocation.getCurrentPosition(
+      pos => resolve(ordenarNearestNeighbor(paradas, pos.coords.latitude, pos.coords.longitude)),
+      () => resolve(ordenarNearestNeighbor(paradas, null, null)),
+      { timeout: 4000, maximumAge: 30000 }
+    );
+  });
+}
+
+function ordenarNearestNeighbor(paradas, originLat, originLng) {
+  if (paradas.length <= 1) return paradas;
+  const dist = (a, b) => Math.hypot(a.lat - b.lat, a.lng - b.lng);
+  const remaining = [...paradas];
+  const result = [];
+  let curLat = originLat ?? remaining[0].lat;
+  let curLng = originLng ?? remaining[0].lng;
+  while (remaining.length > 0) {
+    let minD = Infinity, minI = 0;
+    remaining.forEach((p, i) => {
+      const d = Math.hypot(p.lat - curLat, p.lng - curLng);
+      if (d < minD) { minD = d; minI = i; }
+    });
+    const next = remaining.splice(minI, 1)[0];
+    result.push(next);
+    curLat = next.lat; curLng = next.lng;
+  }
+  return result;
+}
+
+function renderIrRutaStops() {
+  const container = document.getElementById('ir-ruta-stops');
+  container.innerHTML = irRutaParadas.map((p, i) => `
+    <div style="display:flex;align-items:center;gap:10px;background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:9px 12px;">
+      <div style="width:26px;height:26px;border-radius:8px;background:var(--accent);color:var(--bg);font-size:12px;font-weight:800;font-family:var(--mono);display:flex;align-items:center;justify-content:center;flex-shrink:0;">${i + 1}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:12px;font-family:var(--mono);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.plusCode}</div>
+        <div style="font-size:11px;color:var(--text3);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.label.split(',')[0]}</div>
+      </div>
+    </div>`).join('');
+}
+
+function cargarMapaRutaCompleta() {
+  const iframe = document.getElementById('ir-ruta-map');
+  if (irRutaParadas.length === 0) return;
+  const apiKey = 'AIzaSyD-9tSrke72PouQMnMX-a7eZSW0jkFMBWY';
+
+  const buildUrl = (oLat, oLng) => {
+    const origin = oLat ? `${oLat},${oLng}` : `${irRutaParadas[0].lat},${irRutaParadas[0].lng}`;
+    const destination = `${irRutaParadas[irRutaParadas.length - 1].lat},${irRutaParadas[irRutaParadas.length - 1].lng}`;
+    const waypoints = irRutaParadas.slice(oLat ? 0 : 1, -1).map(p => `${p.lat},${p.lng}`).join('|');
+    let url = `https://www.google.com/maps/embed/v1/directions?key=${apiKey}&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(destination)}&mode=driving&language=es`;
+    if (waypoints) url += `&waypoints=${encodeURIComponent(waypoints)}`;
+    return url;
+  };
+
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(
+      pos => { iframe.src = buildUrl(pos.coords.latitude, pos.coords.longitude); },
+      () => { iframe.src = buildUrl(null, null); },
+      { timeout: 4000, maximumAge: 30000 }
+    );
+  } else {
+    iframe.src = buildUrl(null, null);
+  }
+}
+
+window.abrirGoogleMapsNativo = function() {
+  if (irRutaParadas.length === 0) return;
+  const destination = `${irRutaParadas[irRutaParadas.length - 1].lat},${irRutaParadas[irRutaParadas.length - 1].lng}`;
+  const waypoints = irRutaParadas.slice(0, -1).map(p => `${p.lat},${p.lng}`).join('/');
+  const url = `https://www.google.com/maps/dir/${waypoints}/${destination}`;
+  window.open(url, '_blank');
+};
+
 // ─── INIT ─────────────────────────────────────────────────────────────
 loadRecords();
 updateRutaActivaBar();
 </script>
+<!-- ══════════════════════════════════════════
+     SCREEN: IR A RUTA (mapa completo)
+══════════════════════════════════════════ -->
+<div class="screen hidden" id="screen-ir-ruta">
+  <div class="topbar" style="background:var(--bg);">
+    <button class="topbar-back" onclick="showScreen('client')">←</button>
+    <h2 id="ir-ruta-title">🗺️ Ir a Ruta</h2>
+    <span class="topbar-sub" id="ir-ruta-sub"></span>
+  </div>
+
+  <!-- Mapa ocupa todo el espacio disponible -->
+  <div style="flex:1;position:relative;overflow:hidden;">
+    <iframe id="ir-ruta-map"
+      allowfullscreen
+      referrerpolicy="no-referrer-when-downgrade"
+      style="border:none;width:100%;height:100%;display:block;">
+    </iframe>
+
+    <!-- HUD inferior con lista de paradas -->
+    <div id="ir-ruta-hud" style="
+      position:absolute;bottom:0;left:0;right:0;
+      background:linear-gradient(0deg,var(--bg) 0%,rgba(10,22,40,.97) 80%,transparent 100%);
+      padding:14px 16px 20px;display:flex;flex-direction:column;gap:10px;
+    ">
+      <!-- Paradas ordenadas -->
+      <div id="ir-ruta-stops" style="display:flex;flex-direction:column;gap:6px;max-height:180px;overflow-y:auto;"></div>
+
+      <!-- Botón abrir en Google Maps nativo -->
+      <button class="btn btn-green" onclick="abrirGoogleMapsNativo()" style="font-size:14px;">
+        📱 Abrir en Google Maps
+      </button>
+    </div>
+  </div>
+</div>
+
 </body>
 </html>
