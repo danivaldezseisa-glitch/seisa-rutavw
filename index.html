@@ -407,6 +407,42 @@ select option { background: var(--surface2); }
 .photo-capture-btns { display: flex; gap: 8px; }
 .photo-capture-btns .btn { flex: 1; }
 
+/* ── FOTO STEPS ── */
+.foto-steps {
+  display: flex; align-items: center; gap: 0; margin: 2px 0;
+}
+.foto-step {
+  display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 0 0 auto;
+}
+.foto-step-num {
+  width: 28px; height: 28px; border-radius: 50%;
+  background: var(--surface2); border: 2px solid var(--border);
+  color: var(--text3); font-size: 13px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+  transition: all .2s;
+}
+.foto-step.active .foto-step-num { background: var(--accent); border-color: var(--accent); color: var(--bg); }
+.foto-step.done .foto-step-num { background: var(--green); border-color: var(--green); color: var(--bg); }
+.foto-step-label { font-size: 10px; color: var(--text3); font-weight: 600; text-transform: uppercase; letter-spacing: .06em; }
+.foto-step.active .foto-step-label { color: var(--accent); }
+.foto-step.done .foto-step-label { color: var(--green); }
+.foto-step-line { flex: 1; height: 2px; background: var(--border); margin: 0 6px; margin-bottom: 14px; transition: background .2s; }
+.foto-step-line.done { background: var(--green); }
+
+/* ── MINIATURAS ── */
+.foto-thumbs-row { display: flex; gap: 10px; }
+.foto-thumb-slot {
+  flex: 1; aspect-ratio: 4/3; border-radius: 10px;
+  background: var(--surface); border: 2px dashed var(--border);
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; transition: border-color .2s;
+}
+.foto-thumb-slot.filled { border-style: solid; border-color: var(--green); }
+.foto-thumb-slot.active { border-color: var(--accent); }
+.foto-thumb-slot img { width: 100%; height: 100%; object-fit: cover; border-radius: 8px; }
+.foto-thumb-ph { text-align: center; color: var(--text3); font-size: 18px; line-height: 1.4; }
+.foto-thumb-ph span { font-size: 10px; display: block; margin-top: 2px; }
+
 /* ── NUEVA RUTA SCREEN ── */
 .nueva-ruta-hero {
   padding: 32px 20px 24px;
@@ -941,23 +977,54 @@ select option { background: var(--surface2); }
 <!-- MODAL: FOTO DEL ARTÍCULO -->
 <div class="photo-capture-overlay" id="modal-foto-articulo">
   <div class="photo-capture-box">
+    <!-- Encabezado -->
     <div style="display:flex;align-items:center;justify-content:space-between;">
-      <h3>📦 Foto del artículo</h3>
+      <h3 id="foto-modal-title">📦 Foto del artículo</h3>
       <span style="font-size:11px;color:var(--text3);font-family:var(--mono);" id="foto-file-label"></span>
     </div>
-    <p style="font-size:13px;color:var(--text2);margin-top:-6px;">Toma una foto del paquete antes de guardarlo</p>
+
+    <!-- Indicador de pasos -->
+    <div class="foto-steps">
+      <div class="foto-step" id="fstep-1">
+        <div class="foto-step-num">1</div>
+        <div class="foto-step-label">Etiqueta</div>
+      </div>
+      <div class="foto-step-line"></div>
+      <div class="foto-step" id="fstep-2">
+        <div class="foto-step-num">2</div>
+        <div class="foto-step-label">Producto</div>
+      </div>
+    </div>
+
+    <p style="font-size:13px;color:var(--text2);margin-top:-4px;" id="foto-modal-sub">Toma una foto de la etiqueta del paquete</p>
+
+    <!-- Miniaturas de ambas fotos -->
+    <div class="foto-thumbs-row">
+      <div class="foto-thumb-slot" id="fthumb-1">
+        <div class="foto-thumb-ph">📷<br><span>Foto 1</span></div>
+      </div>
+      <div class="foto-thumb-slot" id="fthumb-2">
+        <div class="foto-thumb-ph">📷<br><span>Foto 2</span></div>
+      </div>
+    </div>
+
+    <!-- Preview grande -->
     <div class="photo-preview-area" id="foto-preview-area">
       <div class="photo-placeholder">
         <div class="ph-icon">📷</div>
         <p>Sin foto aún</p>
       </div>
     </div>
-    <input type="file" id="foto-articulo-input" accept="image/*" style="display:none;">
+
+    <input type="file" id="foto-articulo-input" accept="image/*" capture="environment" style="display:none;">
+
+    <!-- Botones de acción -->
     <div class="photo-capture-btns">
-      <button class="btn btn-ghost" onclick="document.getElementById('foto-articulo-input').click()">📷 Tomar foto</button>
-      <button class="btn btn-accent" id="btn-guardar-con-foto" onclick="confirmarGuardadoConFoto()">💾 Guardar</button>
+      <button class="btn btn-ghost" id="btn-tomar-foto" onclick="document.getElementById('foto-articulo-input').click()">📷 Tomar foto</button>
+      <button class="btn btn-accent" id="btn-siguiente-foto" onclick="avanzarFotoStep()" disabled>Siguiente →</button>
     </div>
-    <button class="btn btn-ghost" style="color:var(--red);border-color:var(--red);" onclick="confirmarGuardadoConFoto(true)">Guardar sin foto</button>
+    <button class="btn btn-ghost" id="btn-guardar-con-foto" onclick="confirmarGuardadoConFoto()" style="display:none;">💾 Guardar paquete</button>
+    <button class="btn btn-ghost" style="color:var(--red);border-color:var(--red);font-size:12px;" onclick="confirmarGuardadoConFoto(true)">Saltar fotos y guardar</button>
   </div>
 </div>
 
@@ -1620,86 +1687,135 @@ function updateQI(f, status) {
   if (qi)  qi.className = `qi ${status}`;
 }
 
-// ─── FOTO ARTÍCULO ────────────────────────────────────────────────────
+// ─── FOTO ARTÍCULO (2 fotos) ─────────────────────────────────────────
 let pendingRecordData = null;
 let pendingFileRef = null;
-let capturedArticuloPhoto = null;  // base64 para preview
-let capturedArticuloFile = null;   // File original para subir a Storage
+let fotoStep = 1;                  // 1 = etiqueta, 2 = producto
+let capturedFotos = [null, null];  // [File etiqueta, File producto]
+let capturedFotosB64 = [null, null];
+
+function resetFotoModal() {
+  fotoStep = 1;
+  capturedFotos = [null, null];
+  capturedFotosB64 = [null, null];
+  // Preview
+  document.getElementById('foto-preview-area').innerHTML = `
+    <div class="photo-placeholder"><div class="ph-icon">📷</div><p>Sin foto aún</p></div>`;
+  // Miniaturas
+  document.getElementById('fthumb-1').innerHTML = '<div class="foto-thumb-ph">📷<br><span>Foto 1</span></div>';
+  document.getElementById('fthumb-2').innerHTML = '<div class="foto-thumb-ph">📷<br><span>Foto 2</span></div>';
+  document.getElementById('fthumb-1').className = 'foto-thumb-slot active';
+  document.getElementById('fthumb-2').className = 'foto-thumb-slot';
+  // Steps
+  document.getElementById('fstep-1').className = 'foto-step active';
+  document.getElementById('fstep-2').className = 'foto-step';
+  document.querySelector('.foto-step-line').className = 'foto-step-line';
+  // Textos y botones
+  document.getElementById('foto-modal-title').textContent = '📷 Foto 1 — Etiqueta';
+  document.getElementById('foto-modal-sub').textContent = 'Toma una foto clara de la etiqueta del paquete';
+  document.getElementById('btn-tomar-foto').textContent = '📷 Tomar foto 1';
+  document.getElementById('btn-siguiente-foto').textContent = 'Siguiente →';
+  document.getElementById('btn-siguiente-foto').disabled = true;
+  document.getElementById('btn-siguiente-foto').style.display = '';
+  document.getElementById('btn-guardar-con-foto').style.display = 'none';
+}
 
 document.getElementById('foto-articulo-input').addEventListener('change', function() {
   const file = this.files[0];
   if (!file) return;
-  capturedArticuloFile = file;
+  capturedFotos[fotoStep - 1] = file;
+
   const reader = new FileReader();
   reader.onload = e => {
-    capturedArticuloPhoto = e.target.result;
-    const area = document.getElementById('foto-preview-area');
-    area.innerHTML = `<img src="${capturedArticuloPhoto}" alt="Artículo">`;
-    document.getElementById('btn-guardar-con-foto').textContent = '💾 Guardar con foto';
+    const b64 = e.target.result;
+    capturedFotosB64[fotoStep - 1] = b64;
+
+    // Actualizar miniatura del paso actual
+    const thumb = document.getElementById(`fthumb-${fotoStep}`);
+    thumb.innerHTML = `<img src="${b64}" alt="Foto ${fotoStep}">`;
+    thumb.className = 'foto-thumb-slot filled';
+
+    // Actualizar preview grande
+    document.getElementById('foto-preview-area').innerHTML = `<img src="${b64}" alt="Foto ${fotoStep}" style="width:100%;height:100%;object-fit:cover;border-radius:10px;">`;
+
+    // Habilitar siguiente / guardar
+    document.getElementById('btn-siguiente-foto').disabled = false;
   };
   reader.readAsDataURL(file);
   this.value = '';
 });
 
+window.avanzarFotoStep = function() {
+  if (fotoStep === 1) {
+    // Marcar paso 1 como hecho, activar paso 2
+    fotoStep = 2;
+    document.getElementById('fstep-1').className = 'foto-step done';
+    document.getElementById('fstep-2').className = 'foto-step active';
+    document.querySelector('.foto-step-line').className = 'foto-step-line done';
+    document.getElementById('fthumb-2').className = 'foto-thumb-slot active';
+
+    // Limpiar preview para foto 2
+    document.getElementById('foto-preview-area').innerHTML = `
+      <div class="photo-placeholder"><div class="ph-icon">📦</div><p>Sin foto aún</p></div>`;
+
+    document.getElementById('foto-modal-title').textContent = '📦 Foto 2 — Producto';
+    document.getElementById('foto-modal-sub').textContent = 'Ahora toma una foto del contenido o producto';
+    document.getElementById('btn-tomar-foto').textContent = '📷 Tomar foto 2';
+    document.getElementById('btn-siguiente-foto').textContent = '✓ Listo';
+    document.getElementById('btn-siguiente-foto').disabled = true;
+
+  } else if (fotoStep === 2) {
+    // Ambas fotos capturadas → mostrar botón guardar
+    document.getElementById('fstep-2').className = 'foto-step done';
+    document.getElementById('btn-siguiente-foto').style.display = 'none';
+    document.getElementById('btn-tomar-foto').style.display = 'none';
+    document.getElementById('btn-guardar-con-foto').style.display = '';
+    document.getElementById('foto-modal-title').textContent = '✅ ¡Listo para guardar!';
+    document.getElementById('foto-modal-sub').textContent = 'Las 2 fotos fueron capturadas correctamente';
+  }
+};
+
 function showFotoArticuloModal(result, fileRef, fileName) {
   pendingRecordData = result;
   pendingFileRef = fileRef;
-  capturedArticuloPhoto = null;
-  capturedArticuloFile = null;
-  document.getElementById('foto-preview-area').innerHTML = `
-    <div class="photo-placeholder">
-      <div class="ph-icon">📷</div>
-      <p>Sin foto aún</p>
-    </div>`;
-  document.getElementById('foto-file-label').textContent = fileName?.substring(0,20) || '';
-  document.getElementById('btn-guardar-con-foto').textContent = '💾 Guardar';
-  document.getElementById('btn-guardar-con-foto').disabled = false;
+  resetFotoModal();
+  document.getElementById('foto-file-label').textContent = fileName?.substring(0, 20) || '';
   document.getElementById('modal-foto-articulo').classList.add('open');
 }
 
 window.confirmarGuardadoConFoto = async function(sinFoto = false) {
   if (!pendingRecordData) return;
-
   const data = { ...pendingRecordData };
   const btnGuardar = document.getElementById('btn-guardar-con-foto');
+  if (btnGuardar) { btnGuardar.disabled = true; btnGuardar.textContent = '⏳ Subiendo...'; }
 
-  // Si hay foto, subirla a Firebase Storage primero
-  if (!sinFoto && capturedArticuloFile) {
-    try {
-      btnGuardar.disabled = true;
-      btnGuardar.textContent = '⏳ Subiendo foto...';
-
-      // Nombre único en Storage
-      const ts = Date.now();
-      const tracking = data.tracking || 'sin-tracking';
-      const path = `articulos/${tracking}_${ts}.jpg`;
-      const ref = storageRef(storage, path);
-
-      // Subir el File directamente (sin convertir)
-      await uploadBytes(ref, capturedArticuloFile, { contentType: capturedArticuloFile.type || 'image/jpeg' });
-
-      // Obtener URL pública
-      const url = await getDownloadURL(ref);
-      data.fotoArticuloUrl = url;
-
-      btnGuardar.disabled = false;
-      btnGuardar.textContent = '💾 Guardar con foto';
-    } catch(e) {
-      console.error('Error subiendo foto:', e);
-      showToast('⚠️ Error al subir foto, guardando sin ella');
-      btnGuardar.disabled = false;
-      btnGuardar.textContent = '💾 Guardar';
+  // Subir ambas fotos a Firebase Storage
+  if (!sinFoto) {
+    const labels = ['fotoEtiquetaUrl', 'fotoProductoUrl'];
+    for (let i = 0; i < 2; i++) {
+      const file = capturedFotos[i];
+      if (!file) continue;
+      try {
+        const ts = Date.now() + i;
+        const tracking = data.tracking || 'sin-tracking';
+        const path = `articulos/${tracking}_${i+1}_${ts}.jpg`;
+        const ref = storageRef(storage, path);
+        await uploadBytes(ref, file, { contentType: file.type || 'image/jpeg' });
+        data[labels[i]] = await getDownloadURL(ref);
+        // Compatibilidad: primera foto también en fotoArticuloUrl
+        if (i === 0) data.fotoArticuloUrl = data[labels[i]];
+      } catch(e) {
+        console.error(`Error subiendo foto ${i+1}:`, e);
+      }
     }
   }
 
+  if (btnGuardar) { btnGuardar.disabled = false; btnGuardar.textContent = '💾 Guardar paquete'; }
   document.getElementById('modal-foto-articulo').classList.remove('open');
 
   try {
     await saveRecord(data);
-    if (pendingFileRef) {
-      pendingFileRef._done = true;
-      updateQI(pendingFileRef, 'done');
-    }
+    if (pendingFileRef) { pendingFileRef._done = true; updateQI(pendingFileRef, 'done'); }
   } catch(e) {
     console.error(e);
     if (pendingFileRef) updateQI(pendingFileRef, 'err');
@@ -1707,8 +1823,8 @@ window.confirmarGuardadoConFoto = async function(sinFoto = false) {
 
   pendingRecordData = null;
   pendingFileRef = null;
-  capturedArticuloPhoto = null;
-  capturedArticuloFile = null;
+  capturedFotos = [null, null];
+  capturedFotosB64 = [null, null];
 
   const remaining = files.filter(f => !f._done);
   if (remaining.length === 0) {
@@ -1718,7 +1834,7 @@ window.confirmarGuardadoConFoto = async function(sinFoto = false) {
   } else {
     procesarSiguienteArchivo();
   }
-}
+};
 
 let processingQueue = [];
 let processingIndex = 0;
