@@ -629,6 +629,11 @@ select option { background: var(--surface2); }
       💬 Enviar a pendientes
     </button>
   </div>
+  <div style="padding:0 16px 10px;">
+    <button class="btn" onclick="abrirFinDeRuta()" style="background:linear-gradient(135deg,#ff5252,#cc0000);color:#fff;font-size:14px;font-weight:700;border:none;gap:8px;">
+      🏁 Fin de Ruta
+    </button>
+  </div>
   <div id="ruta-activa-bar" style="display:none;" class="ruta-active-bar" onclick="showScreen('nueva-ruta')">
     <div class="ruta-active-dot"></div>
     <div class="ruta-active-name" id="ruta-activa-nombre">—</div>
@@ -968,6 +973,21 @@ select option { background: var(--surface2); }
       <div id="c-fotos-entrega-grid" style="display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 16px;"></div>
     </div>
 
+    <div id="c-fotos-excepcion-wrap">
+      <div class="sec-header" style="display:flex;align-items:center;justify-content:space-between;padding-right:16px;">
+        <span>⚠️ Fotos de excepción de entrega</span>
+        <label for="c-excepcion-file-input" style="
+          display:inline-flex;align-items:center;gap:5px;
+          padding:5px 12px;border-radius:99px;font-size:12px;font-weight:600;
+          background:rgba(255,145,0,.12);border:1px solid rgba(255,145,0,.3);
+          color:var(--orange);cursor:pointer;">
+          ＋ Agregar
+        </label>
+      </div>
+      <input type="file" id="c-excepcion-file-input" accept="image/*" multiple style="display:none;">
+      <div id="c-fotos-excepcion-grid" style="display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 16px;"></div>
+    </div>
+
     <div class="sec-header" style="display:flex;align-items:center;justify-content:space-between;padding-right:16px;">
       <span>📍 Plus Code de entrega</span>
     </div>
@@ -1052,6 +1072,12 @@ select option { background: var(--surface2); }
               <div id="opt-cliente" onclick="setCamOpt('receptor','cliente')" style="flex:1;padding:14px 8px;border-radius:10px;text-align:center;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--accent);background:rgba(0,212,255,.15);color:var(--accent);">👤 Cliente</div>
               <div id="opt-familiar" onclick="setCamOpt('receptor','familiar')" style="flex:1;padding:14px 8px;border-radius:10px;text-align:center;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--border);background:var(--surface2);color:var(--text2);">👨‍👩‍👦 Familiar</div>
             </div>
+            <!-- Campo de comentario para familiar -->
+            <div id="familiar-comentario-wrap" style="display:none;margin-top:10px;">
+              <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">💬 Comentario (nombre del familiar)</div>
+              <textarea id="familiar-comentario" placeholder="Ej. Esposa, hijo mayor, vecino autorizado..."
+                style="width:100%;height:70px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--text);font-size:14px;font-family:var(--sans);outline:none;resize:none;"></textarea>
+            </div>
           </div>
           <div class="card">
             <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Método de verificación</div>
@@ -1059,6 +1085,7 @@ select option { background: var(--surface2); }
               <div id="opt-nopedido" onclick="setCamOpt('verificacion','nopedido')" style="padding:13px 14px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--accent);background:rgba(0,212,255,.15);color:var(--accent);">🔢 Validación de No. de pedido</div>
               <div id="opt-ine" onclick="setCamOpt('verificacion','ine')" style="padding:13px 14px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--border);background:var(--surface2);color:var(--text2);">🪪 Validación por INE</div>
               <div id="opt-wapedido" onclick="setCamOpt('verificacion','wapedido')" style="padding:13px 14px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--border);background:var(--surface2);color:var(--text2);">📲 Envío de No. de pedido por WhatsApp</div>
+              <div id="opt-codigoentrega" onclick="setCamOpt('verificacion','codigoentrega')" style="padding:13px 14px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--border);background:var(--surface2);color:var(--text2);">🔑 Validación por código de entrega</div>
             </div>
           </div>
         </div>
@@ -1212,6 +1239,49 @@ select option { background: var(--surface2); }
     </div>
     <button class="btn btn-ghost" id="btn-guardar-con-foto" onclick="confirmarGuardadoConFoto()" style="display:none;">💾 Guardar paquete</button>
     <button class="btn btn-ghost" style="color:var(--red);border-color:var(--red);font-size:12px;" onclick="confirmarGuardadoConFoto(true)">Saltar fotos y guardar</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     MODAL: FIN DE RUTA
+══════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-fin-ruta">
+  <div class="modal" style="padding-bottom:40px;">
+    <div class="modal-handle"></div>
+    <h3>🏁 Fin de Ruta</h3>
+    <div style="background:rgba(255,82,82,.08);border:1px solid rgba(255,82,82,.2);border-radius:10px;padding:12px 14px;margin-bottom:16px;">
+      <div style="font-size:12px;color:var(--text2);margin-bottom:4px;">Operador</div>
+      <div style="font-size:13px;font-weight:700;color:var(--text);font-family:var(--mono);" id="fin-ruta-header-preview">FIN DE RUTA OP: DANIEL VALDES PLACAS: KU3000A UNIDAD 1.5 COLOR: BLANCA RUTA: —</div>
+    </div>
+
+    <!-- Foto de fin de ruta -->
+    <div class="field">
+      <label>📸 Foto de cierre de ruta</label>
+      <input type="file" id="fin-ruta-foto-input" accept="image/*" capture="environment" style="display:none;">
+      <div style="display:flex;gap:8px;margin-bottom:8px;">
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('fin-ruta-foto-input').click()" style="flex:1;font-size:13px;">
+          📷 Tomar / seleccionar foto
+        </button>
+      </div>
+      <div id="fin-ruta-fotos-grid" style="display:flex;flex-wrap:wrap;gap:8px;margin-top:4px;"></div>
+    </div>
+
+    <!-- Resumen de excepciones -->
+    <div class="field">
+      <label>⚠️ Excepciones de entrega registradas</label>
+      <div id="fin-ruta-excepciones-list" style="display:flex;flex-direction:column;gap:6px;margin-top:4px;">
+        <div style="font-size:13px;color:var(--text3);padding:10px;text-align:center;" id="fin-ruta-exc-empty">Sin excepciones registradas</div>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px;">
+      <button class="btn btn-red" onclick="enviarFinDeRuta()">
+        📤 Enviar Fin de Ruta por WhatsApp
+      </button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-fin-ruta')">
+        Cancelar
+      </button>
+    </div>
   </div>
 </div>
 
@@ -1686,6 +1756,18 @@ window.openClient = function(id) {
   const entregaGrid = document.getElementById('c-fotos-entrega-grid');
   renderFotosEntregaGrid(fotosEntrega);
 
+  // ── FOTOS DE EXCEPCION ──
+  const fotosExcepcion = Array.isArray(r.fotosExcepcion) ? r.fotosExcepcion : [];
+  const excepcionGrid = document.getElementById('c-fotos-excepcion-grid');
+  if (fotosExcepcion.length > 0) {
+    excepcionGrid.innerHTML = fotosExcepcion.map(url =>
+      `<img src="${url}" onclick="verFotoCompleta('${url}')"
+        style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:2px solid var(--orange);cursor:pointer;">`
+    ).join('');
+  } else {
+    excepcionGrid.innerHTML = `<div style="width:100%;padding:12px 0;font-size:13px;color:var(--text3);text-align:center;">Sin fotos de excepción. Toca <strong style="color:var(--orange);">＋ Agregar</strong> para añadir.</div>`;
+  }
+
   const badge = document.getElementById('client-status-badge');
   badge.innerHTML = r.entregado
     ? '<span class="badge badge-green">✓ Entregado</span>'
@@ -1908,6 +1990,8 @@ document.getElementById('btn-open-camera').addEventListener('click', () => {
   document.getElementById('cam-screen-title').textContent = '📸 Registrar entrega';
   document.getElementById('cam-entrega-cards').style.display = 'block';
   document.getElementById('cam-excepcion-card').style.display = 'none';
+  document.getElementById('familiar-comentario-wrap').style.display = 'none';
+  document.getElementById('familiar-comentario').value = '';
   setCamOpt('receptor', 'cliente');
   setCamOpt('verificacion', 'nopedido');
   showScreen('camera');
@@ -1981,9 +2065,11 @@ window.setCamOpt = function(group, val) {
     camReceptor = val;
     document.getElementById('opt-cliente').style.cssText += val === 'cliente' ? activeStyle : inactiveStyle;
     document.getElementById('opt-familiar').style.cssText += val === 'familiar' ? activeStyle : inactiveStyle;
+    // Mostrar/ocultar campo de comentario para familiar
+    document.getElementById('familiar-comentario-wrap').style.display = val === 'familiar' ? 'block' : 'none';
   } else if (group === 'verificacion') {
     camVerificacion = val;
-    ['nopedido','ine','wapedido'].forEach(id => {
+    ['nopedido','ine','wapedido','codigoentrega'].forEach(id => {
       document.getElementById('opt-' + id).style.cssText += val === id ? activeStyle : inactiveStyle;
     });
   }
@@ -2008,6 +2094,14 @@ window.sendPhotosToWhatsApp = async function() {
 📦 *Núm. Pedido:* ${orden}
 🔖 *Guía:* ${tracking}${comentario ? `\n💬 *Comentario:* ${comentario}` : ''}
 ━━━━━━━━━━━━━━━━━━━`;
+    // Guardar excepción en Firestore para el resumen de fin de ruta
+    if (currentClientId) {
+      try {
+        await updateDoc(doc(db, COL, currentClientId), { excTipo: excLabel, excComentario: comentario });
+        const idx = allRecords.findIndex(x => x.id === currentClientId);
+        if (idx >= 0) allRecords[idx] = { ...allRecords[idx], excTipo: excLabel, excComentario: comentario };
+      } catch(e) { console.error('Error guardando excepción:', e); }
+    }
   } else {
     const receptorTexto = camReceptor === 'familiar' ? '👨‍👩‍👦 Familiar del cliente' : '👤 Cliente titular';
     let verificacionTexto = '';
@@ -2015,16 +2109,19 @@ window.sendPhotosToWhatsApp = async function() {
       verificacionTexto = '🪪 Validación por INE';
     } else if (camVerificacion === 'wapedido') {
       verificacionTexto = '📲 No. de pedido por WhatsApp';
+    } else if (camVerificacion === 'codigoentrega') {
+      verificacionTexto = '🔑 Validación por código de entrega';
     } else {
       verificacionTexto = '🔢 Validación de No. de pedido';
     }
+    const familiarComentario = camReceptor === 'familiar' ? (document.getElementById('familiar-comentario').value.trim() || '') : '';
     texto =
 `✅ *ENTREGA REALIZADA*
 ━━━━━━━━━━━━━━━━━━━
 👤 *Cliente:* ${nombre}
 📦 *Núm. Pedido:* ${orden}
 🔖 *Guía:* ${tracking}
-📬 *Recibe:* ${receptorTexto}
+📬 *Recibe:* ${receptorTexto}${familiarComentario ? `\n💬 *Familiar:* ${familiarComentario}` : ''}
 ✔️ *Verificación:* ${verificacionTexto}
 ━━━━━━━━━━━━━━━━━━━`;
   }
@@ -3368,6 +3465,151 @@ window.abrirModalExcepcion = function(tipo, icon, label) {
   document.getElementById('cam-exc-comentario').value = '';
 
   showScreen('camera');
+};
+
+// ─── FOTOS EXCEPCION EN PANTALLA CLIENTE ─────────────────────────────
+document.getElementById('c-excepcion-file-input').addEventListener('change', async function() {
+  const files = Array.from(this.files);
+  if (!files.length || !currentClientId) return;
+  const r = allRecords.find(x => x.id === currentClientId);
+  const grid = document.getElementById('c-fotos-excepcion-grid');
+  for (const file of files) {
+    const reader = new FileReader();
+    const dataUrl = await new Promise(res => { reader.onload = e => res(e.target.result); reader.readAsDataURL(file); });
+    const img = document.createElement('img');
+    img.src = dataUrl;
+    img.style.cssText = 'width:80px;height:80px;object-fit:cover;border-radius:8px;border:2px solid var(--orange);cursor:pointer;';
+    img.onclick = () => verFotoCompleta(dataUrl);
+    grid.appendChild(img);
+    try {
+      const tracking = r?.tracking || r?.trackings?.[0] || 'sin-tracking';
+      const path = `excepciones/${tracking}_${Date.now()}.jpg`;
+      const ref = storageRef(storage, path);
+      await uploadBytes(ref, file, { contentType: file.type || 'image/jpeg' });
+      const url = await getDownloadURL(ref);
+      const prevFotos = Array.isArray(r?.fotosExcepcion) ? r.fotosExcepcion : [];
+      const mergedFotos = [...prevFotos, url];
+      await updateDoc(doc(db, COL, currentClientId), { fotosExcepcion: mergedFotos });
+      const idx = allRecords.findIndex(x => x.id === currentClientId);
+      if (idx >= 0) allRecords[idx] = { ...allRecords[idx], fotosExcepcion: mergedFotos };
+      showToast(`⚠️ Foto de excepción guardada`);
+    } catch(e) { showToast('⚠️ Foto local lista, error al subir'); }
+  }
+  this.value = '';
+});
+
+// ─── FIN DE RUTA ─────────────────────────────────────────────────────
+let finRutaFotos = [];
+
+window.abrirFinDeRuta = function() {
+  finRutaFotos = [];
+  document.getElementById('fin-ruta-fotos-grid').innerHTML = '';
+  document.getElementById('fin-ruta-foto-input').value = '';
+
+  // Actualizar header preview con ruta activa
+  const rutaNombre = rutaActiva || '—';
+  document.getElementById('fin-ruta-header-preview').textContent =
+    `FIN DE RUTA OP: DANIEL VALDES PLACAS: KU3000A UNIDAD 1.5 COLOR: BLANCA RUTA: ${rutaNombre}`;
+
+  // Buscar excepciones del día de hoy
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2,'0');
+  const mm = String(now.getMonth()+1).padStart(2,'0');
+  const yyyy = now.getFullYear();
+  const hoy = `${dd}/${mm}/${yyyy}`;
+
+  // Buscar registros con excepción (campo excepcion o excepciones)
+  const conExcepcion = allRecords.filter(r =>
+    (r.fechaDia === hoy || !r.fechaDia) &&
+    (r.excepcion || r.excepciones?.length || r.excTipo)
+  );
+
+  const list = document.getElementById('fin-ruta-excepciones-list');
+  const empty = document.getElementById('fin-ruta-exc-empty');
+
+  if (conExcepcion.length === 0) {
+    list.innerHTML = '<div style="font-size:13px;color:var(--text3);padding:10px;text-align:center;" id="fin-ruta-exc-empty">Sin excepciones registradas hoy</div>';
+  } else {
+    list.innerHTML = conExcepcion.map(r => {
+      const tipo = r.excTipo || r.excepcion || 'Excepción';
+      const comentario = r.excComentario || r.excepciones?.[0]?.comentario || '';
+      return `<div style="background:rgba(255,145,0,.08);border:1px solid rgba(255,145,0,.25);border-radius:10px;padding:10px 12px;">
+        <div style="font-size:13px;font-weight:700;color:var(--orange);">⚠️ ${tipo}</div>
+        <div style="font-size:12px;color:var(--text2);margin-top:2px;">${r.nombre || '—'}</div>
+        ${comentario ? `<div style="font-size:11px;color:var(--text3);margin-top:3px;">💬 ${comentario}</div>` : ''}
+      </div>`;
+    }).join('');
+  }
+
+  document.getElementById('modal-fin-ruta').classList.add('open');
+};
+
+document.getElementById('fin-ruta-foto-input').addEventListener('change', async function() {
+  const files = Array.from(this.files);
+  if (!files.length) return;
+  const grid = document.getElementById('fin-ruta-fotos-grid');
+  for (const file of files) {
+    const reader = new FileReader();
+    const dataUrl = await new Promise(res => { reader.onload = e => res(e.target.result); reader.readAsDataURL(file); });
+    finRutaFotos.push({ dataUrl, file });
+    const img = document.createElement('img');
+    img.src = dataUrl;
+    img.style.cssText = 'width:80px;height:80px;object-fit:cover;border-radius:8px;border:2px solid var(--red);';
+    grid.appendChild(img);
+  }
+  this.value = '';
+});
+
+window.enviarFinDeRuta = async function() {
+  const rutaNombre = rutaActiva || '—';
+  const encabezado = `FIN DE RUTA OP: DANIEL VALDES PLACAS: KU3000A UNIDAD 1.5 COLOR: BLANCA RUTA: ${rutaNombre}`;
+
+  // Buscar excepciones
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2,'0');
+  const mm = String(now.getMonth()+1).padStart(2,'0');
+  const yyyy = now.getFullYear();
+  const hoy = `${dd}/${mm}/${yyyy}`;
+  const conExcepcion = allRecords.filter(r =>
+    (r.fechaDia === hoy || !r.fechaDia) &&
+    (r.excepcion || r.excepciones?.length || r.excTipo)
+  );
+
+  let excResumen = '';
+  if (conExcepcion.length > 0) {
+    excResumen = '\n\n⚠️ *EXCEPCIONES DE ENTREGA*\n━━━━━━━━━━━━━━━━━━━\n';
+    excResumen += conExcepcion.map(r => {
+      const tipo = r.excTipo || r.excepcion || 'Excepción';
+      const comentario = r.excComentario || r.excepciones?.[0]?.comentario || '';
+      return `• *${tipo}*\n  👤 ${r.nombre || '—'}${comentario ? `\n  💬 ${comentario}` : ''}`;
+    }).join('\n');
+    excResumen += '\n━━━━━━━━━━━━━━━━━━━';
+  }
+
+  const texto = `🏁 *${encabezado}*${excResumen}`;
+
+  // Convertir fotos a File objects
+  const archivos = finRutaFotos.map((p, i) => {
+    const arr = p.dataUrl.split(',');
+    const mime = arr[0].match(/:(.*?);/)[1];
+    const bstr = atob(arr[1]);
+    const u8 = new Uint8Array(bstr.length);
+    for (let j = 0; j < bstr.length; j++) u8[j] = bstr.charCodeAt(j);
+    return new File([u8], `fin_ruta_${i + 1}.jpg`, { type: mime });
+  });
+
+  if (archivos.length > 0 && navigator.canShare && navigator.canShare({ files: archivos, text: texto })) {
+    try {
+      await navigator.share({ files: archivos, text: texto });
+      showToast('✓ Fin de ruta enviado');
+    } catch(e) {
+      if (e.name !== 'AbortError') window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
+    }
+  } else {
+    window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
+    if (archivos.length > 0) showToast('Comparte las fotos desde galería');
+  }
+  closeModal('modal-fin-ruta');
 };
 
 // ─── INIT ─────────────────────────────────────────────────────────────
