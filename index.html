@@ -1032,32 +1032,47 @@ select option { background: var(--surface2); }
   </div>
 </div>
 
-<!-- SCREEN: ENTREGA -->
+<!-- SCREEN: ENTREGA / EXCEPCIÓN -->
 <div class="screen hidden" id="screen-camera">
   <div class="topbar">
     <button class="topbar-back" onclick="showScreen('client')">←</button>
-    <h2>📸 Registrar entrega</h2>
+    <h2 id="cam-screen-title">📸 Registrar entrega</h2>
     <div id="cam-client-name" style="font-size:12px;color:var(--accent);font-weight:600;"></div>
   </div>
   <div class="scroll">
     <input type="file" id="cam-file-input" accept="image/*" multiple style="display:none;">
     <div style="padding:16px;display:flex;flex-direction:column;gap:14px;">
 
-      <div class="card">
-        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Quién recibe</div>
-        <div style="display:flex;gap:10px;">
-          <div id="opt-cliente" onclick="setCamOpt('receptor','cliente')" style="flex:1;padding:14px 8px;border-radius:10px;text-align:center;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--accent);background:rgba(0,212,255,.15);color:var(--accent);">👤 Cliente</div>
-          <div id="opt-familiar" onclick="setCamOpt('receptor','familiar')" style="flex:1;padding:14px 8px;border-radius:10px;text-align:center;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--border);background:var(--surface2);color:var(--text2);">👨‍👩‍👦 Familiar</div>
+      <!-- Modo entrega -->
+      <div id="cam-entrega-cards">
+        <div style="display:flex;flex-direction:column;gap:14px;">
+          <div class="card">
+            <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Quién recibe</div>
+            <div style="display:flex;gap:10px;">
+              <div id="opt-cliente" onclick="setCamOpt('receptor','cliente')" style="flex:1;padding:14px 8px;border-radius:10px;text-align:center;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--accent);background:rgba(0,212,255,.15);color:var(--accent);">👤 Cliente</div>
+              <div id="opt-familiar" onclick="setCamOpt('receptor','familiar')" style="flex:1;padding:14px 8px;border-radius:10px;text-align:center;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--border);background:var(--surface2);color:var(--text2);">👨‍👩‍👦 Familiar</div>
+            </div>
+          </div>
+          <div class="card">
+            <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Método de verificación</div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <div id="opt-nopedido" onclick="setCamOpt('verificacion','nopedido')" style="padding:13px 14px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--accent);background:rgba(0,212,255,.15);color:var(--accent);">🔢 Validación de No. de pedido</div>
+              <div id="opt-ine" onclick="setCamOpt('verificacion','ine')" style="padding:13px 14px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--border);background:var(--surface2);color:var(--text2);">🪪 Validación por INE</div>
+              <div id="opt-wapedido" onclick="setCamOpt('verificacion','wapedido')" style="padding:13px 14px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--border);background:var(--surface2);color:var(--text2);">📲 Envío de No. de pedido por WhatsApp</div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div class="card">
-        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Método de verificación</div>
-        <div style="display:flex;flex-direction:column;gap:8px;">
-          <div id="opt-nopedido" onclick="setCamOpt('verificacion','nopedido')" style="padding:13px 14px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--accent);background:rgba(0,212,255,.15);color:var(--accent);">🔢 Validación de No. de pedido</div>
-          <div id="opt-ine" onclick="setCamOpt('verificacion','ine')" style="padding:13px 14px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--border);background:var(--surface2);color:var(--text2);">🪪 Validación por INE</div>
-          <div id="opt-wapedido" onclick="setCamOpt('verificacion','wapedido')" style="padding:13px 14px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--border);background:var(--surface2);color:var(--text2);">📲 Envío de No. de pedido por WhatsApp</div>
+      <!-- Modo excepción -->
+      <div id="cam-excepcion-card" style="display:none;" class="card">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+          <span id="cam-exc-icon" style="font-size:22px;">⚠️</span>
+          <span id="cam-exc-label" style="font-size:15px;font-weight:700;color:var(--orange);">—</span>
         </div>
+        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">Comentarios</div>
+        <textarea id="cam-exc-comentario" placeholder="Describe la situación..."
+          style="width:100%;height:80px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--text);font-size:14px;font-family:var(--sans);outline:none;resize:none;"></textarea>
       </div>
 
       <div id="photos-preview" style="display:none;" class="card">
@@ -1881,6 +1896,7 @@ window.saveEdit = async function() {
 document.getElementById('btn-open-camera').addEventListener('click', () => {
   const r = allRecords.find(x => x.id === currentClientId);
   document.getElementById('cam-client-name').textContent = r?.nombre?.split(' ')[0] || '';
+  camModo = 'entrega';
   camReceptor = 'cliente';
   camVerificacion = 'nopedido';
   capturedPhotos = [];
@@ -1888,6 +1904,10 @@ document.getElementById('btn-open-camera').addEventListener('click', () => {
   document.getElementById('photos-preview').style.display = 'none';
   document.getElementById('btn-send-photos').style.display = 'none';
   document.getElementById('btn-mark-done-camera').style.display = 'none';
+  // Restaurar modo entrega
+  document.getElementById('cam-screen-title').textContent = '📸 Registrar entrega';
+  document.getElementById('cam-entrega-cards').style.display = 'block';
+  document.getElementById('cam-excepcion-card').style.display = 'none';
   setCamOpt('receptor', 'cliente');
   setCamOpt('verificacion', 'nopedido');
   showScreen('camera');
@@ -1976,17 +1996,29 @@ window.sendPhotosToWhatsApp = async function() {
   const tracking = (r?.trackings?.[0] || r?.tracking || '—');
   const orden = (r?.shipmentOrders?.[0] || r?.shipment_order || '—');
 
-  const receptorTexto = camReceptor === 'familiar' ? '👨‍👩‍👦 Familiar del cliente' : '👤 Cliente titular';
-  let verificacionTexto = '';
-  if (camVerificacion === 'ine') {
-    verificacionTexto = '🪪 Validación por INE';
-  } else if (camVerificacion === 'wapedido') {
-    verificacionTexto = '📲 No. de pedido por WhatsApp';
-  } else {
-    verificacionTexto = '🔢 Validación de No. de pedido';
-  }
+  let texto;
 
-  const texto =
+  if (camModo === 'excepcion') {
+    const comentario = document.getElementById('cam-exc-comentario').value.trim();
+    texto =
+`⚠️ *EXCEPCIÓN DE ENTREGA*
+━━━━━━━━━━━━━━━━━━━
+📋 *Tipo:* ${excLabel}
+👤 *Cliente:* ${nombre}
+📦 *Núm. Pedido:* ${orden}
+🔖 *Guía:* ${tracking}${comentario ? `\n💬 *Comentario:* ${comentario}` : ''}
+━━━━━━━━━━━━━━━━━━━`;
+  } else {
+    const receptorTexto = camReceptor === 'familiar' ? '👨‍👩‍👦 Familiar del cliente' : '👤 Cliente titular';
+    let verificacionTexto = '';
+    if (camVerificacion === 'ine') {
+      verificacionTexto = '🪪 Validación por INE';
+    } else if (camVerificacion === 'wapedido') {
+      verificacionTexto = '📲 No. de pedido por WhatsApp';
+    } else {
+      verificacionTexto = '🔢 Validación de No. de pedido';
+    }
+    texto =
 `✅ *ENTREGA REALIZADA*
 ━━━━━━━━━━━━━━━━━━━
 👤 *Cliente:* ${nombre}
@@ -1995,6 +2027,7 @@ window.sendPhotosToWhatsApp = async function() {
 📬 *Recibe:* ${receptorTexto}
 ✔️ *Verificación:* ${verificacionTexto}
 ━━━━━━━━━━━━━━━━━━━`;
+  }
 
   // Convertir fotos de base64 a File objects
   const archivos = capturedPhotos.map((p, i) => {
@@ -2003,7 +2036,7 @@ window.sendPhotosToWhatsApp = async function() {
     const bstr = atob(arr[1]);
     const u8 = new Uint8Array(bstr.length);
     for (let j = 0; j < bstr.length; j++) u8[j] = bstr.charCodeAt(j);
-    return new File([u8], `entrega_${tracking || 'foto'}_${i + 1}.jpg`, { type: mime });
+    return new File([u8], `${camModo}_${tracking || 'foto'}_${i + 1}.jpg`, { type: mime });
   });
 
   // Intentar Web Share API con archivos
@@ -2013,13 +2046,11 @@ window.sendPhotosToWhatsApp = async function() {
       showToast('✓ Compartido correctamente');
     } catch(e) {
       if (e.name !== 'AbortError') {
-        // Fallback: solo texto
         window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
       }
       return;
     }
   } else {
-    // Fallback si no soporta archivos: abrir WhatsApp solo con texto
     window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
     showToast('Comparte las fotos manualmente desde galería');
   }
@@ -2028,8 +2059,9 @@ window.sendPhotosToWhatsApp = async function() {
   document.getElementById('photos-thumbs').innerHTML = '';
   document.getElementById('photos-preview').style.display = 'none';
   document.getElementById('btn-send-photos').style.display = 'none';
-  // Mostrar botón de marcar como entregado al regresar de WhatsApp
-  document.getElementById('btn-mark-done-camera').style.display = 'flex';
+  if (camModo === 'entrega') {
+    document.getElementById('btn-mark-done-camera').style.display = 'flex';
+  }
 }
 
 // ─── MARCAR ENTREGADO DESDE CÁMARA ────────────────────────────────────
@@ -3286,9 +3318,10 @@ window.abrirGoogleMapsNativo = function() {
 
 // ─── EXCEPCIONES ─────────────────────────────────────────────────────
 
-let excTipo = '';        // 'cliente_ausente' | 'cancelado_entrega' | 'reprogramar' | 'datos_incorrectos'
-let excLabel = '';       // texto amigable
-let excFotos = [];       // array de { dataUrl, file }
+let excTipo = '';
+let excLabel = '';
+let excFotos = [];
+let camModo = 'entrega'; // 'entrega' | 'excepcion'
 
 window.toggleExcDropdown = function() {
   const dd = document.getElementById('exc-dropdown');
@@ -3298,7 +3331,6 @@ window.toggleExcDropdown = function() {
   arrow.textContent = isOpen ? '▲' : '▼';
 };
 
-// Cerrar dropdown al tocar fuera
 document.addEventListener('click', function(e) {
   const wrap = document.getElementById('exc-btn-wrap');
   if (wrap && !wrap.contains(e.target)) {
@@ -3313,118 +3345,29 @@ window.abrirModalExcepcion = function(tipo, icon, label) {
   document.getElementById('exc-dropdown').classList.remove('open');
   document.getElementById('exc-arrow').textContent = '▲';
 
-  // Resetear estado
   excTipo = tipo;
   excLabel = label;
-  excFotos = [];
+  camModo = 'excepcion';
 
-  document.getElementById('exc-modal-icon').textContent = icon;
-  document.getElementById('exc-modal-label').textContent = label;
-  document.getElementById('exc-comentario').value = '';
-  document.getElementById('exc-photos-grid').innerHTML = '';
-  document.getElementById('exc-foto-input').value = '';
-
-  document.getElementById('modal-excepcion').classList.add('open');
-};
-
-// Manejar selección de fotos de excepción
-document.getElementById('exc-foto-input').addEventListener('change', async function() {
-  const archivos = Array.from(this.files);
-  if (!archivos.length) return;
-
-  const grid = document.getElementById('exc-photos-grid');
-
-  for (const file of archivos) {
-    const dataUrl = await new Promise(res => {
-      const reader = new FileReader();
-      reader.onload = e => res(e.target.result);
-      reader.readAsDataURL(file);
-    });
-
-    excFotos.push({ dataUrl, file });
-
-    const img = document.createElement('img');
-    img.src = dataUrl;
-    img.className = 'exc-photo-thumb';
-    grid.appendChild(img);
-  }
-  this.value = '';
-});
-
-window.enviarExcepcionWhatsApp = async function() {
+  // Resetear estado de la pantalla de cámara
   const r = allRecords.find(x => x.id === currentClientId);
-  const nombre = r?.nombre || 'Cliente';
-  const tracking = (r?.trackings?.[0] || r?.tracking || '—');
-  const orden = (r?.shipmentOrders?.[0] || r?.shipment_order || '—');
-  const comentario = document.getElementById('exc-comentario').value.trim();
+  capturedPhotos = [];
+  document.getElementById('photos-thumbs').innerHTML = '';
+  document.getElementById('photos-preview').style.display = 'none';
+  document.getElementById('btn-send-photos').style.display = 'none';
+  document.getElementById('btn-mark-done-camera').style.display = 'none';
+  document.getElementById('cam-file-input').value = '';
+  document.getElementById('cam-client-name').textContent = r?.nombre?.split(' ')[0] || '';
 
-  const texto =
-`⚠️ *EXCEPCIÓN DE ENTREGA*
-━━━━━━━━━━━━━━━━━━━
-📋 *Tipo:* ${excLabel}
-👤 *Cliente:* ${nombre}
-📦 *Núm. Pedido:* ${orden}
-🔖 *Guía:* ${tracking}${comentario ? `\n💬 *Comentario:* ${comentario}` : ''}
-━━━━━━━━━━━━━━━━━━━`;
+  // Configurar modo excepción
+  document.getElementById('cam-screen-title').textContent = '⚠️ Registrar Excepción';
+  document.getElementById('cam-entrega-cards').style.display = 'none';
+  document.getElementById('cam-excepcion-card').style.display = 'block';
+  document.getElementById('cam-exc-icon').textContent = icon;
+  document.getElementById('cam-exc-label').textContent = label;
+  document.getElementById('cam-exc-comentario').value = '';
 
-  // ── 1. Guardar fotos en Firebase y pantalla del cliente ──
-  if (excFotos.length > 0 && currentClientId) {
-    const prevFotos = Array.isArray(r?.fotosEntrega) ? [...r.fotosEntrega] : [];
-    let merged = [...prevFotos];
-    for (let i = 0; i < excFotos.length; i++) {
-      try {
-        const path = `entregas/${tracking}_exc_${Date.now()}_${i}.jpg`;
-        const ref = storageRef(storage, path);
-        await uploadBytes(ref, excFotos[i].file, { contentType: excFotos[i].file.type || 'image/jpeg' });
-        const url = await getDownloadURL(ref);
-        merged.push(url);
-      } catch(e) { merged.push(excFotos[i].dataUrl); }
-    }
-    try { await updateDoc(doc(db, COL, currentClientId), { fotosEntrega: merged }); } catch(e) {}
-    const idx = allRecords.findIndex(x => x.id === currentClientId);
-    if (idx >= 0) allRecords[idx].fotosEntrega = merged;
-    renderFotosEntregaGrid(merged);
-  }
-
-  // ── 2. Convertir dataUrl a File objects (igual que sendPhotosToWhatsApp) ──
-  const archivos = excFotos.map((p, i) => {
-    const arr = p.dataUrl.split(',');
-    const mime = arr[0].match(/:(.*?);/)[1];
-    const bstr = atob(arr[1]);
-    const u8 = new Uint8Array(bstr.length);
-    for (let j = 0; j < bstr.length; j++) u8[j] = bstr.charCodeAt(j);
-    return new File([u8], `excepcion_${tracking || 'foto'}_${i + 1}.jpg`, { type: mime });
-  });
-
-  // ── 3. Cerrar modal ──
-  document.getElementById('modal-excepcion').classList.remove('open');
-
-  // ── 4. Web Share API exactamente igual que sendPhotosToWhatsApp ──
-  if (archivos.length > 0 && navigator.canShare && navigator.canShare({ files: archivos, text: texto })) {
-    try {
-      await navigator.share({ files: archivos, text: texto });
-      showToast('✓ Compartido correctamente');
-    } catch(e) {
-      if (e.name !== 'AbortError') {
-        window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
-      }
-      return;
-    }
-  } else if (archivos.length > 0 && navigator.canShare && navigator.canShare({ files: archivos })) {
-    // Algunos dispositivos no aceptan text+files juntos, intentar solo files
-    try {
-      await navigator.share({ files: archivos });
-      showToast('✓ Compartido correctamente');
-    } catch(e) {
-      if (e.name !== 'AbortError') {
-        window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
-      }
-      return;
-    }
-  } else {
-    window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
-    showToast('Comparte las fotos manualmente desde galería');
-  }
+  showScreen('camera');
 };
 
 // ─── INIT ─────────────────────────────────────────────────────────────
