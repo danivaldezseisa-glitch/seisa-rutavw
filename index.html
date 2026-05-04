@@ -560,6 +560,50 @@ select option { background: var(--surface2); }
 .plus-stop-code { font-size: 13px; font-weight: 600; font-family: var(--mono); }
 .plus-stop-label { font-size: 11px; color: var(--text3); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .plus-stop-del { color: var(--red); font-size: 18px; cursor: pointer; padding: 4px; flex-shrink: 0; }
+
+/* ── EXCEPCIONES ── */
+.exc-btn-wrap { position: relative; }
+.exc-btn {
+  display: flex; align-items: center; justify-content: center; gap: 8px;
+  padding: 14px 20px; border-radius: var(--radius); font-size: 15px;
+  font-weight: 600; cursor: pointer; border: none; font-family: var(--sans);
+  background: var(--orange); color: var(--bg); width: 100%; transition: all .15s;
+}
+.exc-btn:active { opacity: .85; transform: scale(.98); }
+.exc-dropdown {
+  position: absolute; bottom: calc(100% + 8px); left: 0; right: 0;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden; z-index: 200;
+  display: none; flex-direction: column;
+  box-shadow: 0 -8px 32px rgba(0,0,0,.5);
+}
+.exc-dropdown.open { display: flex; }
+.exc-option {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 16px; cursor: pointer; border: none;
+  background: transparent; color: var(--text); font-family: var(--sans);
+  font-size: 14px; font-weight: 500; text-align: left; width: 100%;
+  transition: background .1s; border-bottom: 1px solid var(--border);
+}
+.exc-option:last-child { border-bottom: none; }
+.exc-option:active { background: var(--surface2); }
+.exc-option-icon { font-size: 20px; width: 28px; text-align: center; flex-shrink: 0; }
+
+/* MODAL EXCEPCION */
+#modal-excepcion .modal { padding-bottom: 40px; }
+.exc-modal-tipo {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px; border-radius: 10px;
+  background: rgba(255,145,0,.1); border: 1px solid rgba(255,145,0,.3);
+  margin-bottom: 14px;
+}
+.exc-modal-tipo-icon { font-size: 22px; }
+.exc-modal-tipo-label { font-size: 15px; font-weight: 700; color: var(--orange); }
+.exc-photos-grid { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.exc-photo-thumb {
+  width: 72px; height: 72px; object-fit: cover;
+  border-radius: 8px; border: 2px solid var(--green);
+}
 </style>
 </head>
 <body>
@@ -740,8 +784,47 @@ select option { background: var(--surface2); }
 </div>
 
 <!-- ══════════════════════════════════════════
-     SCREEN: NUEVA RUTA
+     MODAL: EXCEPCION
 ══════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-excepcion">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h3>⚠️ Registrar Excepción</h3>
+
+    <!-- Tipo seleccionado -->
+    <div class="exc-modal-tipo" id="exc-modal-tipo-info">
+      <span class="exc-modal-tipo-icon" id="exc-modal-icon">⚠️</span>
+      <span class="exc-modal-tipo-label" id="exc-modal-label">—</span>
+    </div>
+
+    <!-- Fotos -->
+    <div class="field">
+      <label>📸 Fotos de evidencia</label>
+      <input type="file" id="exc-foto-input" accept="image/*" multiple style="display:none;">
+      <div style="display:flex;gap:8px;margin-bottom:8px;">
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('exc-foto-input').click()" style="flex:1;font-size:13px;">
+          📷 Abrir cámara / galería
+        </button>
+      </div>
+      <div id="exc-photos-grid" class="exc-photos-grid"></div>
+    </div>
+
+    <!-- Comentario -->
+    <div class="field">
+      <label>💬 Comentarios</label>
+      <textarea id="exc-comentario" placeholder="Describe la situación..." style="height:90px;"></textarea>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px;">
+      <button class="btn btn-green" onclick="enviarExcepcionWhatsApp()">
+        📤 Enviar por WhatsApp
+      </button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-excepcion')">
+        Cancelar
+      </button>
+    </div>
+  </div>
+</div>
 <div class="screen hidden" id="screen-nueva-ruta">
   <div class="topbar">
     <button class="topbar-back" onclick="showScreen('home')">←</button>
@@ -915,6 +998,33 @@ select option { background: var(--surface2); }
       <button class="btn btn-ghost" id="btn-edit-client">
         ✏️ Editar datos
       </button>
+
+      <!-- BOTÓN EXCEPCIONES con menú desplegable -->
+      <div class="exc-btn-wrap" id="exc-btn-wrap">
+        <div class="exc-dropdown" id="exc-dropdown">
+          <button class="exc-option" onclick="abrirModalExcepcion('cliente_ausente','🚪','Cliente Ausente')">
+            <span class="exc-option-icon">🚪</span>
+            <span>Cliente Ausente</span>
+          </button>
+          <button class="exc-option" onclick="abrirModalExcepcion('cancelado_entrega','❌','Cancelado en la Entrega')">
+            <span class="exc-option-icon">❌</span>
+            <span>Cancelado en la Entrega</span>
+          </button>
+          <button class="exc-option" onclick="abrirModalExcepcion('reprogramar','📅','Reprogramar')">
+            <span class="exc-option-icon">📅</span>
+            <span>Reprogramar</span>
+          </button>
+          <button class="exc-option" onclick="abrirModalExcepcion('datos_incorrectos','⚠️','Datos Incorrectos')">
+            <span class="exc-option-icon">⚠️</span>
+            <span>Datos Incorrectos</span>
+          </button>
+        </div>
+        <button class="exc-btn" onclick="toggleExcDropdown()">
+          ⚠️ Excepciones
+          <span id="exc-arrow" style="margin-left:auto;font-size:12px;">▲</span>
+        </button>
+      </div>
+
       <button class="btn btn-red" id="btn-mark-done" style="margin-top:4px;">
         ✓ Marcar como entregado
       </button>
@@ -3172,6 +3282,119 @@ window.abrirGoogleMapsNativo = function() {
   // URL de Google Maps navegación sin API key (abre la app nativa en móvil)
   const todos = irRutaParadas.map(p => `${p.lat},${p.lng}`).join('/');
   window.open(`https://www.google.com/maps/dir/${todos}`, '_blank');
+};
+
+// ─── EXCEPCIONES ─────────────────────────────────────────────────────
+
+let excTipo = '';        // 'cliente_ausente' | 'cancelado_entrega' | 'reprogramar' | 'datos_incorrectos'
+let excLabel = '';       // texto amigable
+let excFotos = [];       // array de { dataUrl, file }
+
+window.toggleExcDropdown = function() {
+  const dd = document.getElementById('exc-dropdown');
+  const arrow = document.getElementById('exc-arrow');
+  const isOpen = dd.classList.contains('open');
+  dd.classList.toggle('open', !isOpen);
+  arrow.textContent = isOpen ? '▲' : '▼';
+};
+
+// Cerrar dropdown al tocar fuera
+document.addEventListener('click', function(e) {
+  const wrap = document.getElementById('exc-btn-wrap');
+  if (wrap && !wrap.contains(e.target)) {
+    document.getElementById('exc-dropdown')?.classList.remove('open');
+    const arrow = document.getElementById('exc-arrow');
+    if (arrow) arrow.textContent = '▲';
+  }
+});
+
+window.abrirModalExcepcion = function(tipo, icon, label) {
+  // Cerrar dropdown
+  document.getElementById('exc-dropdown').classList.remove('open');
+  document.getElementById('exc-arrow').textContent = '▲';
+
+  // Resetear estado
+  excTipo = tipo;
+  excLabel = label;
+  excFotos = [];
+
+  document.getElementById('exc-modal-icon').textContent = icon;
+  document.getElementById('exc-modal-label').textContent = label;
+  document.getElementById('exc-comentario').value = '';
+  document.getElementById('exc-photos-grid').innerHTML = '';
+  document.getElementById('exc-foto-input').value = '';
+
+  document.getElementById('modal-excepcion').classList.add('open');
+};
+
+// Manejar selección de fotos de excepción
+document.getElementById('exc-foto-input').addEventListener('change', async function() {
+  const archivos = Array.from(this.files);
+  if (!archivos.length) return;
+
+  const grid = document.getElementById('exc-photos-grid');
+
+  for (const file of archivos) {
+    const dataUrl = await new Promise(res => {
+      const reader = new FileReader();
+      reader.onload = e => res(e.target.result);
+      reader.readAsDataURL(file);
+    });
+
+    excFotos.push({ dataUrl, file });
+
+    const img = document.createElement('img');
+    img.src = dataUrl;
+    img.className = 'exc-photo-thumb';
+    grid.appendChild(img);
+  }
+  this.value = '';
+});
+
+window.enviarExcepcionWhatsApp = async function() {
+  const r = allRecords.find(x => x.id === currentClientId);
+  const nombre = r?.nombre || 'Cliente';
+  const tracking = r?.trackings?.[0] || r?.tracking || '—';
+  const orden = r?.shipmentOrders?.[0] || r?.shipment_order || '—';
+  const comentario = document.getElementById('exc-comentario').value.trim();
+
+  const texto =
+`⚠️ *EXCEPCIÓN DE ENTREGA*
+━━━━━━━━━━━━━━━━━━━
+📋 *Tipo:* ${excLabel}
+👤 *Cliente:* ${nombre}
+📦 *Núm. Pedido:* ${orden}
+🔖 *Guía:* ${tracking}${comentario ? `\n💬 *Comentario:* ${comentario}` : ''}
+━━━━━━━━━━━━━━━━━━━`;
+
+  if (excFotos.length > 0) {
+    // Compartir con fotos usando Web Share API
+    const archivos = excFotos.map((f, i) => {
+      const arr = f.dataUrl.split(',');
+      const mime = arr[0].match(/:(.*?);/)[1];
+      const bstr = atob(arr[1]);
+      const u8 = new Uint8Array(bstr.length);
+      for (let j = 0; j < bstr.length; j++) u8[j] = bstr.charCodeAt(j);
+      return new File([u8], `excepcion_${excTipo}_${i + 1}.jpg`, { type: mime });
+    });
+
+    if (navigator.canShare && navigator.canShare({ files: archivos, text: texto })) {
+      try {
+        await navigator.share({ files: archivos, text: texto });
+        showToast('✓ Excepción compartida');
+        document.getElementById('modal-excepcion').classList.remove('open');
+        return;
+      } catch(e) {
+        if (e.name === 'AbortError') return;
+        // Fallback a solo texto
+      }
+    }
+  }
+
+  // Fallback: solo texto por WhatsApp (sin número específico para que el usuario elija)
+  window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
+  showToast('Comparte las fotos manualmente si aplica');
+  document.getElementById('modal-excepcion').classList.remove('open');
 };
 
 // ─── INIT ─────────────────────────────────────────────────────────────
