@@ -1758,15 +1758,7 @@ window.openClient = function(id) {
 
   // ── FOTOS DE EXCEPCION ──
   const fotosExcepcion = Array.isArray(r.fotosExcepcion) ? r.fotosExcepcion : [];
-  const excepcionGrid = document.getElementById('c-fotos-excepcion-grid');
-  if (fotosExcepcion.length > 0) {
-    excepcionGrid.innerHTML = fotosExcepcion.map(url =>
-      `<img src="${url}" onclick="verFotoCompleta('${url}')"
-        style="width:80px;height:80px;object-fit:cover;border-radius:8px;border:2px solid var(--orange);cursor:pointer;">`
-    ).join('');
-  } else {
-    excepcionGrid.innerHTML = `<div style="width:100%;padding:12px 0;font-size:13px;color:var(--text3);text-align:center;">Sin fotos de excepción. Toca <strong style="color:var(--orange);">＋ Agregar</strong> para añadir.</div>`;
-  }
+  renderFotosExcepcionGrid(fotosExcepcion);
 
   const badge = document.getElementById('client-status-badge');
   badge.innerHTML = r.entregado
@@ -1815,6 +1807,39 @@ window.eliminarFotoEntrega = async function(idx) {
     if (i >= 0) allRecords[i].fotosEntrega = fotos;
     renderFotosEntregaGrid(fotos);
     showToast('🗑 Foto eliminada');
+  } catch(e) { showToast('⚠️ Error al eliminar foto'); }
+};
+
+function renderFotosExcepcionGrid(fotos) {
+  const grid = document.getElementById('c-fotos-excepcion-grid');
+  if (!fotos.length) {
+    grid.innerHTML = `<div style="width:100%;padding:12px 0;font-size:13px;color:var(--text3);text-align:center;">Sin fotos de excepción. Toca <strong style="color:var(--orange);">＋ Agregar</strong> para añadir.</div>`;
+    return;
+  }
+  grid.innerHTML = fotos.map((url, i) => `
+    <div style="position:relative;width:calc(50% - 4px);">
+      <img src="${url}" onclick="verFotoCompleta('${url}')"
+        style="width:100%;aspect-ratio:4/3;object-fit:cover;border-radius:10px;cursor:zoom-in;border:2px solid var(--orange);display:block;">
+      <button onclick="eliminarFotoExcepcion(${i})" style="
+        position:absolute;top:5px;right:5px;
+        width:24px;height:24px;border-radius:50%;
+        background:rgba(0,0,0,.65);border:none;color:#fff;
+        font-size:13px;cursor:pointer;line-height:1;display:flex;align-items:center;justify-content:center;">✕</button>
+    </div>`
+  ).join('');
+}
+
+window.eliminarFotoExcepcion = async function(idx) {
+  const r = allRecords.find(x => x.id === currentClientId);
+  if (!r) return;
+  const fotos = Array.isArray(r.fotosExcepcion) ? [...r.fotosExcepcion] : [];
+  fotos.splice(idx, 1);
+  try {
+    await updateDoc(doc(db, COL, currentClientId), { fotosExcepcion: fotos });
+    const i = allRecords.findIndex(x => x.id === currentClientId);
+    if (i >= 0) allRecords[i].fotosExcepcion = fotos;
+    renderFotosExcepcionGrid(fotos);
+    showToast('🗑 Foto de excepción eliminada');
   } catch(e) { showToast('⚠️ Error al eliminar foto'); }
 };
 
@@ -2036,21 +2061,34 @@ document.getElementById('cam-file-input').addEventListener('change', async funct
         const r = allRecords.find(x => x.id === currentClientId);
         const tracking = r?.tracking || r?.trackings?.[0] || 'sin-tracking';
         const ts = Date.now();
-        const path = `entregas/${tracking}_${ts}.jpg`;
-        const ref = storageRef(storage, path);
-        await uploadBytes(ref, file, { contentType: file.type || 'image/jpeg' });
-        const url = await getDownloadURL(ref);
 
-        // Agregar al array fotosEntrega del registro
-        const prevFotos = Array.isArray(r?.fotosEntrega) ? r.fotosEntrega : [];
-        const mergedFotos = [...prevFotos, url];
-        await updateDoc(doc(db, COL, currentClientId), { fotosEntrega: mergedFotos });
-        const idx = allRecords.findIndex(x => x.id === currentClientId);
-        if (idx >= 0) allRecords[idx] = { ...allRecords[idx], fotosEntrega: mergedFotos };
-
-        showToast(`📸 Foto ${mergedFotos.length} guardada`);
+        if (camModo === 'excepcion') {
+          // ── Fotos de EXCEPCION ──
+          const excPath = `excepciones/${tracking}_${ts}.jpg`;
+          const excRef = storageRef(storage, excPath);
+          await uploadBytes(excRef, file, { contentType: file.type || 'image/jpeg' });
+          const excUrl = await getDownloadURL(excRef);
+          const prevExcFotos = Array.isArray(r?.fotosExcepcion) ? r.fotosExcepcion : [];
+          const mergedExcFotos = [...prevExcFotos, excUrl];
+          await updateDoc(doc(db, COL, currentClientId), { fotosExcepcion: mergedExcFotos });
+          const excIdx = allRecords.findIndex(x => x.id === currentClientId);
+          if (excIdx >= 0) allRecords[excIdx] = { ...allRecords[excIdx], fotosExcepcion: mergedExcFotos };
+          showToast(`⚠️ Foto de excepción guardada`);
+        } else {
+          // ── Fotos de ENTREGA ──
+          const entPath = `entregas/${tracking}_${ts}.jpg`;
+          const entRef = storageRef(storage, entPath);
+          await uploadBytes(entRef, file, { contentType: file.type || 'image/jpeg' });
+          const entUrl = await getDownloadURL(entRef);
+          const prevEntFotos = Array.isArray(r?.fotosEntrega) ? r.fotosEntrega : [];
+          const mergedEntFotos = [...prevEntFotos, entUrl];
+          await updateDoc(doc(db, COL, currentClientId), { fotosEntrega: mergedEntFotos });
+          const entIdx = allRecords.findIndex(x => x.id === currentClientId);
+          if (entIdx >= 0) allRecords[entIdx] = { ...allRecords[entIdx], fotosEntrega: mergedEntFotos };
+          showToast(`📸 Foto ${mergedEntFotos.length} guardada`);
+        }
       } catch(e) {
-        console.error('Error subiendo foto de entrega:', e);
+        console.error('Error subiendo foto:', e);
         showToast('⚠️ Foto local lista, error al subir');
       }
     }
@@ -3564,7 +3602,7 @@ window.enviarFinDeRuta = async function() {
   const rutaNombre = rutaActiva || '—';
   const encabezado = `FIN DE RUTA OP: DANIEL VALDES PLACAS: KU3000A UNIDAD 1.5 COLOR: BLANCA RUTA: ${rutaNombre}`;
 
-  // Buscar excepciones
+  // Buscar excepciones del día de hoy
   const now = new Date();
   const dd = String(now.getDate()).padStart(2,'0');
   const mm = String(now.getMonth()+1).padStart(2,'0');
@@ -3578,11 +3616,15 @@ window.enviarFinDeRuta = async function() {
   let excResumen = '';
   if (conExcepcion.length > 0) {
     excResumen = '\n\n⚠️ *EXCEPCIONES DE ENTREGA*\n━━━━━━━━━━━━━━━━━━━\n';
-    excResumen += conExcepcion.map(r => {
+    excResumen += conExcepcion.map((r, i) => {
       const tipo = r.excTipo || r.excepcion || 'Excepción';
       const comentario = r.excComentario || r.excepciones?.[0]?.comentario || '';
-      return `• *${tipo}*\n  👤 ${r.nombre || '—'}${comentario ? `\n  💬 ${comentario}` : ''}`;
-    }).join('\n');
+      const nombre = r.nombre || '—';
+      const orden = (Array.isArray(r.shipmentOrders) ? r.shipmentOrders : (r.shipment_order ? [r.shipment_order] : [])).join(', ') || '—';
+      const guias = (Array.isArray(r.trackings) ? r.trackings : (r.tracking ? [r.tracking] : []));
+      const guiasTexto = guias.length > 0 ? guias.join(', ') : '—';
+      return `${i + 1}. *${tipo}*\n   👤 *Cliente:* ${nombre}\n   📦 *Núm. Pedido:* ${orden}\n   🔖 *Guía${guias.length > 1 ? 's' : ''}:* ${guiasTexto}${comentario ? `\n   💬 *Comentario:* ${comentario}` : ''}`;
+    }).join('\n\n');
     excResumen += '\n━━━━━━━━━━━━━━━━━━━';
   }
 
@@ -3598,9 +3640,9 @@ window.enviarFinDeRuta = async function() {
     return new File([u8], `fin_ruta_${i + 1}.jpg`, { type: mime });
   });
 
-  if (archivos.length > 0 && navigator.canShare && navigator.canShare({ files: archivos, text: texto })) {
+  if (navigator.canShare && navigator.canShare({ files: archivos.length ? archivos : undefined, text: texto })) {
     try {
-      await navigator.share({ files: archivos, text: texto });
+      await navigator.share({ files: archivos.length ? archivos : undefined, text: texto });
       showToast('✓ Fin de ruta enviado');
     } catch(e) {
       if (e.name !== 'AbortError') window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
