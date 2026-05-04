@@ -3354,8 +3354,8 @@ document.getElementById('exc-foto-input').addEventListener('change', async funct
 window.enviarExcepcionWhatsApp = async function() {
   const r = allRecords.find(x => x.id === currentClientId);
   const nombre = r?.nombre || 'Cliente';
-  const tracking = r?.trackings?.[0] || r?.tracking || '—';
-  const orden = r?.shipmentOrders?.[0] || r?.shipment_order || '—';
+  const tracking = (r?.trackings?.[0] || r?.tracking || '—');
+  const orden = (r?.shipmentOrders?.[0] || r?.shipment_order || '—');
   const comentario = document.getElementById('exc-comentario').value.trim();
 
   const texto =
@@ -3367,72 +3367,63 @@ window.enviarExcepcionWhatsApp = async function() {
 🔖 *Guía:* ${tracking}${comentario ? `\n💬 *Comentario:* ${comentario}` : ''}
 ━━━━━━━━━━━━━━━━━━━`;
 
-  // ── 1. Guardar fotos en Firebase y mostrarlas en pantalla del cliente ──
+  // ── 1. Guardar fotos en Firebase y pantalla del cliente ──
   if (excFotos.length > 0 && currentClientId) {
-    showToast('⏳ Guardando fotos...');
     const prevFotos = Array.isArray(r?.fotosEntrega) ? [...r.fotosEntrega] : [];
     let merged = [...prevFotos];
     for (let i = 0; i < excFotos.length; i++) {
-      const { file, dataUrl } = excFotos[i];
       try {
         const path = `entregas/${tracking}_exc_${Date.now()}_${i}.jpg`;
         const ref = storageRef(storage, path);
-        await uploadBytes(ref, file, { contentType: file.type || 'image/jpeg' });
+        await uploadBytes(ref, excFotos[i].file, { contentType: excFotos[i].file.type || 'image/jpeg' });
         const url = await getDownloadURL(ref);
         merged.push(url);
-      } catch(e) {
-        merged.push(dataUrl);
-      }
+      } catch(e) { merged.push(excFotos[i].dataUrl); }
     }
-    try {
-      await updateDoc(doc(db, COL, currentClientId), { fotosEntrega: merged });
-    } catch(e) {}
+    try { await updateDoc(doc(db, COL, currentClientId), { fotosEntrega: merged }); } catch(e) {}
     const idx = allRecords.findIndex(x => x.id === currentClientId);
     if (idx >= 0) allRecords[idx].fotosEntrega = merged;
     renderFotosEntregaGrid(merged);
   }
 
-  // ── 2. Cerrar modal ──
+  // ── 2. Convertir dataUrl a File objects (igual que sendPhotosToWhatsApp) ──
+  const archivos = excFotos.map((p, i) => {
+    const arr = p.dataUrl.split(',');
+    const mime = arr[0].match(/:(.*?);/)[1];
+    const bstr = atob(arr[1]);
+    const u8 = new Uint8Array(bstr.length);
+    for (let j = 0; j < bstr.length; j++) u8[j] = bstr.charCodeAt(j);
+    return new File([u8], `excepcion_${tracking || 'foto'}_${i + 1}.jpg`, { type: mime });
+  });
+
+  // ── 3. Cerrar modal ──
   document.getElementById('modal-excepcion').classList.remove('open');
 
-  // ── 3. WhatsApp no acepta texto+fotos juntos en share API.
-  //       Estrategia: copiar texto al portapapeles → compartir fotos
-  //       El usuario pega el texto en el chat del grupo. ──
-  if (excFotos.length > 0) {
-    // Copiar mensaje al portapapeles
-    try { await navigator.clipboard.writeText(texto); } catch(e) {}
-
-    // Construir File objects de las fotos
-    const archivos = excFotos.map((f, i) => {
-      const arr = f.dataUrl.split(',');
-      const mime = arr[0].match(/:(.*?);/)[1];
-      const bstr = atob(arr[1]);
-      const u8 = new Uint8Array(bstr.length);
-      for (let j = 0; j < bstr.length; j++) u8[j] = bstr.charCodeAt(j);
-      return new File([u8], `excepcion_${excTipo}_${i + 1}.jpg`, { type: mime });
-    });
-
-    // Pequeño delay para que el modal cierre antes del share
-    await new Promise(r => setTimeout(r, 300));
-
+  // ── 4. Web Share API exactamente igual que sendPhotosToWhatsApp ──
+  if (archivos.length > 0 && navigator.canShare && navigator.canShare({ files: archivos, text: texto })) {
+    try {
+      await navigator.share({ files: archivos, text: texto });
+      showToast('✓ Compartido correctamente');
+    } catch(e) {
+      if (e.name !== 'AbortError') {
+        window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
+      }
+      return;
+    }
+  } else if (archivos.length > 0 && navigator.canShare && navigator.canShare({ files: archivos })) {
+    // Algunos dispositivos no aceptan text+files juntos, intentar solo files
     try {
       await navigator.share({ files: archivos });
-      showToast('📋 Mensaje copiado — pégalo en el grupo');
+      showToast('✓ Compartido correctamente');
     } catch(e) {
       if (e.name !== 'AbortError') {
-        // Si share falla, al menos abre WhatsApp con el texto
         window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
       }
+      return;
     }
   } else {
-    // Sin fotos: compartir solo el texto
-    try {
-      await navigator.share({ text: texto });
-    } catch(e) {
-      if (e.name !== 'AbortError') {
-        window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
-      }
-    }
+    window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
+    showToast('Comparte las fotos manualmente desde galería');
   }
 };
 
