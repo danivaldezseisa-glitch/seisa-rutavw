@@ -3367,7 +3367,7 @@ window.enviarExcepcionWhatsApp = async function() {
 🔖 *Guía:* ${tracking}${comentario ? `\n💬 *Comentario:* ${comentario}` : ''}
 ━━━━━━━━━━━━━━━━━━━`;
 
-  // ── 1. Guardar fotos en Firebase y en pantalla del cliente ──
+  // ── 1. Guardar fotos en Firebase y mostrarlas en pantalla del cliente ──
   if (excFotos.length > 0 && currentClientId) {
     showToast('⏳ Guardando fotos...');
     const prevFotos = Array.isArray(r?.fotosEntrega) ? [...r.fotosEntrega] : [];
@@ -3382,7 +3382,6 @@ window.enviarExcepcionWhatsApp = async function() {
         merged.push(url);
       } catch(e) {
         console.error('Error subiendo foto de excepción:', e);
-        // Si falla Firebase, guardar el dataUrl localmente igual
         merged.push(dataUrl);
       }
     }
@@ -3392,35 +3391,24 @@ window.enviarExcepcionWhatsApp = async function() {
     const idx = allRecords.findIndex(x => x.id === currentClientId);
     if (idx >= 0) allRecords[idx].fotosEntrega = merged;
     renderFotosEntregaGrid(merged);
+    showToast(`📸 ${excFotos.length} foto(s) guardada(s)`);
   }
 
-  // ── 2. Construir File objects para Web Share ──
-  const archivos = excFotos.map((f, i) => {
-    const arr = f.dataUrl.split(',');
-    const mime = arr[0].match(/:(.*?);/)[1];
-    const bstr = atob(arr[1]);
-    const u8 = new Uint8Array(bstr.length);
-    for (let j = 0; j < bstr.length; j++) u8[j] = bstr.charCodeAt(j);
-    return new File([u8], `excepcion_${excTipo}_${i + 1}.jpg`, { type: mime });
-  });
-
+  // ── 2. Cerrar modal y abrir WhatsApp solo con el texto ──
+  // (igual que sendPhotosToWhatsApp — el usuario adjunta las fotos desde galería)
   document.getElementById('modal-excepcion').classList.remove('open');
 
-  // ── 3. Enviar por WhatsApp ──
-  if (archivos.length > 0 && navigator.canShare && navigator.canShare({ files: archivos, text: texto })) {
-    try {
-      await navigator.share({ files: archivos, text: texto });
-      showToast('✓ Excepción compartida con fotos');
-      return;
-    } catch(e) {
-      if (e.name === 'AbortError') return;
-    }
-  }
+  const tel = r?.telefono?.replace(/\D/g, '');
+  const num = tel ? (tel.startsWith('52') ? tel : '52' + tel) : '';
+  const waUrl = num
+    ? `https://wa.me/${num}?text=${encodeURIComponent(texto)}`
+    : `https://wa.me/?text=${encodeURIComponent(texto)}`;
 
-  // Fallback: solo texto
-  window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
-  if (excFotos.length > 0) showToast('Fotos guardadas. Compártelas manualmente.');
-  else showToast('✓ Excepción enviada');
+  window.open(waUrl, '_blank');
+
+  if (excFotos.length > 0) {
+    showToast('📎 Adjunta las fotos desde tu galería en WhatsApp');
+  }
 };
 
 // ─── INIT ─────────────────────────────────────────────────────────────
