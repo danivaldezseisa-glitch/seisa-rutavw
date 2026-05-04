@@ -374,6 +374,8 @@ select option { background: var(--surface2); }
 }
 .day-delete-btn:active { background: rgba(255,82,82,.25); transform: scale(.96); }
 .day-header-right { display: flex; align-items: center; gap: 8px; }
+.day-header-collapsible { cursor: pointer; user-select: none; }
+.day-header-collapsible:active { background: var(--surface); }
 .confirm-delete-bar {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;
   padding: 10px 16px; background: rgba(255,82,82,.08);
@@ -761,7 +763,7 @@ select option { background: var(--surface2); }
     <div class="nav-stop-card" id="nav-current-card">
       <div class="nav-stop-num" id="nav-current-num">1</div>
       <div class="nav-stop-info">
-        <div class="nav-stop-name" id="nav-current-name">—</div>
+        <div class="nav-stop-name" id="nav-current-name" onclick="irAClienteDesdeNav()" style="cursor:pointer;text-decoration:underline dotted;text-underline-offset:3px;color:var(--accent);">—</div>
         <div class="nav-stop-plus" id="nav-current-plus">—</div>
         <div class="nav-stop-dist" id="nav-current-dist" style="color:var(--accent);font-family:var(--mono);"></div>
       </div>
@@ -848,6 +850,11 @@ select option { background: var(--surface2); }
         <label>Nombre de la ruta</label>
         <input type="text" id="nr-nombre" class="ruta-name-input" placeholder="Ej. Ruta Norte Mañana"
           oninput="updateNRPreview()" autocomplete="off" maxlength="40">
+      </div>
+      <div class="field">
+        <label>📅 Fecha de la ruta</label>
+        <input type="date" id="nr-fecha-input" oninput="updateNRPreview()"
+          style="font-size:15px;font-weight:600;text-align:center;letter-spacing:.02em;">
       </div>
     </div>
 
@@ -1188,57 +1195,38 @@ select option { background: var(--surface2); }
   <div style="color:rgba(255,255,255,.4);font-size:12px;margin-top:12px;">Toca para cerrar</div>
 </div>
 
-<!-- MODAL: FOTO DEL ARTÍCULO -->
+<!-- MODAL: FOTO DEL ARTÍCULO (simplificado - solo muestra datos extraídos) -->
 <div class="photo-capture-overlay" id="modal-foto-articulo">
   <div class="photo-capture-box">
     <!-- Encabezado -->
     <div style="display:flex;align-items:center;justify-content:space-between;">
-      <h3 id="foto-modal-title">📦 Foto del artículo</h3>
+      <h3 id="foto-modal-title">📦 Datos extraídos</h3>
       <span style="font-size:11px;color:var(--text3);font-family:var(--mono);" id="foto-file-label"></span>
     </div>
 
-    <!-- Indicador de pasos -->
-    <div class="foto-steps">
-      <div class="foto-step" id="fstep-1">
-        <div class="foto-step-num">1</div>
-        <div class="foto-step-label">Etiqueta</div>
-      </div>
-      <div class="foto-step-line"></div>
-      <div class="foto-step" id="fstep-2">
-        <div class="foto-step-num">2</div>
-        <div class="foto-step-label">Producto</div>
-      </div>
+    <p style="font-size:13px;color:var(--text2);" id="foto-modal-sub">Verifica los datos y guarda el paquete. Podrás agregar fotos desde la pantalla del cliente.</p>
+
+    <!-- Vista previa de datos extraídos -->
+    <div id="foto-modal-preview" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;">
+      <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-bottom:4px;">Datos del paquete</div>
+      <div id="foto-modal-preview-content" style="font-size:13px;color:var(--text2);line-height:1.8;"></div>
     </div>
-
-    <p style="font-size:13px;color:var(--text2);margin-top:-4px;" id="foto-modal-sub">Toma una foto de la etiqueta del paquete</p>
-
-    <!-- Miniaturas de ambas fotos -->
-    <div class="foto-thumbs-row">
-      <div class="foto-thumb-slot" id="fthumb-1">
-        <div class="foto-thumb-ph">📷<br><span>Foto 1</span></div>
-      </div>
-      <div class="foto-thumb-slot" id="fthumb-2">
-        <div class="foto-thumb-ph">📷<br><span>Foto 2</span></div>
-      </div>
-    </div>
-
-    <!-- Preview grande -->
-    <div class="photo-preview-area" id="foto-preview-area">
-      <div class="photo-placeholder">
-        <div class="ph-icon">📷</div>
-        <p>Sin foto aún</p>
-      </div>
-    </div>
-
-    <input type="file" id="foto-articulo-input" accept="image/*" capture="environment" style="display:none;">
 
     <!-- Botones de acción -->
-    <div class="photo-capture-btns">
-      <button class="btn btn-ghost" id="btn-tomar-foto" onclick="document.getElementById('foto-articulo-input').click()">📷 Tomar foto</button>
-      <button class="btn btn-accent" id="btn-siguiente-foto" onclick="avanzarFotoStep()" disabled>Siguiente →</button>
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px;">
+      <button class="btn btn-accent" id="btn-guardar-con-foto" onclick="confirmarGuardadoConFoto()">💾 Guardar paquete</button>
+      <button class="btn btn-ghost" style="color:var(--red);border-color:var(--red);font-size:13px;" onclick="confirmarGuardadoConFoto(true)">Saltar y guardar</button>
     </div>
-    <button class="btn btn-ghost" id="btn-guardar-con-foto" onclick="confirmarGuardadoConFoto()" style="display:none;">💾 Guardar paquete</button>
-    <button class="btn btn-ghost" style="color:var(--red);border-color:var(--red);font-size:12px;" onclick="confirmarGuardadoConFoto(true)">Saltar fotos y guardar</button>
+
+    <!-- Hidden inputs kept for compatibility -->
+    <input type="file" id="foto-articulo-input" accept="image/*" capture="environment" style="display:none;">
+    <button id="btn-tomar-foto" style="display:none;"></button>
+    <button id="btn-siguiente-foto" style="display:none;"></button>
+    <div id="fstep-1" style="display:none;"></div>
+    <div id="fstep-2" style="display:none;"></div>
+    <div id="fthumb-1" style="display:none;"></div>
+    <div id="fthumb-2" style="display:none;"></div>
+    <div id="foto-preview-area" style="display:none;"></div>
   </div>
 </div>
 
@@ -1326,6 +1314,7 @@ let camReceptor = 'cliente';
 let camVerificacion = 'nopedido';
 let files = [];
 let rutaActiva = localStorage.getItem('rutaActiva') || '';
+let rutaFechaActiva = localStorage.getItem('rutaFechaActiva') || '';
 
 // ─── NUEVA RUTA ───────────────────────────────────────────────────────
 window.showScreen = function(name) {
@@ -1351,6 +1340,11 @@ function initNuevaRutaScreen() {
   const dd = String(now.getDate()).padStart(2,'0');
   const mm = String(now.getMonth()+1).padStart(2,'0');
   const yyyy = now.getFullYear();
+  // Set date picker default to today
+  const dateInput = document.getElementById('nr-fecha-input');
+  if (dateInput) {
+    dateInput.value = `${yyyy}-${mm}-${dd}`;
+  }
   document.getElementById('nr-fecha-label').textContent = `${dd}/${mm}/${yyyy}`;
   document.getElementById('nr-preview-fecha').textContent = `📅 ${dd}/${mm}/${yyyy}`;
   const input = document.getElementById('nr-nombre');
@@ -1358,11 +1352,24 @@ function initNuevaRutaScreen() {
   updateNRPreview();
 }
 
+function getFechaRutaSeleccionada() {
+  const dateInput = document.getElementById('nr-fecha-input');
+  if (dateInput && dateInput.value) {
+    const [y, m, d] = dateInput.value.split('-');
+    return `${d}/${m}/${y}`;
+  }
+  const now = new Date();
+  return `${String(now.getDate()).padStart(2,'0')}/${String(now.getMonth()+1).padStart(2,'0')}/${now.getFullYear()}`;
+}
+
 window.updateNRPreview = function() {
   const val = document.getElementById('nr-nombre').value.trim();
   const preview = document.getElementById('nr-preview');
   const btn = document.getElementById('btn-iniciar-escaneo');
   document.getElementById('nr-preview-nombre').textContent = val || '—';
+  const fechaDisplay = getFechaRutaSeleccionada ? getFechaRutaSeleccionada() : '—';
+  document.getElementById('nr-preview-fecha').textContent = `📅 ${fechaDisplay}`;
+  document.getElementById('nr-fecha-label').textContent = fechaDisplay;
   if (val) {
     preview.style.opacity = '1';
     btn.disabled = false;
@@ -1381,7 +1388,9 @@ window.iniciarNuevaRuta = function() {
   const nombre = document.getElementById('nr-nombre').value.trim();
   if (!nombre) return;
   rutaActiva = nombre;
+  rutaFechaActiva = getFechaRutaSeleccionada();
   localStorage.setItem('rutaActiva', nombre);
+  localStorage.setItem('rutaFechaActiva', rutaFechaActiva);
   // Mostrar barra activa en home
   document.getElementById('ruta-activa-nombre').textContent = nombre;
   document.getElementById('ruta-activa-bar').style.display = 'flex';
@@ -1435,12 +1444,18 @@ async function saveRecord(data) {
   data.createdAt = Date.now();
   data.entregado = false;
 
-  // Fecha del día — se calcula PRIMERO para que la búsqueda de duplicados la use
-  const now = new Date();
-  const dd   = String(now.getDate()).padStart(2,'0');
-  const mm   = String(now.getMonth()+1).padStart(2,'0');
-  const yyyy = now.getFullYear();
-  data.fechaDia = `${dd}/${mm}/${yyyy}`;
+  // Fecha del día — usar la fecha de la ruta activa si está definida, si no la del sistema
+  let fechaDia;
+  if (rutaFechaActiva) {
+    fechaDia = rutaFechaActiva;
+  } else {
+    const now = new Date();
+    const dd   = String(now.getDate()).padStart(2,'0');
+    const mm   = String(now.getMonth()+1).padStart(2,'0');
+    const yyyy = now.getFullYear();
+    fechaDia = `${dd}/${mm}/${yyyy}`;
+  }
+  data.fechaDia = fechaDia;
   if (rutaActiva) data.rutaNombre = rutaActiva;
 
   // Normalizar nombre: minúsculas, sin tildes, sin espacios dobles
@@ -1607,7 +1622,6 @@ function renderRoute() {
 
   // Ordenar días (más reciente primero)
   const sortedDays = Object.keys(byDay).sort((a, b) => {
-    // Parse dd/mm/yyyy
     const parseDay = s => {
       if (s === 'Sin fecha') return 0;
       const [d, m, y] = s.split('/');
@@ -1616,17 +1630,26 @@ function renderRoute() {
     return parseDay(b) - parseDay(a);
   });
 
+  // Detectar el día de hoy
+  const now = new Date();
+  const dd = String(now.getDate()).padStart(2,'0');
+  const mm = String(now.getMonth()+1).padStart(2,'0');
+  const yyyy = now.getFullYear();
+  const hoy = `${dd}/${mm}/${yyyy}`;
+
   let globalIdx = 0;
-  list.innerHTML = sortedDays.map(day => {
+  list.innerHTML = sortedDays.map((day, dayIdx) => {
     const records = byDay[day];
     const dayPending = records.filter(r => !r.entregado).length;
     const dayDone = records.filter(r => r.entregado).length;
+    const esHoy = day === hoy;
+    const esDiaAnterior = !esHoy;
 
     // Formatear título del día
     let dayLabel = day;
     if (day !== 'Sin fecha') {
-      const [dd, mm, yyyy] = day.split('/');
-      const dt = new Date(yyyy, mm-1, dd);
+      const [dd2, mm2, yyyy2] = day.split('/');
+      const dt = new Date(yyyy2, mm2-1, dd2);
       const today = new Date();
       const yesterday = new Date(); yesterday.setDate(yesterday.getDate()-1);
       if (dt.toDateString() === today.toDateString()) dayLabel = `📅 Hoy · ${day}`;
@@ -1649,24 +1672,58 @@ function renderRoute() {
 
     // Nombre de ruta (primer registro del día que tenga rutaNombre)
     const rutaDelDia = records.find(r => r.rutaNombre)?.rutaNombre || '';
-
     const dayKey = day.replace(/\//g, '-');
-    return `
-      <div class="day-section" id="day-section-${dayKey}">
-        <div class="day-header">
-          <div>
-            <div class="day-title">${dayLabel}</div>
-            ${rutaDelDia ? `<div style="font-size:10px;color:var(--text2);margin-top:1px;">🗺️ ${rutaDelDia}</div>` : ''}
+
+    if (esDiaAnterior) {
+      // Día anterior: colapsable (cerrado por defecto)
+      return `
+        <div class="day-section" id="day-section-${dayKey}">
+          <div class="day-header day-header-collapsible" onclick="toggleDaySection('${dayKey}')">
+            <div>
+              <div class="day-title" style="display:flex;align-items:center;gap:6px;">
+                <span id="day-arrow-${dayKey}" style="font-size:12px;color:var(--text3);transition:transform .2s;">▶</span>
+                ${dayLabel}
+                <span style="font-size:10px;color:var(--text3);font-weight:400;font-family:var(--sans);text-transform:none;letter-spacing:0;">${dayPending > 0 ? `· ${dayPending} pendientes` : '· completo'}</span>
+              </div>
+              ${rutaDelDia ? `<div style="font-size:10px;color:var(--text2);margin-top:1px;margin-left:18px;">🗺️ ${rutaDelDia}</div>` : ''}
+            </div>
+            <div class="day-header-right">
+              <span class="day-stats">${dayDone}/${records.length}</span>
+              <button class="day-delete-btn" onclick="event.stopPropagation();confirmarBorrarRuta('${day}', '${dayKey}')">🗑</button>
+            </div>
           </div>
-          <div class="day-header-right">
-            <span class="day-stats">${dayDone}/${records.length} entregados</span>
-            <button class="day-delete-btn" onclick="confirmarBorrarRuta('${day}', '${dayKey}')">🗑 Borrar ruta</button>
+          <div id="day-items-${dayKey}" style="display:none;">
+            ${items}
           </div>
-        </div>
-        ${items}
-      </div>`;
+        </div>`;
+    } else {
+      // Día actual: siempre visible
+      return `
+        <div class="day-section" id="day-section-${dayKey}">
+          <div class="day-header">
+            <div>
+              <div class="day-title">${dayLabel}</div>
+              ${rutaDelDia ? `<div style="font-size:10px;color:var(--text2);margin-top:1px;">🗺️ ${rutaDelDia}</div>` : ''}
+            </div>
+            <div class="day-header-right">
+              <span class="day-stats">${dayDone}/${records.length} entregados</span>
+              <button class="day-delete-btn" onclick="confirmarBorrarRuta('${day}', '${dayKey}')">🗑 Borrar ruta</button>
+            </div>
+          </div>
+          ${items}
+        </div>`;
+    }
   }).join('');
 }
+
+window.toggleDaySection = function(dayKey) {
+  const items = document.getElementById('day-items-' + dayKey);
+  const arrow = document.getElementById('day-arrow-' + dayKey);
+  if (!items) return;
+  const open = items.style.display !== 'none';
+  items.style.display = open ? 'none' : 'block';
+  if (arrow) arrow.style.transform = open ? 'rotate(0deg)' : 'rotate(90deg)';
+};
 
 // ─── OPEN CLIENT ─────────────────────────────────────────────────────
 window.openClient = function(id) {
@@ -1761,9 +1818,13 @@ window.openClient = function(id) {
   renderFotosExcepcionGrid(fotosExcepcion);
 
   const badge = document.getElementById('client-status-badge');
-  badge.innerHTML = r.entregado
-    ? '<span class="badge badge-green">✓ Entregado</span>'
-    : '<span class="badge badge-orange">Pendiente</span>';
+  if (r.excepcion || r.excTipo) {
+    badge.innerHTML = '<span class="badge badge-orange">⚠️ Excepción de entrega</span>';
+  } else {
+    badge.innerHTML = r.entregado
+      ? '<span class="badge badge-green">✓ Entregado</span>'
+      : '<span class="badge badge-orange">Pendiente</span>';
+  }
 
   // ── PLUS CODES ──
   const plusCodes = Array.isArray(r.plusCodes) ? r.plusCodes : [];
@@ -2146,9 +2207,12 @@ window.sendPhotosToWhatsApp = async function() {
     // Guardar excepción en Firestore para el resumen de fin de ruta
     if (currentClientId) {
       try {
-        await updateDoc(doc(db, COL, currentClientId), { excTipo: excLabel, excComentario: comentario });
+        await updateDoc(doc(db, COL, currentClientId), { excTipo: excLabel, excComentario: comentario, excepcion: true });
         const idx = allRecords.findIndex(x => x.id === currentClientId);
-        if (idx >= 0) allRecords[idx] = { ...allRecords[idx], excTipo: excLabel, excComentario: comentario };
+        if (idx >= 0) allRecords[idx] = { ...allRecords[idx], excTipo: excLabel, excComentario: comentario, excepcion: true };
+        // Actualizar badge en pantalla del cliente
+        const badge = document.getElementById('client-status-badge');
+        if (badge) badge.innerHTML = '<span class="badge badge-orange">⚠️ Excepción de entrega</span>';
       } catch(e) { console.error('Error guardando excepción:', e); }
     }
   } else {
@@ -2381,8 +2445,22 @@ window.avanzarFotoStep = function() {
 function showFotoArticuloModal(result, fileRef, fileName) {
   pendingRecordData = result;
   pendingFileRef = fileRef;
-  resetFotoModal();
   document.getElementById('foto-file-label').textContent = fileName?.substring(0, 20) || '';
+  // Mostrar preview de datos extraídos
+  const preview = document.getElementById('foto-modal-preview-content');
+  if (preview) {
+    const campos = [
+      ['👤 Nombre', result.nombre],
+      ['📞 Teléfono', result.telefono],
+      ['🏠 Dirección', [result.calle, result.numero, result.colonia, result.cp].filter(Boolean).join(', ')],
+      ['📦 Shipment Order', result.shipment_order],
+      ['🔖 Tracking', result.tracking],
+      ['📅 PDD', result.pdd],
+    ];
+    preview.innerHTML = campos.filter(([, v]) => v).map(([l, v]) =>
+      `<div><span style="color:var(--text3);">${l}:</span> <span style="color:var(--text);font-weight:600;">${v}</span></div>`
+    ).join('');
+  }
   document.getElementById('modal-foto-articulo').classList.add('open');
 }
 
@@ -2390,10 +2468,10 @@ window.confirmarGuardadoConFoto = async function(sinFoto = false) {
   if (!pendingRecordData) return;
   const data = { ...pendingRecordData };
   const btnGuardar = document.getElementById('btn-guardar-con-foto');
-  if (btnGuardar) { btnGuardar.disabled = true; btnGuardar.textContent = '⏳ Subiendo...'; }
+  if (btnGuardar) { btnGuardar.disabled = true; btnGuardar.textContent = '⏳ Guardando...'; }
 
-  // Subir ambas fotos a Firebase Storage
-  if (!sinFoto) {
+  // Sin carga de fotos en el escaneo — se agregan desde pantalla del cliente
+  if (false) {
     const labels = ['fotoEtiquetaUrl', 'fotoProductoUrl'];
     for (let i = 0; i < 2; i++) {
       const file = capturedFotos[i];
@@ -3201,6 +3279,22 @@ window.saltarParada = function() {
   showToast(`⏭ Parada ${navParadaActual + 1}`);
 }
 
+window.irAClienteDesdeNav = function() {
+  const parada = navParadas[navParadaActual];
+  if (!parada || parada.esRetorno) return;
+  // Buscar el cliente por clienteId o por nombre
+  const clienteId = parada.clienteId;
+  if (clienteId) {
+    openClient(clienteId);
+  } else {
+    // Buscar por nombre parcial
+    const nombre = parada.clienteNombre || parada.label?.split('·')[0]?.trim();
+    const r = allRecords.find(x => x.nombre?.startsWith(nombre));
+    if (r) openClient(r.id);
+    else showToast('⚠️ Cliente no encontrado en la lista');
+  }
+};
+
 window.reanudarNavegacion = function() {
   showScreen('nav-guiada');
 }
@@ -3569,9 +3663,9 @@ window.abrirFinDeRuta = function() {
   const yyyy = now.getFullYear();
   const hoy = `${dd}/${mm}/${yyyy}`;
 
-  // Buscar registros con excepción (campo excepcion o excepciones)
+  // Buscar registros con excepción del día de HOY únicamente
   const conExcepcion = allRecords.filter(r =>
-    (r.fechaDia === hoy || !r.fechaDia) &&
+    r.fechaDia === hoy &&
     (r.excepcion || r.excepciones?.length || r.excTipo)
   );
 
@@ -3622,7 +3716,7 @@ window.enviarFinDeRuta = async function() {
   const yyyy = now.getFullYear();
   const hoy = `${dd}/${mm}/${yyyy}`;
   const conExcepcion = allRecords.filter(r =>
-    (r.fechaDia === hoy || !r.fechaDia) &&
+    r.fechaDia === hoy &&
     (r.excepcion || r.excepciones?.length || r.excTipo)
   );
 
