@@ -3367,34 +3367,60 @@ window.enviarExcepcionWhatsApp = async function() {
 🔖 *Guía:* ${tracking}${comentario ? `\n💬 *Comentario:* ${comentario}` : ''}
 ━━━━━━━━━━━━━━━━━━━`;
 
-  if (excFotos.length > 0) {
-    // Compartir con fotos usando Web Share API
-    const archivos = excFotos.map((f, i) => {
-      const arr = f.dataUrl.split(',');
-      const mime = arr[0].match(/:(.*?);/)[1];
-      const bstr = atob(arr[1]);
-      const u8 = new Uint8Array(bstr.length);
-      for (let j = 0; j < bstr.length; j++) u8[j] = bstr.charCodeAt(j);
-      return new File([u8], `excepcion_${excTipo}_${i + 1}.jpg`, { type: mime });
-    });
-
-    if (navigator.canShare && navigator.canShare({ files: archivos, text: texto })) {
+  // ── 1. Guardar fotos en Firebase y en pantalla del cliente ──
+  if (excFotos.length > 0 && currentClientId) {
+    showToast('⏳ Guardando fotos...');
+    const prevFotos = Array.isArray(r?.fotosEntrega) ? [...r.fotosEntrega] : [];
+    let merged = [...prevFotos];
+    for (let i = 0; i < excFotos.length; i++) {
+      const { file, dataUrl } = excFotos[i];
       try {
-        await navigator.share({ files: archivos, text: texto });
-        showToast('✓ Excepción compartida');
-        document.getElementById('modal-excepcion').classList.remove('open');
-        return;
+        const path = `entregas/${tracking}_exc_${Date.now()}_${i}.jpg`;
+        const ref = storageRef(storage, path);
+        await uploadBytes(ref, file, { contentType: file.type || 'image/jpeg' });
+        const url = await getDownloadURL(ref);
+        merged.push(url);
       } catch(e) {
-        if (e.name === 'AbortError') return;
-        // Fallback a solo texto
+        console.error('Error subiendo foto de excepción:', e);
+        // Si falla Firebase, guardar el dataUrl localmente igual
+        merged.push(dataUrl);
       }
+    }
+    try {
+      await updateDoc(doc(db, COL, currentClientId), { fotosEntrega: merged });
+    } catch(e) { console.error('Error guardando fotos excepción en Firestore:', e); }
+    const idx = allRecords.findIndex(x => x.id === currentClientId);
+    if (idx >= 0) allRecords[idx].fotosEntrega = merged;
+    renderFotosEntregaGrid(merged);
+  }
+
+  // ── 2. Construir File objects para Web Share ──
+  const archivos = excFotos.map((f, i) => {
+    const arr = f.dataUrl.split(',');
+    const mime = arr[0].match(/:(.*?);/)[1];
+    const bstr = atob(arr[1]);
+    const u8 = new Uint8Array(bstr.length);
+    for (let j = 0; j < bstr.length; j++) u8[j] = bstr.charCodeAt(j);
+    return new File([u8], `excepcion_${excTipo}_${i + 1}.jpg`, { type: mime });
+  });
+
+  document.getElementById('modal-excepcion').classList.remove('open');
+
+  // ── 3. Enviar por WhatsApp ──
+  if (archivos.length > 0 && navigator.canShare && navigator.canShare({ files: archivos, text: texto })) {
+    try {
+      await navigator.share({ files: archivos, text: texto });
+      showToast('✓ Excepción compartida con fotos');
+      return;
+    } catch(e) {
+      if (e.name === 'AbortError') return;
     }
   }
 
-  // Fallback: solo texto por WhatsApp (sin número específico para que el usuario elija)
+  // Fallback: solo texto
   window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
-  showToast('Comparte las fotos manualmente si aplica');
-  document.getElementById('modal-excepcion').classList.remove('open');
+  if (excFotos.length > 0) showToast('Fotos guardadas. Compártelas manualmente.');
+  else showToast('✓ Excepción enviada');
 };
 
 // ─── INIT ─────────────────────────────────────────────────────────────
