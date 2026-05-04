@@ -8,10 +8,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <title>SEISA Rutas</title>
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css"/>
-<script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.min.js"></script>
+<link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet">
+<script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
 <style>
 :root {
   --bg: #0a1628;
@@ -527,22 +525,35 @@ select option { background: var(--surface2); }
   from { box-shadow: 0 0 0 4px rgba(0,230,118,.4); }
   to   { box-shadow: 0 0 0 10px rgba(0,230,118,.05); }
 }
-/* Estilos del panel de instrucciones de Leaflet Routing Machine */
-.leaflet-routing-container {
-  background: var(--bg2) !important;
-  border: 1px solid var(--border) !important;
-  border-radius: 12px !important;
-  color: var(--text) !important;
-  font-family: var(--sans) !important;
-  font-size: 13px !important;
-  max-height: 160px !important;
-  overflow-y: auto !important;
-  box-shadow: 0 4px 20px rgba(0,0,0,.4) !important;
+/* ── Mapbox GL overrides ── */
+.mapboxgl-ctrl-logo { display: none !important; }
+.mapboxgl-ctrl-attrib { display: none !important; }
+.mapboxgl-ctrl-group { background: var(--surface2) !important; border: 1px solid var(--border) !important; border-radius: 10px !important; }
+.mapboxgl-ctrl-group button { background: transparent !important; }
+.mapboxgl-ctrl-group button .mapboxgl-ctrl-icon { filter: invert(1) brightness(.7); }
+
+/* ── Panel de instrucciones giro a giro ── */
+#nav-turn-panel {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 10;
+  background: linear-gradient(180deg, rgba(10,22,40,.96) 0%, transparent 100%);
+  padding: 12px 16px 24px;
+  pointer-events: none;
 }
-.leaflet-routing-alt { background: transparent !important; }
-.leaflet-routing-alt h2, .leaflet-routing-alt h3 { color: var(--accent) !important; font-size: 12px !important; }
-.leaflet-routing-alt table { color: var(--text2) !important; font-size: 11px !important; }
-.leaflet-routing-collapse-btn { color: var(--text2) !important; }
+.turn-instruction {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--bg2); border: 1px solid var(--border);
+  border-radius: 14px; padding: 12px 14px;
+  box-shadow: 0 4px 20px rgba(0,0,0,.5);
+}
+.turn-arrow {
+  width: 44px; height: 44px; border-radius: 12px;
+  background: var(--accent); color: var(--bg);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 22px; flex-shrink: 0;
+}
+.turn-text { flex: 1; min-width: 0; }
+.turn-street { font-size: 15px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.turn-dist { font-size: 12px; color: var(--accent); font-family: var(--mono); margin-top: 2px; }
 
 /* Lista de paradas (pantalla de configuración) */
 .plus-stop-item {
@@ -691,14 +702,23 @@ select option { background: var(--surface2); }
     <div style="height:16px;"></div>
   </div>
 
-  <!-- Mapa overview (todos los puntos) -->
-  <div id="nav-map-overview" class="nav-map-wrap" style="flex:1;min-height:0;">
+  <!-- Mapa Mapbox GL (único, overview + giro a giro) -->
+  <div id="nav-map-overview" class="nav-map-wrap" style="flex:1;min-height:0;position:relative;">
     <div id="nav-map" style="width:100%;height:100%;"></div>
-  </div>
-
-  <!-- Mapa de navegación giro a giro (oculto por defecto) -->
-  <div id="nav-map-routing" style="display:none;flex:1;min-height:0;">
-    <div id="nav-routing-map" style="width:100%;height:100%;"></div>
+    <!-- Panel instrucciones giro a giro (oculto por defecto) -->
+    <div id="nav-turn-panel" style="display:none;">
+      <div class="turn-instruction">
+        <div class="turn-arrow" id="nav-turn-arrow">↑</div>
+        <div class="turn-text">
+          <div class="turn-street" id="nav-turn-street">Calculando ruta...</div>
+          <div class="turn-dist" id="nav-turn-dist"></div>
+        </div>
+        <div style="font-size:12px;color:var(--text3);text-align:right;flex-shrink:0;">
+          <div id="nav-turn-eta" style="font-family:var(--mono);"></div>
+          <div id="nav-turn-total" style="font-size:10px;margin-top:2px;"></div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- HUD debajo del mapa -->
@@ -729,9 +749,9 @@ select option { background: var(--surface2); }
       <div style="font-size:12px;color:var(--text2);font-weight:600;flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" id="nav-next-name">—</div>
     </div>
 
-    <!-- Botón navegar (toggle mapa giro a giro) -->
+    <!-- Botón navegar (toggle modo giro a giro) -->
     <button id="btn-navegar-stop" onclick="toggleNavegacionGiro()" class="btn btn-accent" style="font-size:13px;">
-      🧭 Iniciar navegación a parada
+      🧭 Navegar a esta parada
     </button>
 
     <!-- Acciones -->
@@ -2647,12 +2667,17 @@ function obtenerUbicacion() {
   });
 }
 
-// Calcular distancia total de ruta via OSRM y devolver { km, durMin }
+// Calcular distancia total via Mapbox Directions y devolver { km, durMin }
 async function calcularInfoRuta(puntos) {
   if (puntos.length < 2) return { km: 0, durMin: 0 };
-  const coords = puntos.map(p => `${p.lng},${p.lat}`).join(';');
+  // Mapbox Directions soporta máx 25 waypoints
+  const pts = puntos.slice(0, 25);
+  const coords = pts.map(p => `${p.lng},${p.lat}`).join(';');
   try {
-    const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=false`);
+    const res = await fetch(
+      `https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${coords}` +
+      `?overview=false&access_token=${MAPBOX_TOKEN}`
+    );
     const data = await res.json();
     if (data.routes?.[0]) {
       return {
@@ -2711,242 +2736,337 @@ window.calcularYNavegar = async function() {
   renderNavGuiada();
 }
 
-// ─── MAPA LEAFLET NAVEGACIÓN GUIADA ──────────────────────────────────
-let navMap = null;
-let navMapLayer = null;
-let navMapMarker = null;
-let navMapRouteLine = null;
-let navRutaInfo = { km: 0, durMin: 0 };
+// ─── MAPBOX GL JS — NAVEGACIÓN GUIADA ────────────────────────────────
+const MAPBOX_TOKEN = 'pk.eyJ1IjoiZGFuaWVsdWxpc2VzIiwiYSI6ImNtYjVubXowbjAxeDQyanM2bmQ2cjg1MDQifQ.Fz5_o5rFrRJH5Y_7nqUhXg';
+mapboxgl.accessToken = MAPBOX_TOKEN;
 
-// Mapa de navegación giro a giro
-let routingMap = null;
-let routingControl = null;
+let navMap = null;
+let navRutaInfo = { km: 0, durMin: 0 };
 let navGiroActivo = false;
 let navGiroWatch = null;
-let navGiroMarkerActual = null;
+let navGiroSteps = [];      // instrucciones de la ruta actual
+let navGiroStepIdx = 0;     // índice de la instrucción actual
+let navUserMarker = null;   // marcador de posición actual en el mapa
+
+// Iconos de giro → emoji
+const MANEUVER_ICONS = {
+  'turn-right': '↱', 'turn-left': '↰', 'turn-sharp-right': '↪',
+  'turn-sharp-left': '↩', 'turn-slight-right': '↗', 'turn-slight-left': '↖',
+  'straight': '↑', 'uturn': '↩', 'roundabout': '🔄',
+  'merge': '⇒', 'ramp-right': '↱', 'ramp-left': '↰',
+  'fork-right': '↱', 'fork-left': '↰', 'end-of-road-right': '↱',
+  'end-of-road-left': '↰', 'depart': '🏁', 'arrive': '📍'
+};
+
+function getManeuvIcon(step) {
+  if (!step) return '↑';
+  const t = step.maneuver?.type || '';
+  const mod = step.maneuver?.modifier || '';
+  const key = mod ? `${t}-${mod}` : t;
+  return MANEUVER_ICONS[key] || MANEUVER_ICONS[t] || '↑';
+}
+
+function fmtDist(m) {
+  return m >= 1000 ? `${(m / 1000).toFixed(1)} km` : `${Math.round(m)} m`;
+}
 
 function initNavMap() {
   if (navMap) return;
-  navMap = L.map('nav-map', { zoomControl: true, attributionControl: false });
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(navMap);
+  navMap = new mapboxgl.Map({
+    container: 'nav-map',
+    style: 'mapbox://styles/mapbox/navigation-night-v1',
+    zoom: 13,
+    center: [-99.1, 19.4],
+    attributionControl: false
+  });
+  navMap.addControl(new mapboxgl.NavigationControl({ showCompass: true, showZoom: true }), 'top-right');
 }
 
-function initRoutingMap() {
-  if (routingMap) return;
-  routingMap = L.map('nav-routing-map', { zoomControl: true, attributionControl: false });
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(routingMap);
-}
-
-// ── Mapa overview: todos los puntos ──────────────────────────────────
+// ── Mapa overview Mapbox GL: todos los puntos + ruta ─────────────────
 async function actualizarMapaNavGuiada() {
   initNavMap();
-
-  // Limpiar todo
-  navMap.eachLayer(layer => {
-    if (layer instanceof L.Marker || layer instanceof L.GeoJSON || layer instanceof L.Polyline) {
-      navMap.removeLayer(layer);
-    }
-  });
-
   if (navParadas.length === 0) return;
 
-  // Marcadores para TODAS las paradas
+  // Esperar a que el mapa esté listo
+  await new Promise(resolve => {
+    if (navMap.isStyleLoaded()) { resolve(); return; }
+    navMap.once('load', resolve);
+  });
+
+  // --- Limpiar capas anteriores ---
+  ['nav-route', 'nav-route-outline', 'nav-markers-labels'].forEach(id => {
+    if (navMap.getLayer(id)) navMap.removeLayer(id);
+  });
+  ['nav-route-src', 'nav-markers-src'].forEach(id => {
+    if (navMap.getSource(id)) navMap.removeSource(id);
+  });
+  // Quitar marcadores HTML anteriores
+  document.querySelectorAll('.mbx-nav-marker').forEach(el => el.remove());
+  if (navUserMarker) { navUserMarker.remove(); navUserMarker = null; }
+
+  // --- Marcadores para todas las paradas ---
+  const bounds = new mapboxgl.LngLatBounds();
   navParadas.forEach((p, i) => {
     const esActual = i === navParadaActual;
     const esRetorno = p.esRetorno;
-    let color = p.hecha ? '#3d5a80' : esActual ? '#00d4ff' : '#ff9100';
-    if (i === 0 && !p.hecha && !esActual) color = '#00e676';
-    if (esRetorno) color = '#ffd740';
-
-    const icon = L.divIcon({
-      className: '',
-      html: `<div style="position:relative;width:30px;height:36px;">
-        <div style="width:30px;height:30px;border-radius:50% 50% 50% 0;background:${color};border:3px solid #fff;transform:rotate(-45deg);box-shadow:0 2px 8px rgba(0,0,0,.4);${p.hecha ? 'opacity:.4' : ''}"></div>
-        <div style="position:absolute;top:4px;left:0;width:24px;text-align:center;font-size:11px;font-weight:800;color:#fff;">${p.hecha ? '✓' : esRetorno ? '🏠' : i + 1}</div>
-      </div>`,
-      iconSize: [30, 36], iconAnchor: [15, 36]
-    });
-    L.marker([p.lat, p.lng], { icon })
-      .bindPopup(`<b>${esRetorno ? '🏠 Regreso' : (i + 1) + '. ' + p.label.split(',')[0]}</b><br><code>${p.plusCode}</code>`)
+    let bg = p.hecha ? '#3d5a80' : esActual ? '#00d4ff' : '#ff9100';
+    if (esRetorno) bg = '#ffd740';
+    const label = p.hecha ? '✓' : esRetorno ? '🏠' : (i + 1);
+    const size = esActual ? 38 : 30;
+    const border = esActual ? '3px solid #fff' : '2px solid rgba(255,255,255,.6)';
+    const el = document.createElement('div');
+    el.className = 'mbx-nav-marker';
+    el.style.cssText = `width:${size}px;height:${size}px;border-radius:50%;
+      background:${bg};border:${border};
+      display:flex;align-items:center;justify-content:center;
+      font-size:${esActual ? 14 : 11}px;font-weight:800;color:#fff;
+      box-shadow:0 2px 8px rgba(0,0,0,.5);
+      opacity:${p.hecha ? '.4' : '1'};
+      cursor:pointer;`;
+    el.textContent = label;
+    const popup = new mapboxgl.Popup({ offset: 25, closeButton: false })
+      .setHTML(`<strong>${esRetorno ? '🏠 Regreso' : (i+1)+'. '+p.label.split(',')[0]}</strong><br><code>${p.plusCode}</code>`);
+    new mapboxgl.Marker({ element: el })
+      .setLngLat([p.lng, p.lat])
+      .setPopup(popup)
       .addTo(navMap);
+    bounds.extend([p.lng, p.lat]);
   });
 
-  // Trazar ruta overview con OSRM
+  // --- Marcador posición actual ---
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(pos => {
+      const el = document.createElement('div');
+      el.className = 'mbx-nav-marker';
+      el.style.cssText = `width:18px;height:18px;border-radius:50%;
+        background:#fff;border:3px solid #00e676;
+        box-shadow:0 0 0 6px rgba(0,230,118,.25);`;
+      navUserMarker = new mapboxgl.Marker({ element: el })
+        .setLngLat([pos.coords.longitude, pos.coords.latitude])
+        .setPopup(new mapboxgl.Popup({ closeButton: false }).setHTML('<b>📍 Tú aquí</b>'))
+        .addTo(navMap);
+      bounds.extend([pos.coords.longitude, pos.coords.latitude]);
+      navMap.fitBounds(bounds, { padding: 60, maxZoom: 16, animate: true });
+    }, () => {
+      navMap.fitBounds(bounds, { padding: 60, maxZoom: 16, animate: true });
+    }, { timeout: 4000, maximumAge: 30000 });
+  } else {
+    navMap.fitBounds(bounds, { padding: 60, maxZoom: 16, animate: true });
+  }
+
+  // --- Trazar ruta con Mapbox Directions API ---
   const pendientes = navParadas.filter(p => !p.hecha);
   if (pendientes.length >= 2) {
     const coords = pendientes.map(p => `${p.lng},${p.lat}`).join(';');
     try {
-      const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`);
+      const res = await fetch(
+        `https://api.mapbox.com/directions/v5/mapbox/driving/${coords}` +
+        `?overview=full&geometries=geojson&access_token=${MAPBOX_TOKEN}`
+      );
       const data = await res.json();
       if (data.routes?.[0]) {
-        L.geoJSON(data.routes[0].geometry, {
-          style: { color: '#00d4ff', weight: 4, opacity: .7, dashArray: '8,4' }
-        }).addTo(navMap);
+        const geom = data.routes[0].geometry;
+        navMap.addSource('nav-route-src', { type: 'geojson', data: { type: 'Feature', geometry: geom } });
+        navMap.addLayer({ id: 'nav-route-outline', type: 'line', source: 'nav-route-src',
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: { 'line-color': '#003d4f', 'line-width': 10, 'line-opacity': .6 }
+        }, navMap.getLayer('road-label') ? 'road-label' : undefined);
+        navMap.addLayer({ id: 'nav-route', type: 'line', source: 'nav-route-src',
+          layout: { 'line-join': 'round', 'line-cap': 'round' },
+          paint: { 'line-color': '#00d4ff', 'line-width': 5, 'line-opacity': .9 }
+        }, navMap.getLayer('road-label') ? 'road-label' : undefined);
       }
     } catch(e) {}
   }
-
-  // Marcador posición actual
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(pos => {
-      const posIcon = L.divIcon({
-        className: '',
-        html: `<div style="width:18px;height:18px;border-radius:50%;background:#fff;border:3px solid #00e676;box-shadow:0 0 0 5px rgba(0,230,118,.25);"></div>`,
-        iconSize: [18, 18], iconAnchor: [9, 9]
-      });
-      L.marker([pos.coords.latitude, pos.coords.longitude], { icon: posIcon })
-        .bindPopup('<b>📍 Tú aquí</b>').addTo(navMap);
-    }, () => {}, { timeout: 4000, maximumAge: 30000 });
-  }
-
-  const allPts = navParadas.map(p => [p.lat, p.lng]);
-  if (allPts.length > 0) navMap.fitBounds(L.latLngBounds(allPts), { padding: [50, 50] });
-  setTimeout(() => navMap.invalidateSize(), 200);
 }
 
-// ── Navegación giro a giro con Leaflet Routing Machine ───────────────
+// ── Navegación giro a giro con Mapbox Directions API ────────────────
 window.toggleNavegacionGiro = function() {
-  if (navGiroActivo) {
-    cerrarNavegacionGiro();
-  } else {
-    abrirNavegacionGiro();
-  }
+  if (navGiroActivo) cerrarNavegacionGiro();
+  else abrirNavegacionGiro();
 }
 
 function abrirNavegacionGiro() {
-  const parada = navParadas[navParadaActual];
-  if (!parada) return;
-
-  // Cambiar visibilidad de mapas
-  document.getElementById('nav-map-overview').style.display = 'none';
-  document.getElementById('nav-map-routing').style.display = 'flex';
   navGiroActivo = true;
-
   const btn = document.getElementById('btn-navegar-stop');
   btn.textContent = '🗺️ Ver mapa general';
   btn.classList.remove('btn-accent');
   btn.classList.add('btn-ghost');
 
-  initRoutingMap();
-  setTimeout(() => {
-    routingMap.invalidateSize();
-    cargarRutaGiro(parada);
-  }, 100);
+  const parada = navParadas[navParadaActual];
+  if (parada) cargarRutaGiro(parada);
 }
 
 function cerrarNavegacionGiro() {
-  document.getElementById('nav-map-overview').style.display = 'flex';
-  document.getElementById('nav-map-routing').style.display = 'none';
   navGiroActivo = false;
+  document.getElementById('nav-turn-panel').style.display = 'none';
+  navGiroSteps = [];
+  navGiroStepIdx = 0;
 
-  const btn = document.getElementById('btn-navegar-stop');
-  btn.textContent = '🧭 Iniciar navegación a parada';
-  btn.classList.add('btn-accent');
-  btn.classList.remove('btn-ghost');
-
-  // Detener seguimiento GPS del mapa de giro
   if (navGiroWatch !== null) {
     navigator.geolocation.clearWatch(navGiroWatch);
     navGiroWatch = null;
   }
 
-  setTimeout(() => navMap.invalidateSize(), 100);
+  const btn = document.getElementById('btn-navegar-stop');
+  btn.textContent = '🧭 Navegar a esta parada';
+  btn.classList.add('btn-accent');
+  btn.classList.remove('btn-ghost');
+
+  // Volver a vista overview
+  actualizarMapaNavGuiada();
 }
 
-function cargarRutaGiro(parada) {
-  // Limpiar control anterior
-  if (routingControl) {
-    try { routingMap.removeControl(routingControl); } catch(e) {}
-    routingControl = null;
-  }
-  if (navGiroMarkerActual) {
-    try { routingMap.removeLayer(navGiroMarkerActual); } catch(e) {}
-    navGiroMarkerActual = null;
-  }
+async function cargarRutaGiro(parada) {
+  initNavMap();
+  await new Promise(resolve => {
+    if (navMap.isStyleLoaded()) { resolve(); return; }
+    navMap.once('load', resolve);
+  });
 
-  const destino = L.latLng(parada.lat, parada.lng);
+  // Limpiar ruta anterior
+  ['nav-giro-route', 'nav-giro-outline'].forEach(id => {
+    if (navMap.getLayer(id)) navMap.removeLayer(id);
+  });
+  ['nav-giro-src'].forEach(id => {
+    if (navMap.getSource(id)) navMap.removeSource(id);
+  });
+  document.querySelectorAll('.mbx-nav-marker').forEach(el => el.remove());
+  if (navUserMarker) { navUserMarker.remove(); navUserMarker = null; }
 
-  const crearRutaDesde = (oLat, oLng) => {
-    const origen = L.latLng(oLat, oLng);
+  const obtenerYNavegar = async (oLat, oLng) => {
+    // Dibujar marcador de posición actual
+    const elUser = document.createElement('div');
+    elUser.className = 'mbx-nav-marker';
+    elUser.style.cssText = `width:20px;height:20px;border-radius:50%;
+      background:#00e676;border:3px solid #fff;
+      box-shadow:0 0 0 7px rgba(0,230,118,.3);`;
+    navUserMarker = new mapboxgl.Marker({ element: elUser })
+      .setLngLat([oLng, oLat])
+      .addTo(navMap);
 
-    // Icono de posición actual (punto pulsante)
-    const posIcon = L.divIcon({
-      className: '',
-      html: `<div style="width:20px;height:20px;border-radius:50%;background:#00e676;border:3px solid #fff;box-shadow:0 0 0 6px rgba(0,230,118,.3);animation:pulseGps .9s ease-in-out infinite alternate;"></div>`,
-      iconSize: [20, 20], iconAnchor: [10, 10]
-    });
-    navGiroMarkerActual = L.marker([oLat, oLng], { icon: posIcon, zIndexOffset: 1000 })
-      .bindPopup('<b>📍 Tú aquí</b>').addTo(routingMap);
+    // Marcador de destino
+    const elDest = document.createElement('div');
+    elDest.className = 'mbx-nav-marker';
+    elDest.style.cssText = `width:36px;height:36px;border-radius:50%;
+      background:#ff5252;border:3px solid #fff;
+      display:flex;align-items:center;justify-content:center;
+      font-size:18px;box-shadow:0 2px 10px rgba(0,0,0,.5);`;
+    elDest.textContent = '📦';
+    new mapboxgl.Marker({ element: elDest })
+      .setLngLat([parada.lng, parada.lat])
+      .setPopup(new mapboxgl.Popup({ closeButton: false }).setHTML(`<b>${parada.label.split(',')[0]}</b>`))
+      .addTo(navMap);
 
-    // Control de ruta con instrucciones en español
-    routingControl = L.Routing.control({
-      waypoints: [origen, destino],
-      router: L.Routing.osrmv1({
-        serviceUrl: 'https://router.project-osrm.org/route/v1',
-        language: 'es'
-      }),
-      lineOptions: {
-        styles: [{ color: '#00d4ff', weight: 6, opacity: .9 }],
-        extendToWaypoints: true,
-        missingRouteTolerance: 5
-      },
-      show: true,
-      addWaypoints: false,
-      routeWhileDragging: false,
-      fitSelectedRoutes: true,
-      showAlternatives: false,
-      containerClassName: 'nav-routing-panel',
-      createMarker: (i, wp) => {
-        if (i === 0) return null; // no duplicar marcador de origen
-        return L.marker(wp.latLng, {
-          icon: L.divIcon({
-            className: '',
-            html: `<div style="position:relative;width:30px;height:36px;">
-              <div style="width:30px;height:30px;border-radius:50% 50% 50% 0;background:#ff5252;border:3px solid #fff;transform:rotate(-45deg);box-shadow:0 2px 8px rgba(0,0,0,.5);"></div>
-              <div style="position:absolute;top:5px;left:0;width:24px;text-align:center;font-size:14px;">📦</div>
-            </div>`,
-            iconSize: [30, 36], iconAnchor: [15, 36]
-          })
-        });
-      }
-    }).addTo(routingMap);
+    // Llamar a Mapbox Directions API
+    try {
+      const url = `https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${oLng},${oLat};${parada.lng},${parada.lat}` +
+        `?steps=true&overview=full&geometries=geojson&language=es&access_token=${MAPBOX_TOKEN}`;
+      const res = await fetch(url);
+      const data = await res.json();
+      const route = data.routes?.[0];
+      if (!route) throw new Error('Sin ruta');
 
-    // Mostrar distancia al destino en HUD
-    routingControl.on('routesfound', e => {
-      const r = e.routes[0];
-      const km = Math.round(r.summary.totalDistance / 100) / 10;
-      const min = Math.round(r.summary.totalTime / 60);
-      document.getElementById('nav-current-dist').textContent =
-        `🚗 ${km} km · ~${min} min`;
-    });
+      // Dibujar línea de ruta
+      const geom = route.geometry;
+      navMap.addSource('nav-giro-src', { type: 'geojson', data: { type: 'Feature', geometry: geom } });
+      navMap.addLayer({ id: 'nav-giro-outline', type: 'line', source: 'nav-giro-src',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: { 'line-color': '#003d4f', 'line-width': 12, 'line-opacity': .7 }
+      });
+      navMap.addLayer({ id: 'nav-giro-route', type: 'line', source: 'nav-giro-src',
+        layout: { 'line-join': 'round', 'line-cap': 'round' },
+        paint: { 'line-color': '#00d4ff', 'line-width': 7, 'line-opacity': 1 }
+      });
 
-    // Seguimiento GPS en tiempo real
-    if (navGiroWatch !== null) navigator.geolocation.clearWatch(navGiroWatch);
-    navGiroWatch = navigator.geolocation.watchPosition(pos => {
-      if (!navGiroMarkerActual) return;
-      const newPos = L.latLng(pos.coords.latitude, pos.coords.longitude);
-      navGiroMarkerActual.setLatLng(newPos);
-      // Centrar mapa en posición actual si está alejado
-      if (routingMap.getCenter().distanceTo(newPos) > 300) {
-        routingMap.panTo(newPos, { animate: true });
-      }
-    }, () => {}, { enableHighAccuracy: true, maximumAge: 5000 });
+      // Centrar mapa con bearing hacia el destino
+      const bearing = getBearing(oLat, oLng, parada.lat, parada.lng);
+      navMap.flyTo({
+        center: [oLng, oLat],
+        zoom: 16,
+        bearing,
+        pitch: 55,
+        duration: 1200
+      });
+
+      // Guardar pasos de la ruta
+      navGiroSteps = route.legs[0].steps || [];
+      navGiroStepIdx = 0;
+
+      // Distancia y tiempo total
+      const km = (route.distance / 1000).toFixed(1);
+      const min = Math.round(route.duration / 60);
+      document.getElementById('nav-current-dist').textContent = `🚗 ${km} km · ~${min} min`;
+      document.getElementById('nav-turn-total').textContent = `${km} km · ${min} min`;
+
+      // Mostrar primera instrucción
+      mostrarInstruccionActual();
+      document.getElementById('nav-turn-panel').style.display = 'block';
+
+      // Seguimiento GPS en tiempo real
+      if (navGiroWatch !== null) navigator.geolocation.clearWatch(navGiroWatch);
+      navGiroWatch = navigator.geolocation.watchPosition(pos => {
+        const { latitude: lat, longitude: lng } = pos.coords;
+        if (navUserMarker) navUserMarker.setLngLat([lng, lat]);
+        // Avanzar instrucción si el usuario está cerca de la siguiente
+        avanzarInstruccionSiCerca(lat, lng);
+        navMap.panTo([lng, lat], { animate: true, duration: 500 });
+      }, () => {}, { enableHighAccuracy: true, maximumAge: 3000 });
+
+    } catch(e) {
+      // Fallback: solo centrar en la parada
+      navMap.flyTo({ center: [parada.lng, parada.lat], zoom: 15 });
+      document.getElementById('nav-turn-street').textContent = 'Sin conexión — guía manual';
+      document.getElementById('nav-turn-panel').style.display = 'block';
+    }
   };
 
   if (navigator.geolocation) {
     navigator.geolocation.getCurrentPosition(
-      pos => crearRutaDesde(pos.coords.latitude, pos.coords.longitude),
+      pos => obtenerYNavegar(pos.coords.latitude, pos.coords.longitude),
       () => {
-        // Sin GPS: usar coordenadas de la parada anterior o centrar en destino
         const ant = navParadaActual > 0 ? navParadas[navParadaActual - 1] : null;
-        if (ant) crearRutaDesde(ant.lat, ant.lng);
-        else routingMap.setView([parada.lat, parada.lng], 15);
+        if (ant) obtenerYNavegar(ant.lat, ant.lng);
+        else navMap.flyTo({ center: [parada.lng, parada.lat], zoom: 15 });
       },
       { timeout: 6000, maximumAge: 15000, enableHighAccuracy: true }
     );
   } else {
-    routingMap.setView([parada.lat, parada.lng], 15);
+    navMap.flyTo({ center: [parada.lng, parada.lat], zoom: 15 });
   }
+}
+
+function mostrarInstruccionActual() {
+  const step = navGiroSteps[navGiroStepIdx];
+  if (!step) return;
+  document.getElementById('nav-turn-arrow').textContent = getManeuvIcon(step);
+  const nombre = step.name || step.maneuver?.instruction || 'Continúa recto';
+  document.getElementById('nav-turn-street').textContent = nombre;
+  document.getElementById('nav-turn-dist').textContent = fmtDist(step.distance);
+  // ETA restante
+  const stepsRestantes = navGiroSteps.slice(navGiroStepIdx);
+  const secRestantes = stepsRestantes.reduce((s, st) => s + (st.duration || 0), 0);
+  document.getElementById('nav-turn-eta').textContent = `~${Math.round(secRestantes / 60)} min`;
+}
+
+function avanzarInstruccionSiCerca(lat, lng) {
+  if (navGiroStepIdx >= navGiroSteps.length - 1) return;
+  const step = navGiroSteps[navGiroStepIdx];
+  if (!step?.maneuver?.location) return;
+  const [sLng, sLat] = step.maneuver.location;
+  const dist = Math.hypot(lat - sLat, lng - sLng) * 111320;
+  if (dist < 35) {
+    navGiroStepIdx = Math.min(navGiroStepIdx + 1, navGiroSteps.length - 1);
+    mostrarInstruccionActual();
+  }
+}
+
+function getBearing(lat1, lng1, lat2, lng2) {
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const φ1 = lat1 * Math.PI / 180, φ2 = lat2 * Math.PI / 180;
+  const y = Math.sin(dLng) * Math.cos(φ2);
+  const x = Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(dLng);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
 }
 
 function renderNavGuiada() {
@@ -3081,8 +3201,8 @@ window.reanudarNavegacion = function() {
 window.salirNavegacion = function() {
   cerrarNavegacionGiro();
   document.getElementById('nav-lista-panel').style.display = 'none';
+  document.querySelectorAll('.mbx-nav-marker').forEach(el => el.remove());
   if (navMap) { navMap.remove(); navMap = null; }
-  if (routingMap) { routingMap.remove(); routingMap = null; routingControl = null; }
   showScreen('navegacion');
 }
 
@@ -3243,75 +3363,96 @@ function renderIrRutaStops() {
     </div>`).join('');
 }
 
-// ─── MAPA LEAFLET IR A RUTA ───────────────────────────────────────────
+// ─── MAPA MAPBOX GL — IR A RUTA ───────────────────────────────────────
 let irRutaMap = null;
 
 async function cargarMapaRutaCompleta() {
   if (irRutaParadas.length === 0) return;
 
-  // Inicializar mapa (destruir si ya existía)
   if (irRutaMap) { irRutaMap.remove(); irRutaMap = null; }
-  irRutaMap = L.map('ir-ruta-map', { zoomControl: true, attributionControl: false });
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(irRutaMap);
-
-  const pinIcon = (num, color) => L.divIcon({
-    className: '',
-    html: `<div style="position:relative;width:30px;height:36px;">
-      <div style="width:30px;height:30px;border-radius:50% 50% 50% 0;background:${color};border:3px solid #fff;transform:rotate(-45deg);box-shadow:0 2px 8px rgba(0,0,0,.4);"></div>
-      <div style="position:absolute;top:4px;left:0;width:24px;text-align:center;font-size:11px;font-weight:800;color:#fff;">${num}</div>
-    </div>`,
-    iconSize: [30, 36], iconAnchor: [15, 36]
+  irRutaMap = new mapboxgl.Map({
+    container: 'ir-ruta-map',
+    style: 'mapbox://styles/mapbox/navigation-night-v1',
+    zoom: 12,
+    center: [irRutaParadas[0].lng, irRutaParadas[0].lat],
+    attributionControl: false
   });
+  irRutaMap.addControl(new mapboxgl.NavigationControl({ showCompass: false }), 'top-right');
 
-  // Agregar marcadores numerados
-  irRutaParadas.forEach((p, i) => {
-    const color = i === 0 ? '#00e676' : i === irRutaParadas.length - 1 ? '#ff5252' : '#00d4ff';
-    L.marker([p.lat, p.lng], { icon: pinIcon(i + 1, color) })
-      .bindPopup(`<b>${i + 1}. ${p.label.split(',')[0]}</b><br><code>${p.plusCode}</code>`)
-      .addTo(irRutaMap);
-  });
+  // Colores por posición
+  const colors = ['#00e676', '#00d4ff', '#ff9100', '#ffd740', '#ff5252'];
+  const bounds = new mapboxgl.LngLatBounds();
 
-  // Obtener ubicación actual y trazar ruta con OSRM
-  const trazarRuta = async (oLat, oLng) => {
-    const puntos = oLat
-      ? [{ lat: oLat, lng: oLng }, ...irRutaParadas]
-      : irRutaParadas;
+  irRutaMap.on('load', async () => {
+    // Marcadores numerados
+    irRutaParadas.forEach((p, i) => {
+      const color = colors[Math.min(i, colors.length - 1)];
+      const el = document.createElement('div');
+      el.style.cssText = `width:32px;height:32px;border-radius:50%;
+        background:${color};border:3px solid #fff;
+        display:flex;align-items:center;justify-content:center;
+        font-size:13px;font-weight:800;color:#0a1628;
+        box-shadow:0 2px 10px rgba(0,0,0,.5);cursor:pointer;`;
+      el.textContent = i + 1;
+      new mapboxgl.Marker({ element: el })
+        .setLngLat([p.lng, p.lat])
+        .setPopup(new mapboxgl.Popup({ closeButton: false })
+          .setHTML(`<b>${i+1}. ${p.label.split(',')[0]}</b><br><code>${p.plusCode}</code>`))
+        .addTo(irRutaMap);
+      bounds.extend([p.lng, p.lat]);
+    });
 
-    if (oLat) {
-      L.marker([oLat, oLng], { icon: pinIcon('📍', '#fff') })
-        .bindPopup('<b>Tu ubicación</b>').addTo(irRutaMap);
-    }
+    // Trazar ruta con Mapbox Directions
+    const trazarRuta = async (oLat, oLng) => {
+      const puntos = oLat
+        ? [{ lat: oLat, lng: oLng }, ...irRutaParadas]
+        : irRutaParadas;
 
-    // Coordenadas para OSRM: lng,lat separadas por ;
-    const coords = puntos.map(p => `${p.lng},${p.lat}`).join(';');
-    try {
-      const res = await fetch(`https://router.project-osrm.org/route/v1/driving/${coords}?overview=full&geometries=geojson`);
-      const data = await res.json();
-      if (data.routes?.[0]) {
-        const line = L.geoJSON(data.routes[0].geometry, {
-          style: { color: '#00d4ff', weight: 5, opacity: .85 }
-        }).addTo(irRutaMap);
-        irRutaMap.fitBounds(line.getBounds(), { padding: [60, 60] });
-      } else {
-        const bounds = L.latLngBounds(puntos.map(p => [p.lat, p.lng]));
-        irRutaMap.fitBounds(bounds, { padding: [50, 50] });
+      if (oLat) {
+        const elU = document.createElement('div');
+        elU.style.cssText = `width:18px;height:18px;border-radius:50%;
+          background:#fff;border:3px solid #00e676;
+          box-shadow:0 0 0 6px rgba(0,230,118,.25);`;
+        new mapboxgl.Marker({ element: elU })
+          .setLngLat([oLng, oLat])
+          .setPopup(new mapboxgl.Popup({ closeButton: false }).setHTML('<b>📍 Tú aquí</b>'))
+          .addTo(irRutaMap);
+        bounds.extend([oLng, oLat]);
       }
-    } catch {
-      const bounds = L.latLngBounds(puntos.map(p => [p.lat, p.lng]));
-      irRutaMap.fitBounds(bounds, { padding: [50, 50] });
-    }
-    setTimeout(() => irRutaMap.invalidateSize(), 250);
-  };
 
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(
-      pos => trazarRuta(pos.coords.latitude, pos.coords.longitude),
-      () => trazarRuta(null, null),
-      { timeout: 4000, maximumAge: 30000 }
-    );
-  } else {
-    trazarRuta(null, null);
-  }
+      const coords = puntos.map(p => `${p.lng},${p.lat}`).join(';');
+      try {
+        const res = await fetch(
+          `https://api.mapbox.com/directions/v5/mapbox/driving-traffic/${coords}` +
+          `?overview=full&geometries=geojson&access_token=${MAPBOX_TOKEN}`
+        );
+        const data = await res.json();
+        if (data.routes?.[0]) {
+          irRutaMap.addSource('ir-route-src', { type: 'geojson', data: { type: 'Feature', geometry: data.routes[0].geometry } });
+          irRutaMap.addLayer({ id: 'ir-route-outline', type: 'line', source: 'ir-route-src',
+            layout: { 'line-join': 'round', 'line-cap': 'round' },
+            paint: { 'line-color': '#003d4f', 'line-width': 10, 'line-opacity': .6 }
+          });
+          irRutaMap.addLayer({ id: 'ir-route', type: 'line', source: 'ir-route-src',
+            layout: { 'line-join': 'round', 'line-cap': 'round' },
+            paint: { 'line-color': '#00d4ff', 'line-width': 5, 'line-opacity': .9 }
+          });
+        }
+      } catch(e) {}
+
+      irRutaMap.fitBounds(bounds, { padding: 80, maxZoom: 16, animate: true });
+    };
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        pos => trazarRuta(pos.coords.latitude, pos.coords.longitude),
+        () => trazarRuta(null, null),
+        { timeout: 4000, maximumAge: 30000 }
+      );
+    } else {
+      trazarRuta(null, null);
+    }
+  });
 }
 
 window.abrirGoogleMapsNativo = function() {
@@ -3335,7 +3476,7 @@ updateRutaActivaBar();
     <span class="topbar-sub" id="ir-ruta-sub"></span>
   </div>
 
-  <!-- Mapa Leaflet ocupa todo el espacio disponible -->
+  <!-- Mapa Mapbox GL ocupa todo el espacio disponible -->
   <div style="flex:1;position:relative;overflow:hidden;">
     <div id="ir-ruta-map" style="width:100%;height:100%;"></div>
 
