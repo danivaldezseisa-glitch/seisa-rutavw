@@ -896,8 +896,8 @@ select option { background: var(--surface2); }
         <button class="btn btn-accent btn-sm" onclick="agregarPlusCodeCliente()" style="white-space:nowrap;flex-shrink:0;">＋ Agregar</button>
       </div>
       <div id="c-pluscode-list" style="display:flex;flex-direction:column;gap:6px;"></div>
-      <button class="btn btn-accent" id="btn-ir-ruta" onclick="irARuta()" style="display:none;margin-top:4px;">
-        🗺️ Calcular e ir a ruta
+      <button class="btn btn-ghost" id="btn-ir-ruta" onclick="agregarClienteARuta()" style="display:none;margin-top:4px;border-color:var(--accent);color:var(--accent);">
+        📍 Agregar paradas a ruta
       </button>
     </div>
 
@@ -2710,26 +2710,12 @@ window.calcularYNavegar = async function() {
 let navMap = null;
 let navMapLayer = null;
 let navMapMarker = null;
-let navMapRouteLine = null;
 let navRutaInfo = { km: 0, durMin: 0 };
-
-// Mapa de navegación giro a giro
-let routingMap = null;
-let routingControl = null;
-let navGiroActivo = false;
-let navGiroWatch = null;
-let navGiroMarkerActual = null;
 
 function initNavMap() {
   if (navMap) return;
   navMap = L.map('nav-map', { zoomControl: true, attributionControl: false });
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(navMap);
-}
-
-function initRoutingMap() {
-  if (routingMap) return;
-  routingMap = L.map('nav-routing-map', { zoomControl: true, attributionControl: false });
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(routingMap);
 }
 
 // ── Mapa overview: todos los puntos ──────────────────────────────────
@@ -2842,12 +2828,7 @@ function renderNavGuiada() {
     nextPrev.style.display = 'none';
   }
 
-  // Si el modo giro estaba activo, actualizar la ruta al nuevo destino
-  if (navGiroActivo) {
-    cargarRutaGiro(parada);
-  } else {
-    actualizarMapaNavGuiada();
-  }
+  actualizarMapaNavGuiada();
 
   renderListaParadas();
 }
@@ -2911,7 +2892,6 @@ window.marcarParadaHecha = function() {
     document.getElementById('nav-current-name').textContent = '¡Todas las entregas completadas!';
     document.getElementById('nav-current-plus').textContent = '';
     document.getElementById('nav-next-preview').style.display = 'none';
-    if (navGiroActivo) cerrarNavegacionGiro();
     showToast('🎉 ¡Ruta completada!');
   }
 }
@@ -2936,10 +2916,8 @@ window.reanudarNavegacion = function() {
 }
 
 window.salirNavegacion = function() {
-  cerrarNavegacionGiro();
   document.getElementById('nav-lista-panel').style.display = 'none';
   if (navMap) { navMap.remove(); navMap = null; }
-  if (routingMap) { routingMap.remove(); routingMap = null; routingControl = null; }
   showScreen('navegacion');
 }
 
@@ -3034,7 +3012,25 @@ async function sincronizarNavParadas(plusCodes, r) {
   document.getElementById('nav-stop-count').textContent = `${navParadas.length} paradas`;
 }
 
-// ─── IR A RUTA ────────────────────────────────────────────────────────
+// ─── AGREGAR CLIENTE A RUTA (sin navegar) ────────────────────────────
+
+window.agregarClienteARuta = async function() {
+  const r = allRecords.find(x => x.id === currentClientId);
+  if (!r || !Array.isArray(r.plusCodes) || r.plusCodes.length === 0) {
+    showToast('Agrega al menos un Plus Code'); return;
+  }
+  const btn = document.getElementById('btn-ir-ruta');
+  btn.disabled = true;
+  btn.textContent = '⏳ Agregando...';
+
+  await sincronizarNavParadas(r.plusCodes, r);
+
+  btn.disabled = false;
+  btn.textContent = '📍 Agregar paradas a ruta';
+  showToast(`✅ ${r.plusCodes.length} parada(s) agregadas a navegación`);
+};
+
+// ─── IR A RUTA (desde pantalla de navegación) ─────────────────────────────
 
 let irRutaParadas = [];
 
