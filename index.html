@@ -2117,20 +2117,31 @@ window.sendPhotosToWhatsApp = async function() {
   if (capturedPhotos.length === 0) { showToast('Toma al menos una foto'); return; }
   const r = allRecords.find(x => x.id === currentClientId);
   const nombre = r?.nombre || 'Cliente';
-  const tracking = (r?.trackings?.[0] || r?.tracking || '—');
-  const orden = (r?.shipmentOrders?.[0] || r?.shipment_order || '—');
+
+  // Todas las guías y pedidos del cliente
+  const guias = Array.isArray(r?.trackings) && r.trackings.length
+    ? r.trackings
+    : (r?.tracking ? [r.tracking] : []);
+  const ordenes = Array.isArray(r?.shipmentOrders) && r.shipmentOrders.length
+    ? r.shipmentOrders
+    : (r?.shipment_order ? [r.shipment_order] : []);
+
+  const tracking = guias.length ? guias.join('\n🔖 ') : '—';
+  const orden = ordenes.length ? ordenes.join('\n📦 ') : '—';
 
   let texto;
 
   if (camModo === 'excepcion') {
     const comentario = document.getElementById('cam-exc-comentario').value.trim();
+    const guiaLabel = guias.length > 1 ? 'Guías' : 'Guía';
+    const ordenLabel = ordenes.length > 1 ? 'Núms. Pedido' : 'Núm. Pedido';
     texto =
 `⚠️ *EXCEPCIÓN DE ENTREGA*
 ━━━━━━━━━━━━━━━━━━━
 📋 *Tipo:* ${excLabel}
 👤 *Cliente:* ${nombre}
-📦 *Núm. Pedido:* ${orden}
-🔖 *Guía:* ${tracking}${comentario ? `\n💬 *Comentario:* ${comentario}` : ''}
+📦 *${ordenLabel}:* ${orden}
+🔖 *${guiaLabel}:* ${tracking}${comentario ? `\n💬 *Comentario:* ${comentario}` : ''}
 ━━━━━━━━━━━━━━━━━━━`;
     // Guardar excepción en Firestore para el resumen de fin de ruta
     if (currentClientId) {
@@ -2153,12 +2164,14 @@ window.sendPhotosToWhatsApp = async function() {
       verificacionTexto = '🔢 Validación de No. de pedido';
     }
     const familiarComentario = camReceptor === 'familiar' ? (document.getElementById('familiar-comentario').value.trim() || '') : '';
+    const ordenEntrega = ordenes.length ? ordenes.join(', ') : '—';
+    const trackingEntrega = guias.length ? guias.join(', ') : '—';
     texto =
 `✅ *ENTREGA REALIZADA*
 ━━━━━━━━━━━━━━━━━━━
 👤 *Cliente:* ${nombre}
-📦 *Núm. Pedido:* ${orden}
-🔖 *Guía:* ${tracking}
+📦 *Núm. Pedido:* ${ordenEntrega}
+🔖 *Guía:* ${trackingEntrega}
 📬 *Recibe:* ${receptorTexto}${familiarComentario ? `\n💬 *Familiar:* ${familiarComentario}` : ''}
 ✔️ *Verificación:* ${verificacionTexto}
 ━━━━━━━━━━━━━━━━━━━`;
