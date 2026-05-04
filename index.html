@@ -3394,20 +3394,35 @@ window.enviarExcepcionWhatsApp = async function() {
     showToast(`📸 ${excFotos.length} foto(s) guardada(s)`);
   }
 
-  // ── 2. Cerrar modal y abrir WhatsApp solo con el texto ──
-  // (igual que sendPhotosToWhatsApp — el usuario adjunta las fotos desde galería)
+  // ── 2. Cerrar modal ──
   document.getElementById('modal-excepcion').classList.remove('open');
 
-  const tel = r?.telefono?.replace(/\D/g, '');
-  const num = tel ? (tel.startsWith('52') ? tel : '52' + tel) : '';
-  const waUrl = num
-    ? `https://wa.me/${num}?text=${encodeURIComponent(texto)}`
-    : `https://wa.me/?text=${encodeURIComponent(texto)}`;
+  // ── 3. Compartir con selector nativo (elige grupo tú mismo) ──
+  const archivos = excFotos.map((f, i) => {
+    const arr = f.dataUrl.split(',');
+    const mime = arr[0].match(/:(.*?);/)[1];
+    const bstr = atob(arr[1]);
+    const u8 = new Uint8Array(bstr.length);
+    for (let j = 0; j < bstr.length; j++) u8[j] = bstr.charCodeAt(j);
+    return new File([u8], `excepcion_${excTipo}_${i + 1}.jpg`, { type: mime });
+  });
 
-  window.open(waUrl, '_blank');
+  try {
+    const shareData = archivos.length > 0
+      ? { files: archivos, text: texto }
+      : { text: texto };
 
-  if (excFotos.length > 0) {
-    showToast('📎 Adjunta las fotos desde tu galería en WhatsApp');
+    if (navigator.share) {
+      await navigator.share(shareData);
+      showToast('✓ Excepción compartida');
+    } else {
+      // Fallback si el navegador no soporta share
+      window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
+    }
+  } catch(e) {
+    if (e.name !== 'AbortError') {
+      window.open(`https://wa.me/?text=${encodeURIComponent(texto)}`, '_blank');
+    }
   }
 };
 
