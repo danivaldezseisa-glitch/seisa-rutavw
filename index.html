@@ -1224,6 +1224,7 @@ select option { background: var(--surface2); }
         <div class="field" style="margin-bottom:0;"><label>CP</label><input id="fm-cp" type="text" maxlength="5"></div>
         <div class="field" style="margin-bottom:0;"><label>PDD</label><input id="fm-pdd" type="text" placeholder="YYYY-MM-DD"></div>
       </div>
+      <div class="field" style="margin-bottom:0;"><label>Municipio</label><input id="fm-municipio" type="text" placeholder="Tultitlán de Mariano Escobedo"></div>
       <div class="field" style="margin-bottom:0;"><label>Shipment Order</label><input id="fm-order" type="text" placeholder="15 dígitos"></div>
       <div class="field" style="margin-bottom:0;"><label>Tracking</label><input id="fm-tracking" type="text" placeholder="MXFDD..."></div>
     </div>
@@ -2475,6 +2476,7 @@ function showFotoArticuloModal(result, fileRef, fileName) {
   set('fm-numero', result.numero);
   set('fm-colonia', result.colonia);
   set('fm-cp', result.cp);
+  set('fm-municipio', result.municipio);
   set('fm-pdd', result.pdd);
   set('fm-order', result.shipment_order);
   set('fm-tracking', result.tracking);
@@ -2486,6 +2488,7 @@ function showFotoArticuloModal(result, fileRef, fileName) {
       ['👤 Nombre', result.nombre],
       ['📞 Tel', result.telefono],
       ['🏠 Dir', [result.calle, result.numero, result.colonia, result.cp].filter(Boolean).join(', ')],
+      ['🏙️ Municipio', result.municipio],
       ['📦 SO', result.shipment_order],
       ['🔖 Tracking', result.tracking],
       ['📅 PDD', result.pdd],
@@ -2528,6 +2531,7 @@ window.confirmarGuardadoConFoto = async function(sinFoto = false) {
     data.numero = getVal('fm-numero') || data.numero;
     data.colonia = getVal('fm-colonia') || data.colonia;
     data.cp = getVal('fm-cp') || data.cp;
+    data.municipio = getVal('fm-municipio') || data.municipio;
     data.pdd = getVal('fm-pdd') || data.pdd;
     data.shipment_order = getVal('fm-order') || data.shipment_order;
     data.tracking = getVal('fm-tracking') || data.tracking;
@@ -2615,21 +2619,29 @@ async function procesarSiguienteArchivo() {
 
 async function extractLabel(b64, mt) {
   const GROQ_KEY = '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';
-  const prompt = `Eres un extractor de datos de etiquetas de paquetería de Walmart México / Bodega Aurrera. Analiza la imagen con mucho cuidado.
+  const prompt = `Eres un extractor de datos de etiquetas de paquetería de Walmart México / Bodega Aurrera.
 
-Extrae ÚNICAMENTE estos 9 campos:
-1. "nombre" — Nombre completo del destinatario. Aparece después de "Para".
-2. "telefono" — Número telefónico del destinatario (10 dígitos).
-3. "calle" — Nombre de la calle.
-4. "numero" — Número exterior de la dirección.
-5. "colonia" — Nombre de la colonia en MAYÚSCULAS.
-6. "cp" — Código postal de 5 dígitos.
-7. "shipment_order" — 15 dígitos que empiezan con 6, junto a "Shipment Order No #:".
-8. "tracking" — Alfanumérico bajo "Tracking #:" y el código de barras. Ej: MXFDDWM18460169
-9. "pdd" — Fecha junto a "PDD :" en formato YYYY-MM-DD.
+Extrae ÚNICAMENTE estos campos del área de destinatario (la sección que empieza con "Para"):
 
-Responde ÚNICAMENTE con JSON válido, sin markdown, sin explicaciones:
-{"nombre":"","telefono":"","calle":"","numero":"","colonia":"","cp":"","shipment_order":"","tracking":"","pdd":""}`;
+1. "nombre" — Nombre completo después de "Para". Ej: "Fernanda Hernandez Castillo"
+2. "telefono" — Número de 10 dígitos que aparece junto al nombre. Ej: "5511458168"
+3. "calle" — Nombre de la calle o avenida. Ej: "Av Estado de Mexico Esquina Zacazonapan"
+4. "numero" — Número exterior o local. Ej: "4"
+5. "colonia" — Nombre de la colonia en MAYÚSCULAS. Ej: "SOLIDARIDAD 3RA. SECCION"
+6. "cp" — Código postal de 5 dígitos. Ej: "54948"
+7. "municipio" — Ciudad o municipio. Ej: "Tultitlán de Mariano Escobedo"
+8. "shipment_order" — El número junto a "Shipment Order No #:". Son 15 dígitos que empiezan con 6. Ej: "600000089411313"
+9. "tracking" — El número alfanumérico debajo de "Tracking #:" y del código de barras. Ej: "MXFDDWM18590997"
+10. "pdd" — Fecha junto a "PDD :" en formato YYYY-MM-DD. Ej: "2026-05-04"
+
+REGLAS:
+- Extrae SOLO lo que ves claramente. Si un campo no aparece devuelve "".
+- El shipment_order son exactamente 15 dígitos empezando con 6.
+- El tracking empieza con MXFDD seguido de letras y números.
+- NO inventes datos.
+
+Responde ÚNICAMENTE con JSON válido, sin markdown:
+{"nombre":"","telefono":"","calle":"","numero":"","colonia":"","cp":"","municipio":"","shipment_order":"","tracking":"","pdd":""}`;
 
   const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
