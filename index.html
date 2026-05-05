@@ -2364,27 +2364,19 @@ function resetFotoModal() {
   fotoStep = 1;
   capturedFotos = [null, null];
   capturedFotosB64 = [null, null];
-  // Preview
-  document.getElementById('foto-preview-area').innerHTML = `
-    <div class="photo-placeholder"><div class="ph-icon">📷</div><p>Sin foto aún</p></div>`;
-  // Miniaturas
-  document.getElementById('fthumb-1').innerHTML = '<div class="foto-thumb-ph">📷<br><span>Foto 1</span></div>';
-  document.getElementById('fthumb-2').innerHTML = '<div class="foto-thumb-ph">📷<br><span>Foto 2</span></div>';
-  document.getElementById('fthumb-1').className = 'foto-thumb-slot active';
-  document.getElementById('fthumb-2').className = 'foto-thumb-slot';
-  // Steps
-  document.getElementById('fstep-1').className = 'foto-step active';
-  document.getElementById('fstep-2').className = 'foto-step';
-  document.querySelector('.foto-step-line').className = 'foto-step-line';
-  // Textos y botones
-  document.getElementById('foto-modal-title').textContent = '📷 Foto 1 — Etiqueta';
-  document.getElementById('foto-modal-sub').textContent = 'Toma una foto clara de la etiqueta del paquete';
-  document.getElementById('btn-tomar-foto').textContent = '📷 Tomar foto 1';
-  document.getElementById('btn-tomar-foto').style.display = '';
-  document.getElementById('btn-siguiente-foto').textContent = 'Siguiente →';
-  document.getElementById('btn-siguiente-foto').disabled = true;
-  document.getElementById('btn-siguiente-foto').style.display = '';
-  document.getElementById('btn-guardar-con-foto').style.display = 'none';
+  // Reset seguro — los elementos pueden no existir en el nuevo modal simplificado
+  const safeEl = id => document.getElementById(id);
+  const safeSet = (id, prop, val) => { const el = safeEl(id); if (el) el[prop] = val; };
+  const safeClass = (id, cls) => { const el = safeEl(id); if (el) el.className = cls; };
+  safeClass('fthumb-1', 'foto-thumb-slot active');
+  safeClass('fthumb-2', 'foto-thumb-slot');
+  safeClass('fstep-1', 'foto-step active');
+  safeClass('fstep-2', 'foto-step');
+  const stepLine = document.querySelector('.foto-step-line');
+  if (stepLine) stepLine.className = 'foto-step-line';
+  safeSet('btn-guardar-con-foto', 'style', null);
+  const btnG = safeEl('btn-guardar-con-foto');
+  if (btnG) { btnG.style.display = 'none'; btnG.disabled = false; btnG.textContent = '💾 Guardar paquete'; }
 }
 
 document.getElementById('foto-articulo-input').addEventListener('change', function() {
@@ -2445,6 +2437,13 @@ window.avanzarFotoStep = function() {
 function showFotoArticuloModal(result, fileRef, fileName) {
   pendingRecordData = result;
   pendingFileRef = fileRef;
+  // Reset estado del modal
+  fotoStep = 1;
+  capturedFotos = [null, null];
+  capturedFotosB64 = [null, null];
+  // Reset botón guardar
+  const btnG = document.getElementById('btn-guardar-con-foto');
+  if (btnG) { btnG.disabled = false; btnG.textContent = '💾 Guardar paquete'; }
   document.getElementById('foto-file-label').textContent = fileName?.substring(0, 20) || '';
   // Mostrar preview de datos extraídos
   const preview = document.getElementById('foto-modal-preview-content');
@@ -2459,7 +2458,7 @@ function showFotoArticuloModal(result, fileRef, fileName) {
     ];
     preview.innerHTML = campos.filter(([, v]) => v).map(([l, v]) =>
       `<div><span style="color:var(--text3);">${l}:</span> <span style="color:var(--text);font-weight:600;">${v}</span></div>`
-    ).join('');
+    ).join('') || '<div style="color:var(--text3);">No se pudieron extraer datos de esta imagen.</div>';
   }
   document.getElementById('modal-foto-articulo').classList.add('open');
 }
