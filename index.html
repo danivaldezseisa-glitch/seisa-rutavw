@@ -1314,7 +1314,8 @@ const db = getFirestore(fireApp);
 const storage = getStorage(fireApp);
 const COL = 'paquetes';
 
-// ─── EXTRACCIÓN DE ETIQUETAS — usa Claude API (Anthropic) ───────────
+// ─── EXTRACCIÓN DE ETIQUETAS — usa Gemini 2.0 Flash (Google AI) ──────
+const GEMINI_KEY = 'AIzaSyAuNisB_ZR2MCTXVGwFkIF9T94Jmgqi8NA';
 
 // ─── MESSAGES ────────────────────────────────────────────────────────
 const MSG_PRESENTACION = `¡ Hola ! Soy Daniel Ulises Valdes Torres de paqueteria y estare a cargo de la ruta que te entregara tu pedido de Grupo Walmart. Te avisare cuando vaya en camino a tu domicilio. Es importante que muestres tu orden de compra, ya sea impresa o digital. Te agradeceria que nos compartas referencias o indicaciones adicionales sobre tu direccion si es necesario. Si requieres asistencia, puedes comunicarte con nuestro equipo de atencion a clientes al 800 WALMART (9256278)`;
@@ -2613,47 +2614,42 @@ async function extractLabel(b64, mt) {
   const prompt = `Eres un extractor de datos de etiquetas de paquetería de Walmart México / Bodega Aurrera. Analiza la imagen con mucho cuidado.
 
 Extrae ÚNICAMENTE estos 9 campos marcados en la etiqueta:
-
-1. "nombre" — Nombre completo del destinatario. Aparece después de "Para". Ejemplo: "Maribel Navarro Filio"
-2. "telefono" — Número telefónico del destinatario (10 dígitos). Ejemplo: "5540308632"
-3. "calle" — Nombre de la calle. Ejemplo: "jasminez"
-4. "numero" — Número exterior de la dirección. Ejemplo: "8"
-5. "colonia" — Nombre de la colonia o fraccionamiento en MAYÚSCULAS. Ejemplo: "SAN MATEO CUAUTEPEC"
-6. "cp" — Código postal de 5 dígitos. Ejemplo: "54948"
-7. "shipment_order" — Número junto a "Shipment Order No #:". Son 15 dígitos que empiezan con 6. Ejemplo: "600000080442428"
+1. "nombre" — Nombre completo del destinatario. Aparece después de "Para".
+2. "telefono" — Número telefónico del destinatario (10 dígitos).
+3. "calle" — Nombre de la calle.
+4. "numero" — Número exterior de la dirección.
+5. "colonia" — Nombre de la colonia o fraccionamiento en MAYÚSCULAS.
+6. "cp" — Código postal de 5 dígitos.
+7. "shipment_order" — Número junto a "Shipment Order No #:". Son 15 dígitos que empiezan con 6.
 8. "tracking" — Número alfanumérico debajo de "Tracking #:" y del código de barras. Ejemplo: "MXFDDWM18460169"
-9. "pdd" — Fecha junto a "PDD :" en formato YYYY-MM-DD. Ejemplo: "2026-04-27"
+9. "pdd" — Fecha junto a "PDD :" en formato YYYY-MM-DD.
 
-REGLAS IMPORTANTES:
-- Extrae SOLO lo que ves claramente en la imagen. Si un campo no aparece, devuelve cadena vacía "".
-- El shipment_order son exactamente 15 dígitos. Si ves más, toma los últimos 15.
-- El tracking empieza con letras (ej: MXFDD...) y está bajo el código de barras grande.
-- NO inventes datos. NO agregues campos extra.
-
-Responde ÚNICAMENTE con JSON válido, sin markdown, sin explicaciones:
+REGLAS: Extrae SOLO lo visible. Si un campo no aparece devuelve "". NO inventes datos.
+Responde ÚNICAMENTE con JSON válido sin markdown:
 {"nombre":"","telefono":"","calle":"","numero":"","colonia":"","cp":"","shipment_order":"","tracking":"","pdd":""}`;
 
-  const res = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      model: 'claude-sonnet-4-20250514',
-      max_tokens: 500,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'image', source: { type: 'base64', media_type: mt, data: b64 } },
-          { type: 'text', text: prompt }
-        ]
-      }]
-    })
-  });
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { inline_data: { mime_type: mt, data: b64 } },
+            { text: prompt }
+          ]
+        }],
+        generationConfig: { temperature: 0, maxOutputTokens: 500 }
+      })
+    }
+  );
   if (!res.ok) {
     const e = await res.json().catch(() => ({}));
     throw new Error(e?.error?.message || `HTTP ${res.status}`);
   }
   const data = await res.json();
-  const text = data.content?.[0]?.text || '{}';
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
   try {
     const match = text.match(/\{[\s\S]*\}/);
     return JSON.parse(match ? match[0] : text.replace(/```json|```/g, '').trim());
