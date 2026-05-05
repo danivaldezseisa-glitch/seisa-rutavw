@@ -2614,7 +2614,7 @@ async function procesarSiguienteArchivo() {
 }
 
 async function extractLabel(b64, mt) {
-  const GEMINI_KEY = 'AIzaSyAuNisB_ZR2MCTXVGwFkIF9T94Jmgqi8NA';
+  const GROQ_KEY = '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';
   const prompt = `Eres un extractor de datos de etiquetas de paquetería de Walmart México / Bodega Aurrera. Analiza la imagen con mucho cuidado.
 
 Extrae ÚNICAMENTE estos 9 campos:
@@ -2631,29 +2631,32 @@ Extrae ÚNICAMENTE estos 9 campos:
 Responde ÚNICAMENTE con JSON válido, sin markdown, sin explicaciones:
 {"nombre":"","telefono":"","calle":"","numero":"","colonia":"","cp":"","shipment_order":"","tracking":"","pdd":""}`;
 
-  const res = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
-    {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        contents: [{
-          parts: [
-            { inline_data: { mime_type: mt, data: b64 } },
-            { text: prompt }
-          ]
-        }],
-        generationConfig: { temperature: 0, maxOutputTokens: 500 }
-      })
-    }
-  );
+  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${GROQ_KEY}`
+    },
+    body: JSON.stringify({
+      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
+      max_tokens: 500,
+      temperature: 0,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image_url', image_url: { url: `data:${mt};base64,${b64}` } },
+          { type: 'text', text: prompt }
+        ]
+      }]
+    })
+  });
 
   if (!res.ok) {
     const e = await res.json().catch(() => ({}));
     throw new Error(e?.error?.message || `HTTP ${res.status}`);
   }
   const data = await res.json();
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
+  const text = data.choices?.[0]?.message?.content || '{}';
   try {
     const match = text.match(/\{[\s\S]*\}/);
     return JSON.parse(match ? match[0] : text.replace(/```json|```/g, '').trim());
