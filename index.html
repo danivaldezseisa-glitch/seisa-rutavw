@@ -1314,8 +1314,7 @@ const db = getFirestore(fireApp);
 const storage = getStorage(fireApp);
 const COL = 'paquetes';
 
-// ─── GROQ KEY ────────────────────────────────────────────────────────
-const GROQ_KEY = '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';
+// ─── EXTRACCIÓN DE ETIQUETAS — usa Claude API (Anthropic) ───────────
 
 // ─── MESSAGES ────────────────────────────────────────────────────────
 const MSG_PRESENTACION = `¡ Hola ! Soy Daniel Ulises Valdes Torres de paqueteria y estare a cargo de la ruta que te entregara tu pedido de Grupo Walmart. Te avisare cuando vaya en camino a tu domicilio. Es importante que muestres tu orden de compra, ya sea impresa o digital. Te agradeceria que nos compartas referencias o indicaciones adicionales sobre tu direccion si es necesario. Si requieres asistencia, puedes comunicarte con nuestro equipo de atencion a clientes al 800 WALMART (9256278)`;
@@ -2632,41 +2631,35 @@ REGLAS IMPORTANTES:
 - NO inventes datos. NO agregues campos extra.
 
 Responde ÚNICAMENTE con JSON válido, sin markdown, sin explicaciones:
-{
-  "nombre": "",
-  "telefono": "",
-  "calle": "",
-  "numero": "",
-  "colonia": "",
-  "cp": "",
-  "shipment_order": "",
-  "tracking": "",
-  "pdd": ""
-}
-Solo JSON, nada más.`;
+{"nombre":"","telefono":"","calle":"","numero":"","colonia":"","cp":"","shipment_order":"","tracking":"","pdd":""}`;
 
-  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+  const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
-      temperature: 0, max_tokens: 500,
-      messages: [{ role: 'user', content: [
-        { type: 'image_url', image_url: { url: `data:${mt};base64,${b64}` } },
-        { type: 'text', text: prompt }
-      ]}]
+      model: 'claude-sonnet-4-20250514',
+      max_tokens: 500,
+      messages: [{
+        role: 'user',
+        content: [
+          { type: 'image', source: { type: 'base64', media_type: mt, data: b64 } },
+          { type: 'text', text: prompt }
+        ]
+      }]
     })
   });
-  if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e?.error?.message || res.status); }
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({}));
+    throw new Error(e?.error?.message || `HTTP ${res.status}`);
+  }
   const data = await res.json();
-  const text = data.choices?.[0]?.message?.content || '{}';
+  const text = data.content?.[0]?.text || '{}';
   try {
-    // Extraer JSON aunque venga con texto extra
     const match = text.match(/\{[\s\S]*\}/);
-    return JSON.parse(match ? match[0] : text.replace(/```json|```/g,'').trim());
+    return JSON.parse(match ? match[0] : text.replace(/```json|```/g, '').trim());
   } catch(e) {
-    console.warn('JSON parse error, texto recibido:', text);
-    return {}; // retornar vacío en lugar de explotar
+    console.warn('JSON parse error:', text);
+    return {};
   }
 }
 
