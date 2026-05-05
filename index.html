@@ -1204,19 +1204,36 @@ select option { background: var(--surface2); }
       <span style="font-size:11px;color:var(--text3);font-family:var(--mono);" id="foto-file-label"></span>
     </div>
 
-    <p style="font-size:13px;color:var(--text2);" id="foto-modal-sub">Verifica los datos y guarda el paquete. Podrás agregar fotos desde la pantalla del cliente.</p>
+    <p style="font-size:12px;color:var(--text2);" id="foto-modal-sub">Verifica los datos antes de guardar. Podrás agregar fotos desde la pantalla del cliente.</p>
 
     <!-- Vista previa de datos extraídos -->
-    <div id="foto-modal-preview" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:6px;">
-      <div style="font-size:12px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-bottom:4px;">Datos del paquete</div>
-      <div id="foto-modal-preview-content" style="font-size:13px;color:var(--text2);line-height:1.8;"></div>
+    <div id="foto-modal-preview" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:12px 14px;display:flex;flex-direction:column;gap:4px;max-height:260px;overflow-y:auto;">
+      <div id="foto-modal-preview-content" style="font-size:13px;color:var(--text2);line-height:1.9;"></div>
+    </div>
+
+    <!-- Edición rápida (oculta por defecto) -->
+    <div id="foto-modal-edit" style="display:none;flex-direction:column;gap:6px;">
+      <div class="field" style="margin-bottom:0;"><label>Nombre</label><input id="fm-nombre" type="text" placeholder="Nombre del destinatario"></div>
+      <div class="field" style="margin-bottom:0;"><label>Teléfono</label><input id="fm-tel" type="text" placeholder="10 dígitos"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+        <div class="field" style="margin-bottom:0;"><label>Calle</label><input id="fm-calle" type="text"></div>
+        <div class="field" style="margin-bottom:0;"><label>Número</label><input id="fm-numero" type="text"></div>
+      </div>
+      <div class="field" style="margin-bottom:0;"><label>Colonia</label><input id="fm-colonia" type="text"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+        <div class="field" style="margin-bottom:0;"><label>CP</label><input id="fm-cp" type="text" maxlength="5"></div>
+        <div class="field" style="margin-bottom:0;"><label>PDD</label><input id="fm-pdd" type="text" placeholder="YYYY-MM-DD"></div>
+      </div>
+      <div class="field" style="margin-bottom:0;"><label>Shipment Order</label><input id="fm-order" type="text" placeholder="15 dígitos"></div>
+      <div class="field" style="margin-bottom:0;"><label>Tracking</label><input id="fm-tracking" type="text" placeholder="MXFDD..."></div>
     </div>
 
     <!-- Botones de acción -->
-    <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px;">
-      <button class="btn btn-accent" id="btn-guardar-con-foto" onclick="confirmarGuardadoConFoto()">💾 Guardar paquete</button>
-      <button class="btn btn-ghost" style="color:var(--red);border-color:var(--red);font-size:13px;" onclick="confirmarGuardadoConFoto(true)">Saltar y guardar</button>
+    <div style="display:flex;gap:8px;margin-top:4px;">
+      <button class="btn btn-ghost btn-sm" onclick="toggleFotoModalEdit()" id="btn-editar-datos" style="flex:1;font-size:12px;">✏️ Editar</button>
+      <button class="btn btn-ghost btn-sm" onclick="confirmarGuardadoConFoto(true)" style="flex:1;font-size:12px;color:var(--text3);">Saltar →</button>
     </div>
+    <button class="btn btn-accent" id="btn-guardar-con-foto" onclick="confirmarGuardadoConFoto()">💾 Guardar paquete</button>
 
     <!-- Hidden inputs kept for compatibility -->
     <input type="file" id="foto-articulo-input" accept="image/*" capture="environment" style="display:none;">
@@ -2364,9 +2381,8 @@ function resetFotoModal() {
   fotoStep = 1;
   capturedFotos = [null, null];
   capturedFotosB64 = [null, null];
-  // Reset seguro — los elementos pueden no existir en el nuevo modal simplificado
+  // Reset seguro — los elementos ocultos pueden no existir en el nuevo modal simplificado
   const safeEl = id => document.getElementById(id);
-  const safeSet = (id, prop, val) => { const el = safeEl(id); if (el) el[prop] = val; };
   const safeClass = (id, cls) => { const el = safeEl(id); if (el) el.className = cls; };
   safeClass('fthumb-1', 'foto-thumb-slot active');
   safeClass('fthumb-2', 'foto-thumb-slot');
@@ -2374,9 +2390,7 @@ function resetFotoModal() {
   safeClass('fstep-2', 'foto-step');
   const stepLine = document.querySelector('.foto-step-line');
   if (stepLine) stepLine.className = 'foto-step-line';
-  safeSet('btn-guardar-con-foto', 'style', null);
-  const btnG = safeEl('btn-guardar-con-foto');
-  if (btnG) { btnG.style.display = 'none'; btnG.disabled = false; btnG.textContent = '💾 Guardar paquete'; }
+  // NOTA: NO ocultar btn-guardar-con-foto aquí — el nuevo modal lo necesita visible
 }
 
 document.getElementById('foto-articulo-input').addEventListener('change', function() {
@@ -2444,50 +2458,80 @@ function showFotoArticuloModal(result, fileRef, fileName) {
   // Reset botón guardar
   const btnG = document.getElementById('btn-guardar-con-foto');
   if (btnG) { btnG.disabled = false; btnG.textContent = '💾 Guardar paquete'; }
+  // Ocultar edición, mostrar preview
+  const editDiv = document.getElementById('foto-modal-edit');
+  if (editDiv) editDiv.style.display = 'none';
+  const previewDiv = document.getElementById('foto-modal-preview');
+  if (previewDiv) previewDiv.style.display = 'flex';
+  const btnEditar = document.getElementById('btn-editar-datos');
+  if (btnEditar) btnEditar.textContent = '✏️ Editar';
+
   document.getElementById('foto-file-label').textContent = fileName?.substring(0, 20) || '';
+
+  // Poblar campos de edición
+  const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val || ''; };
+  set('fm-nombre', result.nombre);
+  set('fm-tel', result.telefono);
+  set('fm-calle', result.calle);
+  set('fm-numero', result.numero);
+  set('fm-colonia', result.colonia);
+  set('fm-cp', result.cp);
+  set('fm-pdd', result.pdd);
+  set('fm-order', result.shipment_order);
+  set('fm-tracking', result.tracking);
+
   // Mostrar preview de datos extraídos
   const preview = document.getElementById('foto-modal-preview-content');
   if (preview) {
     const campos = [
       ['👤 Nombre', result.nombre],
-      ['📞 Teléfono', result.telefono],
-      ['🏠 Dirección', [result.calle, result.numero, result.colonia, result.cp].filter(Boolean).join(', ')],
-      ['📦 Shipment Order', result.shipment_order],
+      ['📞 Tel', result.telefono],
+      ['🏠 Dir', [result.calle, result.numero, result.colonia, result.cp].filter(Boolean).join(', ')],
+      ['📦 SO', result.shipment_order],
       ['🔖 Tracking', result.tracking],
       ['📅 PDD', result.pdd],
     ];
-    preview.innerHTML = campos.filter(([, v]) => v).map(([l, v]) =>
-      `<div><span style="color:var(--text3);">${l}:</span> <span style="color:var(--text);font-weight:600;">${v}</span></div>`
-    ).join('') || '<div style="color:var(--text3);">No se pudieron extraer datos de esta imagen.</div>';
+    const filled = campos.filter(([, v]) => v);
+    preview.innerHTML = filled.length
+      ? filled.map(([l, v]) => `<div><span style="color:var(--text3);font-size:11px;">${l}:</span> <strong style="color:var(--text);">${v}</strong></div>`).join('')
+      : '<div style="color:var(--orange);font-size:13px;">⚠️ No se pudieron extraer datos. Usa "Editar" para capturarlos manualmente.</div>';
   }
   document.getElementById('modal-foto-articulo').classList.add('open');
 }
 
+window.toggleFotoModalEdit = function() {
+  const editDiv = document.getElementById('foto-modal-edit');
+  const previewDiv = document.getElementById('foto-modal-preview');
+  const btnEditar = document.getElementById('btn-editar-datos');
+  if (!editDiv) return;
+  const showing = editDiv.style.display !== 'none';
+  editDiv.style.display = showing ? 'none' : 'flex';
+  if (previewDiv) previewDiv.style.display = showing ? 'flex' : 'none';
+  if (btnEditar) btnEditar.textContent = showing ? '✏️ Editar' : '👁 Ver resumen';
+};
+
 window.confirmarGuardadoConFoto = async function(sinFoto = false) {
   if (!pendingRecordData) return;
-  const data = { ...pendingRecordData };
   const btnGuardar = document.getElementById('btn-guardar-con-foto');
   if (btnGuardar) { btnGuardar.disabled = true; btnGuardar.textContent = '⏳ Guardando...'; }
 
-  // Sin carga de fotos en el escaneo — se agregan desde pantalla del cliente
-  if (false) {
-    const labels = ['fotoEtiquetaUrl', 'fotoProductoUrl'];
-    for (let i = 0; i < 2; i++) {
-      const file = capturedFotos[i];
-      if (!file) continue;
-      try {
-        const ts = Date.now() + i;
-        const tracking = data.tracking || 'sin-tracking';
-        const path = `articulos/${tracking}_${i+1}_${ts}.jpg`;
-        const ref = storageRef(storage, path);
-        await uploadBytes(ref, file, { contentType: file.type || 'image/jpeg' });
-        data[labels[i]] = await getDownloadURL(ref);
-        // Compatibilidad: primera foto también en fotoArticuloUrl
-        if (i === 0) data.fotoArticuloUrl = data[labels[i]];
-      } catch(e) {
-        console.error(`Error subiendo foto ${i+1}:`, e);
-      }
-    }
+  // Leer datos del formulario de edición si está visible
+  const editDiv = document.getElementById('foto-modal-edit');
+  const editVisible = editDiv && editDiv.style.display !== 'none';
+  const getVal = id => { const el = document.getElementById(id); return el ? el.value.trim() : ''; };
+
+  const data = { ...pendingRecordData };
+  if (editVisible) {
+    // Sobreescribir con lo que el usuario editó
+    data.nombre = getVal('fm-nombre') || data.nombre;
+    data.telefono = getVal('fm-tel') || data.telefono;
+    data.calle = getVal('fm-calle') || data.calle;
+    data.numero = getVal('fm-numero') || data.numero;
+    data.colonia = getVal('fm-colonia') || data.colonia;
+    data.cp = getVal('fm-cp') || data.cp;
+    data.pdd = getVal('fm-pdd') || data.pdd;
+    data.shipment_order = getVal('fm-order') || data.shipment_order;
+    data.tracking = getVal('fm-tracking') || data.tracking;
   }
 
   if (btnGuardar) { btnGuardar.disabled = false; btnGuardar.textContent = '💾 Guardar paquete'; }
@@ -2545,21 +2589,25 @@ async function procesarSiguienteArchivo() {
   }
 
   updateQI(next, 'proc');
-  document.getElementById('prog-label-text').textContent = next.name.substring(0, 25) + '...';
+  const labelEl = document.getElementById('prog-label-text');
+  if (labelEl) labelEl.textContent = next.name.substring(0, 25) + '...';
+
+  let result = {};
   try {
     let mt = next.type || 'image/jpeg';
     if (mt === 'image/jpg') mt = 'image/jpeg';
     if (!['image/jpeg','image/png','image/gif','image/webp'].includes(mt)) mt = 'image/jpeg';
     const b64 = await fileToBase64(next);
-    const result = await extractLabel(b64, mt);
-    // Mostrar modal de foto del artículo
-    showFotoArticuloModal(result, next, next.name);
+    result = await extractLabel(b64, mt);
   } catch(e) {
-    console.error(e);
-    updateQI(next, 'err');
-    next._done = true;
-    procesarSiguienteArchivo();
+    console.error('Error extrayendo etiqueta:', e);
+    // Mostrar error pero continuar — mostrar modal con datos vacíos para que el usuario pueda editar
+    showToast(`⚠️ Error al leer etiqueta: ${e.message?.substring(0,40) || 'sin conexión'}`);
+    result = {}; // datos vacíos, el usuario puede guardar igual
   }
+
+  // Siempre mostrar el modal para que el usuario confirme o edite
+  showFotoArticuloModal(result, next, next.name);
 }
 
 async function extractLabel(b64, mt) {
@@ -2612,7 +2660,14 @@ Solo JSON, nada más.`;
   if (!res.ok) { const e = await res.json().catch(()=>({})); throw new Error(e?.error?.message || res.status); }
   const data = await res.json();
   const text = data.choices?.[0]?.message?.content || '{}';
-  return JSON.parse(text.replace(/```json|```/g,'').trim());
+  try {
+    // Extraer JSON aunque venga con texto extra
+    const match = text.match(/\{[\s\S]*\}/);
+    return JSON.parse(match ? match[0] : text.replace(/```json|```/g,'').trim());
+  } catch(e) {
+    console.warn('JSON parse error, texto recibido:', text);
+    return {}; // retornar vacío en lugar de explotar
+  }
 }
 
 function fileToBase64(f) {
