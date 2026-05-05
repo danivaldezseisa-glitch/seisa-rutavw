@@ -10,7 +10,6 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css"/>
 <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.min.js"></script>
 <style>
@@ -2601,9 +2600,13 @@ async function procesarSiguienteArchivo() {
     result = await extractLabel(b64, mt);
   } catch(e) {
     console.error('Error extrayendo etiqueta:', e);
-    // Mostrar error pero continuar — mostrar modal con datos vacíos para que el usuario pueda editar
-    showToast(`⚠️ Error al leer etiqueta: ${e.message?.substring(0,40) || 'sin conexión'}`);
-    result = {}; // datos vacíos, el usuario puede guardar igual
+    const msg = e.message || '';
+    if (msg.includes('quota') || msg.includes('529') || msg.includes('overloaded')) {
+      showToast('⚠️ Límite de API alcanzado — captura los datos manualmente');
+    } else {
+      showToast(`⚠️ Error al leer: ${msg.substring(0, 35) || 'sin conexión'}`);
+    }
+    result = {};
   }
 
   // Siempre mostrar el modal para que el usuario confirme o edite
@@ -2611,102 +2614,52 @@ async function procesarSiguienteArchivo() {
 }
 
 async function extractLabel(b64, mt) {
-  // ── OCR con Tesseract.js (sin API key, sin quota) ──
-  const dataUrl = `data:${mt};base64,${b64}`;
+  const GEMINI_KEY = 'AIzaSyAuNisB_ZR2MCTXVGwFkIF9T94Jmgqi8NA';
+  const prompt = `Eres un extractor de datos de etiquetas de paquetería de Walmart México / Bodega Aurrera. Analiza la imagen con mucho cuidado.
 
-  let rawText = '';
+Extrae ÚNICAMENTE estos 9 campos:
+1. "nombre" — Nombre completo del destinatario. Aparece después de "Para".
+2. "telefono" — Número telefónico del destinatario (10 dígitos).
+3. "calle" — Nombre de la calle.
+4. "numero" — Número exterior de la dirección.
+5. "colonia" — Nombre de la colonia en MAYÚSCULAS.
+6. "cp" — Código postal de 5 dígitos.
+7. "shipment_order" — 15 dígitos que empiezan con 6, junto a "Shipment Order No #:".
+8. "tracking" — Alfanumérico bajo "Tracking #:" y el código de barras. Ej: MXFDDWM18460169
+9. "pdd" — Fecha junto a "PDD :" en formato YYYY-MM-DD.
+
+Responde ÚNICAMENTE con JSON válido, sin markdown, sin explicaciones:
+{"nombre":"","telefono":"","calle":"","numero":"","colonia":"","cp":"","shipment_order":"","tracking":"","pdd":""}`;
+
+  const res = await fetch(
+    `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{
+          parts: [
+            { inline_data: { mime_type: mt, data: b64 } },
+            { text: prompt }
+          ]
+        }],
+        generationConfig: { temperature: 0, maxOutputTokens: 500 }
+      })
+    }
+  );
+
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({}));
+    throw new Error(e?.error?.message || `HTTP ${res.status}`);
+  }
+  const data = await res.json();
+  const text = data.candidates?.[0]?.content?.parts?.[0]?.text || '{}';
   try {
-    const worker = await Tesseract.createWorker('spa+eng', 1, {
-      logger: () => {} // silenciar logs
-    });
-    const { data } = await worker.recognize(dataUrl);
-    rawText = data.text || '';
-    await worker.terminate();
+    const match = text.match(/\{[\s\S]*\}/);
+    return JSON.parse(match ? match[0] : text.replace(/```json|```/g, '').trim());
   } catch(e) {
-    console.error('OCR error:', e);
-    throw new Error('Error de OCR: ' + (e.message || 'sin detalle'));
+    return {};
   }
-
-  const lines = rawText.split('\n').map(l => l.trim()).filter(Boolean);
-  const full  = lines.join(' ');
-
-  // ── Helpers ──
-  const find = (patterns) => {
-    for (const pat of patterns) {
-      const m = full.match(pat);
-      if (m) return (m[1] || m[0]).trim().replace(/[|]/g, '').trim();
-    }
-    return '';
-  };
-
-  // ── Tracking: empieza con MX o letras, ~15 chars alfanum ──
-  const tracking = find([
-    /Tracking\s*#?\s*:?\s*([A-Z]{2,}[A-Z0-9]{8,20})/i,
-    /\b(MXFDD[A-Z0-9]{8,12})\b/,
-    /\b([A-Z]{4,}[0-9]{6,}[A-Z0-9]*)\b/
-  ]);
-
-  // ── Shipment Order: 15 dígitos empezando con 6 ──
-  const shipment_order = find([
-    /Shipment\s*Order[^:]*:\s*#?\s*([6]\d{14})/i,
-    /\b(6\d{14})\b/
-  ]);
-
-  // ── Teléfono: 10 dígitos ──
-  const telefono = find([
-    /Tel[eé]fono\s*:?\s*(\d{10})/i,
-    /\b((?:55|33|81|56|664|442|222)\d{7,8})\b/,
-    /\b(\d{10})\b/
-  ]);
-
-  // ── CP: 5 dígitos ──
-  const cp = find([
-    /C\.?P\.?\s*:?\s*(\d{5})/i,
-    /(?:CP|C\.P\.)\s*(\d{5})/i,
-    /\b(\d{5})\b/
-  ]);
-
-  // ── PDD: fecha ──
-  const pdd = find([
-    /PDD\s*:?\s*(\d{4}-\d{2}-\d{2})/i,
-    /PDD\s*:?\s*(\d{2}[-\/]\d{2}[-\/]\d{4})/i,
-    /(\d{4}-\d{2}-\d{2})/
-  ]);
-
-  // ── Nombre: línea después de "Para" ──
-  let nombre = '';
-  for (let i = 0; i < lines.length; i++) {
-    if (/^para\b/i.test(lines[i])) {
-      nombre = (lines[i + 1] || '').replace(/[^a-záéíóúüñA-ZÁÉÍÓÚÜÑ\s]/g, '').trim();
-      break;
-    }
-    const m = lines[i].match(/Para\s+(.+)/i);
-    if (m) { nombre = m[1].trim(); break; }
-  }
-
-  // ── Dirección: buscar calle, número, colonia ──
-  let calle = '', numero = '', colonia = '';
-
-  // Buscar patrón "Calle Número, Colonia"
-  const dirMatch = full.match(/([A-Za-záéíóúüñÁÉÍÓÚÜÑ\s\.]+)\s+#?\s*(\d+)[,\s]+([A-ZÁÉÍÓÚÜÑ\s]+)/);
-  if (dirMatch) {
-    calle   = dirMatch[1].trim();
-    numero  = dirMatch[2].trim();
-    colonia = dirMatch[3].trim();
-  }
-
-  // Buscar colonia explícita
-  const colMatch = full.match(/(?:Col\.?|Colonia|Fracc\.?)\s*:?\s*([A-ZÁÉÍÓÚÜÑ\s]{4,40})/i);
-  if (colMatch) colonia = colMatch[1].trim();
-
-  // Buscar calle explícita
-  const calleMatch = full.match(/(?:Calle|Av\.?|Avenida|Blvd\.?|Boulevard)\s*:?\s*([A-Za-záéíóúüñÁÉÍÓÚÜÑ\s\.]{3,40})/i);
-  if (calleMatch) calle = calleMatch[1].trim();
-
-  const numMatch = full.match(/(?:No\.?|Núm\.?|Número|Ext\.?)\s*:?\s*(\d+)/i);
-  if (numMatch) numero = numMatch[1].trim();
-
-  return { nombre, telefono, calle, numero, colonia, cp, shipment_order, tracking, pdd };
 }
 
 function fileToBase64(f) {
