@@ -1512,8 +1512,10 @@ window.iniciarNuevaRuta = function() {
   document.getElementById('ruta-activa-bar').style.display = 'flex';
   // Actualizar topbar del scan
   document.getElementById('scan-ruta-title').textContent = nombre;
-  // Limpiar cola y pasar a scan
-  clearQueue();
+  // Resetear trackings y pasar a scan
+  trackingsDetectados = [];
+  renderTrackingsDetectados();
+  verificarBtnCruzar();
   showScreen('scan');
 }
 
@@ -2717,25 +2719,15 @@ window.confirmarGuardadoConFoto = async function(sinFoto = false) {
 
   try {
     await saveRecord(data);
-    if (pendingFileRef) { pendingFileRef._done = true; updateQI(pendingFileRef, 'done'); }
   } catch(e) {
     console.error(e);
-    if (pendingFileRef) updateQI(pendingFileRef, 'err');
   }
 
   pendingRecordData = null;
   pendingFileRef = null;
   capturedFotos = [null, null];
   capturedFotosB64 = [null, null];
-
-  const remaining = files.filter(f => !f._done);
-  if (remaining.length === 0) {
-    btnScan.disabled = false;
-    showToast(`✓ Todas las etiquetas guardadas`);
-    updateStats();
-  } else {
-    procesarSiguienteArchivo();
-  }
+  updateStats();
 };
 
 
