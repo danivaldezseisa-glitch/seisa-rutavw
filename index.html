@@ -11,6 +11,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
+<script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css"/>
 <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.min.js"></script>
 <style>
@@ -607,6 +608,11 @@ select option { background: var(--surface2); }
   width: 72px; height: 72px; object-fit: cover;
   border-radius: 8px; border: 2px solid var(--green);
 }
+@keyframes scanLine {
+  0%   { top: 0; }
+  50%  { top: calc(100% - 2px); }
+  100% { top: 0; }
+}
 </style>
 </head>
 <body>
@@ -899,40 +905,56 @@ select option { background: var(--surface2); }
 ══════════════════════════════════════════ -->
 <div class="screen hidden" id="screen-scan">
   <div class="topbar">
-    <button class="topbar-back" onclick="showScreen('home')">←</button>
+    <button class="topbar-back" onclick="detenerEscaner();showScreen('home')">←</button>
     <h2 id="scan-ruta-title">Escanear guías</h2>
-    <span class="topbar-sub" id="scan-count">0 imgs</span>
+    <span class="topbar-sub" id="scan-count"></span>
   </div>
   <div class="scroll">
 
-    <!-- PASO 1: Escanear etiquetas (solo tracking) -->
-    <div style="padding:14px 16px 4px;">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+    <!-- PASO 1: Escáner de código de barras -->
+    <div style="padding:14px 16px 8px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
         <div style="width:28px;height:28px;border-radius:50%;background:var(--accent);color:var(--bg);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0;">1</div>
         <div>
-          <div style="font-size:14px;font-weight:700;">Escanear guías</div>
-          <div style="font-size:11px;color:var(--text3);">Toma foto de cada etiqueta para leer el Tracking #</div>
+          <div style="font-size:14px;font-weight:700;">Escanear código de barras</div>
+          <div style="font-size:11px;color:var(--text3);">Apunta la cámara al código de barras del Tracking</div>
         </div>
       </div>
+
+      <!-- Visor de cámara -->
+      <div id="scanner-wrap" style="position:relative;border-radius:14px;overflow:hidden;background:#000;aspect-ratio:4/3;margin-bottom:10px;display:none;">
+        <video id="scanner-video" style="width:100%;height:100%;object-fit:cover;" autoplay muted playsinline></video>
+        <!-- Línea de escaneo animada -->
+        <div style="position:absolute;inset:0;pointer-events:none;">
+          <div style="position:absolute;left:10%;right:10%;top:50%;transform:translateY(-50%);height:60px;border:2px solid var(--accent);border-radius:8px;box-shadow:0 0 0 2000px rgba(0,0,0,.45);">
+            <div id="scan-line" style="position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent);box-shadow:0 0 8px var(--accent);animation:scanLine 1.5s ease-in-out infinite;"></div>
+          </div>
+        </div>
+        <!-- Último tracking detectado -->
+        <div id="scanner-last" style="position:absolute;bottom:0;left:0;right:0;padding:10px 14px;background:rgba(0,0,0,.7);font-size:13px;font-weight:700;color:var(--green);font-family:var(--mono);text-align:center;display:none;"></div>
+      </div>
+
+      <div id="scanner-btns" style="display:flex;gap:8px;margin-bottom:10px;">
+        <button class="btn btn-accent" id="btn-iniciar-scanner" onclick="iniciarEscaner()" style="flex:1;">
+          📷 Iniciar escáner
+        </button>
+        <button class="btn btn-ghost btn-sm" id="btn-detener-scanner" onclick="detenerEscaner()" style="display:none;white-space:nowrap;">
+          ⏹ Detener
+        </button>
+      </div>
+
+      <!-- Ingreso manual como fallback -->
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input type="text" id="tracking-manual-input" placeholder="O escribe el tracking manualmente..."
+          style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--text);font-size:13px;font-family:var(--mono);outline:none;"
+          onkeydown="if(event.key==='Enter')agregarTrackingManual()">
+        <button class="btn btn-ghost btn-sm" onclick="agregarTrackingManual()" style="white-space:nowrap;flex-shrink:0;">＋ Agregar</button>
+      </div>
     </div>
-    <label class="upload-zone" id="drop-zone" style="margin:0 16px 10px;">
-      <input type="file" id="file-input" accept="image/*" multiple>
-      <div class="uz-icon">📷</div>
-      <p><strong>Toca para fotografiar etiquetas</strong><br>Puedes seleccionar varias a la vez</p>
-    </label>
-    <div style="padding: 0 16px 12px; display:flex; gap:8px;">
-      <button class="btn btn-accent" id="btn-scan" disabled>▶ Leer Trackings</button>
-      <button class="btn btn-ghost btn-sm" id="btn-clear-queue" onclick="clearQueue()" style="white-space:nowrap;">🗑 Limpiar</button>
-    </div>
-    <div class="prog-wrap" id="prog-wrap" style="display:none;">
-      <div class="prog-label"><span id="prog-label-text">Leyendo tracking...</span><span id="prog-count">0/0</span></div>
-      <div class="prog-bar"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
-    </div>
-    <div class="queue-wrap" id="queue"></div>
 
     <!-- Trackings detectados -->
     <div id="trackings-detectados-wrap" style="display:none;padding:0 16px 10px;">
-      <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;font-weight:600;">Trackings detectados</div>
+      <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;font-weight:600;">Trackings escaneados</div>
       <div id="trackings-detectados-list" style="display:flex;flex-direction:column;gap:6px;"></div>
     </div>
 
@@ -2418,62 +2440,92 @@ window.marcarEntregadoDesdeCamera = async function() {
 }
 
 // ─── SCAN / UPLOAD ───────────────────────────────────────────────────
-const fileInput = document.getElementById('file-input');
-const dropZone  = document.getElementById('drop-zone');
-const btnScan   = document.getElementById('btn-scan');
+// ─── ESCÁNER DE CÓDIGO DE BARRAS (ZXing) ─────────────────────────────
+let zxingReader = null;
+let scannerActivo = false;
+let ultimoTracking = '';
+let cooldown = false;
 
-fileInput.addEventListener('change', e => addFiles(Array.from(e.target.files)));
-dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag'); });
-dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag'));
-dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag'); addFiles(Array.from(e.dataTransfer.files)); });
+window.iniciarEscaner = async function() {
+  const video = document.getElementById('scanner-video');
+  const wrap  = document.getElementById('scanner-wrap');
+  const btnIni = document.getElementById('btn-iniciar-scanner');
+  const btnDet = document.getElementById('btn-detener-scanner');
 
-function addFiles(newFiles) {
-  newFiles.forEach(f => {
-    if (!files.find(x => x.name === f.name && x.size === f.size)) {
-      files.push(f);
-      renderQueueItem(f);
-    }
-  });
-  document.getElementById('scan-count').textContent = `${files.length} imgs`;
-  btnScan.disabled = files.length === 0;
-  fileInput.value = '';
-}
+  try {
+    wrap.style.display = 'block';
+    btnIni.style.display = 'none';
+    btnDet.style.display = 'block';
+    scannerActivo = true;
 
-window.clearQueue = function() {
-  files = [];
-  document.getElementById('queue').innerHTML = '';
-  document.getElementById('scan-count').textContent = '0 imgs';
-  document.getElementById('prog-wrap').style.display = 'none';
-  document.getElementById('prog-fill').style.width = '0%';
-  document.getElementById('prog-count').textContent = '0/0';
-  btnScan.disabled = true;
-  showToast('🗑 Cola limpiada');
-}
+    const hints = new Map();
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
+      ZXing.BarcodeFormat.CODE_128,
+      ZXing.BarcodeFormat.CODE_39,
+      ZXing.BarcodeFormat.EAN_13,
+      ZXing.BarcodeFormat.QR_CODE,
+    ]);
+    zxingReader = new ZXing.BrowserMultiFormatReader(hints);
 
-function safeId(name) { return name.replace(/[^a-zA-Z0-9]/g, '_'); }
+    await zxingReader.decodeFromVideoDevice(null, video, (result, err) => {
+      if (!result || cooldown || !scannerActivo) return;
+      const raw = result.getText().trim().toUpperCase();
+      // Solo aceptar strings que parezcan tracking (alfanumérico >6 chars)
+      if (raw.length < 6) return;
+      if (raw === ultimoTracking) return;
 
-function renderQueueItem(f) {
-  const id = safeId(f.name);
-  const item = document.createElement('div');
-  item.className = 'qi'; item.id = 'qi-' + id;
-  const img = document.createElement('img');
-  img.src = URL.createObjectURL(f); img.className = 'qi-thumb';
-  const info = document.createElement('div'); info.className = 'qi-info';
-  info.innerHTML = `<div class="qi-name">${f.name}</div><div class="qi-status" id="qs-${id}">En cola</div>`;
-  const dot = document.createElement('div'); dot.className = 'qi-dot dot-wait'; dot.id = 'qd-' + id;
-  item.appendChild(img); item.appendChild(info); item.appendChild(dot);
-  document.getElementById('queue').appendChild(item);
-}
+      ultimoTracking = raw;
+      cooldown = true;
 
-function updateQI(f, status) {
-  const id = safeId(f.name);
-  const dot = document.getElementById('qd-' + id);
-  const qs  = document.getElementById('qs-' + id);
-  const qi  = document.getElementById('qi-' + id);
-  if (dot) dot.className = `qi-dot dot-${status}`;
-  if (qs)  qs.textContent = { wait:'En cola', proc:'Procesando...', done:'✓ Guardado', err:'✗ Error' }[status];
-  if (qi)  qi.className = `qi ${status}`;
-}
+      // Vibrar si está disponible
+      if (navigator.vibrate) navigator.vibrate(120);
+
+      agregarTrackingDetectado(raw, 'escáner');
+
+      const lastEl = document.getElementById('scanner-last');
+      lastEl.style.display = 'block';
+      lastEl.textContent = '✅ ' + raw;
+
+      showToast('✅ ' + raw);
+
+      // Pausa de 2s antes de aceptar otro
+      setTimeout(() => { cooldown = false; ultimoTracking = ''; }, 2000);
+    });
+
+  } catch(e) {
+    console.error('Error escáner:', e);
+    showToast('⚠️ No se pudo acceder a la cámara');
+    detenerEscaner();
+  }
+};
+
+window.detenerEscaner = function() {
+  scannerActivo = false;
+  if (zxingReader) {
+    zxingReader.reset();
+    zxingReader = null;
+  }
+  const video = document.getElementById('scanner-video');
+  if (video && video.srcObject) {
+    video.srcObject.getTracks().forEach(t => t.stop());
+    video.srcObject = null;
+  }
+  const wrap  = document.getElementById('scanner-wrap');
+  const btnIni = document.getElementById('btn-iniciar-scanner');
+  const btnDet = document.getElementById('btn-detener-scanner');
+  if (wrap)  wrap.style.display = 'none';
+  if (btnIni) btnIni.style.display = 'block';
+  if (btnDet) btnDet.style.display = 'none';
+};
+
+window.agregarTrackingManual = function() {
+  const input = document.getElementById('tracking-manual-input');
+  const val = (input.value || '').trim().toUpperCase();
+  if (!val) return;
+  agregarTrackingDetectado(val, 'manual');
+  input.value = '';
+  input.focus();
+};
 
 // ─── FOTO ARTÍCULO (2 fotos) ─────────────────────────────────────────
 let pendingRecordData = null;
@@ -2668,93 +2720,6 @@ window.confirmarGuardadoConFoto = async function(sinFoto = false) {
   }
 };
 
-let processingQueue = [];
-let processingIndex = 0;
-
-btnScan.addEventListener('click', async () => {
-  btnScan.disabled = true;
-  const progWrap = document.getElementById('prog-wrap');
-  progWrap.style.display = 'block';
-  processingQueue = files.filter(f => !f._done);
-  processingIndex = 0;
-  if (processingQueue.length === 0) { btnScan.disabled = false; return; }
-  document.getElementById('prog-fill').style.width = '0%';
-  document.getElementById('prog-count').textContent = `0/${processingQueue.length}`;
-  procesarSiguienteArchivo();
-});
-
-async function procesarSiguienteArchivo() {
-  const done = processingQueue.filter(f => f._done).length;
-  document.getElementById('prog-fill').style.width = Math.round(done / processingQueue.length * 100) + '%';
-  document.getElementById('prog-count').textContent = `${done}/${processingQueue.length}`;
-
-  const next = processingQueue.find(f => !f._done);
-  if (!next) {
-    btnScan.disabled = false;
-    showToast(`✓ ${done} trackings detectados`);
-    return;
-  }
-
-  updateQI(next, 'proc');
-  const labelEl = document.getElementById('prog-label-text');
-  if (labelEl) labelEl.textContent = 'Leyendo tracking: ' + next.name.substring(0, 20) + '...';
-
-  try {
-    let mt = next.type || 'image/jpeg';
-    if (mt === 'image/jpg') mt = 'image/jpeg';
-    if (!['image/jpeg','image/png','image/gif','image/webp'].includes(mt)) mt = 'image/jpeg';
-    const b64 = await fileToBase64(next);
-    const result = await extractLabel(b64, mt);
-    const tracking = (result.tracking || '').trim();
-    if (tracking) {
-      agregarTrackingDetectado(tracking, next.name);
-      updateQI(next, 'done');
-      showToast(`✅ ${tracking}`);
-    } else {
-      updateQI(next, 'err');
-      showToast(`⚠️ No se detectó tracking en ${next.name.substring(0,20)}`);
-    }
-  } catch(e) {
-    console.error('Error extrayendo tracking:', e);
-    showToast(`⚠️ Error: ${(e.message || '').substring(0, 35)}`);
-    updateQI(next, 'err');
-  }
-
-  next._done = true;
-  // Avanzar automáticamente al siguiente
-  setTimeout(procesarSiguienteArchivo, 300);
-}
-
-async function extractLabel(b64, mt) {
-  const GROQ_KEY = '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';
-  const prompt = `Analiza esta etiqueta de paquetería de Walmart México y extrae ÚNICAMENTE el número de Tracking.
-El tracking está bajo "Tracking #:" seguido de un código de barras. Empieza con letras como MXFDD...
-Responde ÚNICAMENTE con JSON válido sin markdown: {"tracking":""}`;
-
-  const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
-    body: JSON.stringify({
-      model: 'meta-llama/llama-4-scout-17b-16e-instruct',
-      max_tokens: 80,
-      temperature: 0,
-      messages: [{ role: 'user', content: [
-        { type: 'image_url', image_url: { url: `data:${mt};base64,${b64}` } },
-        { type: 'text', text: prompt }
-      ]}]
-    })
-  });
-  if (!res.ok) {
-    const e = await res.json().catch(() => ({}));
-    throw new Error(e?.error?.message || `HTTP ${res.status}`);
-  }
-  const data = await res.json();
-  const text = data.choices?.[0]?.message?.content || '{}';
-  try {
-    const match = text.match(/\{[\s\S]*\}/);
-    return JSON.parse(match ? match[0] : text.replace(/```json|```/g, '').trim());
-  } catch(e) { return {}; }
-}
 
 // ─── TRACKINGS DETECTADOS ─────────────────────────────────────────────
 let trackingsDetectados = []; // [{tracking, fileName}]
@@ -2939,14 +2904,6 @@ window.cruzarDatos = async function() {
   }
 };
 
-function fileToBase64(f) {
-  return new Promise((res, rej) => {
-    const r = new FileReader();
-    r.onload = () => res(r.result.split(',')[1]);
-    r.onerror = rej;
-    r.readAsDataURL(f);
-  });
-}
 
 // ─── DB SCREEN ───────────────────────────────────────────────────────
 function renderDB() {
