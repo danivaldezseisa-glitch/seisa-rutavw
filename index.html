@@ -983,7 +983,7 @@ select option { background: var(--surface2); }
           <div style="font-size:13px;font-weight:600;color:var(--text);" id="archivo-datos-nombre">Toca para seleccionar archivo</div>
           <div style="font-size:11px;color:var(--text3);">Excel (.xlsx, .xls) o CSV (.csv)</div>
         </div>
-        <input type="file" id="archivo-datos-input" accept=".xlsx,.xls,.csv" style="position:absolute;opacity:0;width:0;height:0;pointer-events:none;">
+        <input type="file" id="archivo-datos-input" accept=".xlsx,.xls,.csv" style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">
       </label>
 
       <!-- Preview de columnas detectadas -->
@@ -1063,7 +1063,7 @@ select option { background: var(--surface2); }
           ＋ Agregar
         </label>
       </div>
-      <input type="file" id="c-entrega-file-input" accept="image/*" multiple style="position:absolute;opacity:0;width:0;height:0;pointer-events:none;">
+      <input type="file" id="c-entrega-file-input" accept="image/*" multiple style="display:none;">
       <div id="c-fotos-entrega-grid" style="display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 16px;"></div>
     </div>
 
@@ -1075,7 +1075,7 @@ select option { background: var(--surface2); }
           ＋ Agregar
         </label>
       </div>
-      <input type="file" id="c-articulo-file-input" accept="image/*" multiple style="position:absolute;opacity:0;width:0;height:0;pointer-events:none;">
+      <input type="file" id="c-articulo-file-input" accept="image/*" multiple style="display:none;">
       <div id="c-fotos-articulo-grid" style="display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 16px;"></div>
     </div>
 
@@ -1090,7 +1090,7 @@ select option { background: var(--surface2); }
           ＋ Agregar
         </label>
       </div>
-      <input type="file" id="c-excepcion-file-input" accept="image/*" multiple style="position:absolute;opacity:0;width:0;height:0;pointer-events:none;">
+      <input type="file" id="c-excepcion-file-input" accept="image/*" multiple style="display:none;">
       <div id="c-fotos-excepcion-grid" style="display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 16px;"></div>
     </div>
 
@@ -1513,7 +1513,20 @@ window.iniciarNuevaRuta = function() {
   // Actualizar topbar del scan
   document.getElementById('scan-ruta-title').textContent = nombre;
   // Limpiar cola y pasar a scan
-  clearQueue();
+  files = [];
+  trackingsDetectados = [];
+  archivoFilas = [];
+  archivoHeaders = [];
+  const wrap = document.getElementById('archivo-columnas-wrap');
+  if (wrap) wrap.style.display = 'none';
+  const trackWrap = document.getElementById('trackings-detectados-wrap');
+  if (trackWrap) trackWrap.style.display = 'none';
+  const trackList = document.getElementById('trackings-detectados-list');
+  if (trackList) trackList.innerHTML = '';
+  const res = document.getElementById('cruzar-resultado');
+  if (res) res.style.display = 'none';
+  const archivoNombre = document.getElementById('archivo-datos-nombre');
+  if (archivoNombre) archivoNombre.textContent = 'Toca para seleccionar archivo';
   showScreen('scan');
 }
 
@@ -2717,10 +2730,10 @@ window.confirmarGuardadoConFoto = async function(sinFoto = false) {
 
   try {
     await saveRecord(data);
-    if (pendingFileRef) { pendingFileRef._done = true; updateQI(pendingFileRef, 'done'); }
+    if (pendingFileRef) pendingFileRef._done = true;
   } catch(e) {
     console.error(e);
-    if (pendingFileRef) updateQI(pendingFileRef, 'err');
+    showToast('⚠️ Error al guardar el registro');
   }
 
   pendingRecordData = null;
@@ -2730,11 +2743,8 @@ window.confirmarGuardadoConFoto = async function(sinFoto = false) {
 
   const remaining = files.filter(f => !f._done);
   if (remaining.length === 0) {
-    btnScan.disabled = false;
     showToast(`✓ Todas las etiquetas guardadas`);
     updateStats();
-  } else {
-    procesarSiguienteArchivo();
   }
 };
 
@@ -3703,22 +3713,13 @@ window.agregarClienteARuta = async function() {
   }
   const btn = document.getElementById('btn-ir-ruta');
   btn.disabled = true;
-  btn.textContent = '⏳ Cargando mapa...';
+  btn.textContent = '⏳ Agregando...';
 
   await sincronizarNavParadas(r.plusCodes, r);
 
-  // Copiar paradas al array de ir-ruta
-  irRutaParadas = navParadas.map(p => ({ ...p }));
-
   btn.disabled = false;
   btn.textContent = '📍 Agregar paradas a ruta';
-
-  // Navegar a pantalla de mapa y cargar
-  document.getElementById('ir-ruta-title').textContent = `🗺️ ${r.nombre?.split(' ')[0] || 'Ruta'}`;
-  document.getElementById('ir-ruta-sub').textContent = `${irRutaParadas.length} parada(s)`;
-  showScreen('ir-ruta');
-  renderIrRutaStops();
-  await cargarMapaRutaCompleta();
+  showToast(`✅ ${r.plusCodes.length} parada(s) agregadas a navegación`);
 };
 
 // ─── IR A RUTA (desde pantalla de navegación) ─────────────────────────────
