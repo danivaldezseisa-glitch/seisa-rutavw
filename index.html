@@ -2595,18 +2595,30 @@ let rafId          = null;
 let mediaStream    = null;
 
 const PREFIJOS_VALIDOS = ['MXFDD', 'FLDSWM'];
-function esValido(c) { return PREFIJOS_VALIDOS.some(p => c.startsWith(p)); }
+
+function extraerTracking(raw) {
+  // Limpiar caracteres de control y espacios
+  const limpio = (raw || '').replace(/[\x00-\x1F\x7F]/g, ' ').trim().toUpperCase();
+  // Buscar el prefijo en cualquier posición del string
+  for (const p of PREFIJOS_VALIDOS) {
+    const idx = limpio.indexOf(p);
+    if (idx !== -1) {
+      // Extraer desde el prefijo hasta el primer espacio o fin
+      const sub = limpio.slice(idx).split(/\s/)[0];
+      if (sub.length >= 6) return sub;
+    }
+  }
+  return null;
+}
 
 function onCodigoLeido(raw) {
   if (!scannerActivo || cooldown) return;
-  const code = (raw || '').trim().toUpperCase();
-  if (code.length < 6) return;
 
-  // Mostrar en debug lo que se detectó (sin filtro) para diagnóstico
   const dbg = document.getElementById('scanner-debug');
-  if (dbg) { dbg.textContent = '👁 ' + code; dbg.style.display = 'block'; }
+  if (dbg) { dbg.textContent = '👁 ' + (raw || '').trim(); dbg.style.display = 'block'; }
 
-  if (!esValido(code) || code === ultimoTracking) return;
+  const code = extraerTracking(raw);
+  if (!code || code === ultimoTracking) return;
 
   ultimoTracking = code;
   cooldown = true;
