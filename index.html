@@ -2589,24 +2589,24 @@ window.marcarEntregadoDesdeCamera = async function() {
 }
 
 // ─── SCAN / UPLOAD ───────────────────────────────────────────────────
-// ─── ESCÁNER: CÓDIGO DE BARRAS (QuaggaJS) + QR (jsQR) ───────────────
+// ─── ESCÁNER: QR (jsQR nativo) + BARRAS (Quagga) ────────────────────
 let scannerActivo = false;
 let cooldown = false;
 let ultimoTracking = '';
-let qrRafId = null;   // requestAnimationFrame id para el loop de jsQR
+let qrRafId = null;
+let mediaStream = null;   // stream nativo compartido
 
-// Prefijos válidos (mayúsculas)
+// Prefijos válidos
 const PREFIJOS_VALIDOS = ['MXFDD', 'FLDSWM'];
-
 function esTrackingValido(code) {
   return PREFIJOS_VALIDOS.some(p => code.startsWith(p));
 }
 
 function procesarCodigoEscaneado(raw) {
   if (!scannerActivo || cooldown) return;
-  const code = raw.trim().toUpperCase();
+  const code = (raw || '').trim().toUpperCase();
   if (!code || code.length < 6) return;
-  if (!esTrackingValido(code)) return;   // ← solo prefijos válidos
+  if (!esTrackingValido(code)) return;
   if (code === ultimoTracking) return;
 
   ultimoTracking = code;
@@ -2622,25 +2622,27 @@ function procesarCodigoEscaneado(raw) {
   setTimeout(() => { cooldown = false; ultimoTracking = ''; }, 1500);
 }
 
-// ── Loop jsQR para leer QR ──────────────────────────────────────────
-function iniciarLoopQR() {
+// ── Loop jsQR — lee QR directamente del <video> nativo ───────────────
+function iniciarLoopQR(videoEl) {
   const canvas = document.getElementById('qr-canvas');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
+  if (!canvas || !videoEl) return;
+  const ctx = canvas.getContext('2d', { willReadFrequently: true });
 
-  function tick() {
+  let lastQrTick = 0;
+  function tick(ts) {
     if (!scannerActivo) return;
-    const video = document.querySelector('#scanner-video video');
-    if (video && video.readyState === video.HAVE_ENOUGH_DATA) {
-      canvas.width  = video.videoWidth;
-      canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      const qr = jsQR(imageData.data, imageData.width, imageData.height, {
-        inversionAttempts: 'dontInvert',
-      });
-      if (qr && qr.data) {
-        procesarCodigoEscaneado(qr.data);
+    // Procesar QR a ~10 fps para no saturar la CPU
+    if (ts - lastQrTick > 100) {
+      lastQrTick = ts;
+      if (videoEl.readyState === videoEl.HAVE_ENOUGH_DATA &&
+          videoEl.videoWidth > 0) {
+        canvas.width  = videoEl.videoWidth;
+        canvas.height = videoEl.videoHeight;
+        ctx.drawImage(videoEl, 0, 0);
+        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const qr = jsQR(imgData.data, imgData.width, imgData.height,
+                        { inversionAttempts: 'attemptBoth' });
+        if (qr && qr.data) procesarCodigoEscaneado(qr.data);
       }
     }
     qrRafId = requestAnimationFrame(tick);
@@ -2648,7 +2650,7 @@ function iniciarLoopQR() {
   qrRafId = requestAnimationFrame(tick);
 }
 
-window.iniciarEscaner = function() {
+window.iniciarEscaner = async function() {
   const wrap   = document.getElementById('scanner-wrap');
   const btnIni = document.getElementById('btn-iniciar-scanner');
   const btnDet = document.getElementById('btn-detener-scanner');
@@ -2658,51 +2660,71 @@ window.iniciarEscaner = function() {
   btnDet.style.display = 'block';
   scannerActivo = true;
 
+  // ── 1. Obtener stream nativo ────────────────────────────────────────
+  try {
+    mediaStream = await navigator.mediaDevices.getUserMedia({
+      video: {
+        facingMode: { ideal: 'environment' },
+        width:  { ideal: 1280 },
+        height: { ideal: 720 },
+      },
+      audio: false,
+    });
+  } catch(e) {
+    showToast('⚠️ No se pudo acceder a la cámara');
+    detenerEscaner();
+    return;
+  }
+
+  // ── 2. Crear <video> y mostrarlo ────────────────────────────────────
+  const videoWrap = document.getElementById('scanner-video');
+  videoWrap.innerHTML = '';
+  const videoEl = document.createElement('video');
+  videoEl.setAttribute('playsinline', '');
+  videoEl.setAttribute('muted', '');
+  videoEl.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+  videoEl.srcObject = mediaStream;
+  videoWrap.appendChild(videoEl);
+  await videoEl.play();
+
+  // ── 3. jsQR loop para QR ────────────────────────────────────────────
+  iniciarLoopQR(videoEl);
+
+  // ── 4. Quagga para códigos de barras (apunta al mismo stream) ───────
   Quagga.init({
     inputStream: {
       name: 'Live',
       type: 'LiveStream',
-      target: document.getElementById('scanner-video'),
+      target: videoWrap,
       constraints: {
-        facingMode: { exact: 'environment' },
-        width: { min: 640, ideal: 1280, max: 1920 },
-        height: { min: 480, ideal: 720, max: 1080 },
-        zoom: 1,
-        focusMode: 'continuous',
+        facingMode: { ideal: 'environment' },
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
       },
-      area: { top: '20%', right: '5%', bottom: '20%', left: '5%' },
     },
     locator: { patchSize: 'large', halfSample: false },
     numOfWorkers: 2,
-    frequency: 15,
+    frequency: 12,
     decoder: {
-      readers: ['code_128_reader', 'code_39_reader', 'ean_reader'],
+      readers: ['code_128_reader', 'code_39_reader'],
       multiple: false,
     },
     locate: true,
   }, function(err) {
     if (err) {
-      console.error('Quagga init error:', err);
-      showToast('⚠️ No se pudo acceder a la cámara');
-      detenerEscaner();
+      console.warn('Quagga no disponible, solo QR activo:', err);
       return;
     }
-    // Forzar que el video no haga zoom via CSS
-    const video = document.querySelector('#scanner-video video');
-    if (video) {
-      video.style.cssText = 'width:100%!important;height:100%!important;object-fit:cover!important;transform:none!important;';
-    }
-    const canvas = document.querySelector('#scanner-video canvas');
-    if (canvas) canvas.style.cssText = 'display:none!important;';
+    // Ocultar canvas extra que Quagga crea
+    videoWrap.querySelectorAll('canvas').forEach(c => {
+      if (c.id !== 'qr-canvas') c.style.display = 'none';
+    });
     Quagga.start();
-    // Iniciar loop de lectura QR en paralelo
-    iniciarLoopQR();
   });
 
   Quagga.offDetected();
   Quagga.onDetected(function(data) {
-    const raw = (data.codeResult?.code || '').trim();
-    procesarCodigoEscaneado(raw);
+    procesarCodigoEscaneado(data.codeResult?.code || '');
   });
 };
 
@@ -2710,10 +2732,11 @@ window.detenerEscaner = function() {
   scannerActivo = false;
   if (qrRafId) { cancelAnimationFrame(qrRafId); qrRafId = null; }
   try { Quagga.offDetected(); Quagga.stop(); } catch(e) {}
+  if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
   const wrap   = document.getElementById('scanner-wrap');
   const btnIni = document.getElementById('btn-iniciar-scanner');
   const btnDet = document.getElementById('btn-detener-scanner');
-  if (wrap)   wrap.style.display = 'none';
+  if (wrap)   { wrap.style.display = 'none'; document.getElementById('scanner-video').innerHTML = ''; }
   if (btnIni) btnIni.style.display = 'block';
   if (btnDet) btnDet.style.display = 'none';
 };
