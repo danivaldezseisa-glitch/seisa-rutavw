@@ -613,6 +613,16 @@ select option { background: var(--surface2); }
   50%  { top: calc(100% - 2px); }
   100% { top: 0; }
 }
+#scanner-video { position: relative; }
+#scanner-video video {
+  width: 100% !important;
+  height: 100% !important;
+  object-fit: cover !important;
+  transform: none !important;
+  position: absolute !important;
+  top: 0 !important; left: 0 !important;
+}
+#scanner-video canvas.drawingBuffer { display: none !important; }
 </style>
 </head>
 <body>
@@ -2461,16 +2471,19 @@ window.iniciarEscaner = function() {
       type: 'LiveStream',
       target: document.getElementById('scanner-video'),
       constraints: {
-        facingMode: 'environment',
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
+        facingMode: { exact: 'environment' },
+        width: { min: 640, ideal: 1280, max: 1920 },
+        height: { min: 480, ideal: 720, max: 1080 },
+        zoom: 1,
+        focusMode: 'continuous',
       },
+      area: { top: '20%', right: '5%', bottom: '20%', left: '5%' },
     },
-    locator: { patchSize: 'medium', halfSample: true },
+    locator: { patchSize: 'large', halfSample: false },
     numOfWorkers: 2,
-    frequency: 20,
+    frequency: 15,
     decoder: {
-      readers: ['code_128_reader', 'code_39_reader', 'ean_reader'],
+      readers: ['code_128_reader'],
       multiple: false,
     },
     locate: true,
@@ -2481,10 +2494,17 @@ window.iniciarEscaner = function() {
       detenerEscaner();
       return;
     }
+    // Forzar que el video no haga zoom via CSS
+    const video = document.querySelector('#scanner-video video');
+    if (video) {
+      video.style.cssText = 'width:100%!important;height:100%!important;object-fit:cover!important;transform:none!important;';
+    }
+    const canvas = document.querySelector('#scanner-video canvas');
+    if (canvas) canvas.style.cssText = 'display:none!important;';
     Quagga.start();
   });
 
-  Quagga.offDetected(); // limpiar listeners previos
+  Quagga.offDetected();
   Quagga.onDetected(function(data) {
     if (!scannerActivo || cooldown) return;
     const raw = (data.codeResult?.code || '').trim().toUpperCase();
