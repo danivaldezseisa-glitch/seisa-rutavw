@@ -1517,16 +1517,11 @@ window.iniciarNuevaRuta = function() {
   trackingsDetectados = [];
   archivoFilas = [];
   archivoHeaders = [];
-  const wrap = document.getElementById('archivo-columnas-wrap');
-  if (wrap) wrap.style.display = 'none';
-  const trackWrap = document.getElementById('trackings-detectados-wrap');
-  if (trackWrap) trackWrap.style.display = 'none';
-  const trackList = document.getElementById('trackings-detectados-list');
-  if (trackList) trackList.innerHTML = '';
-  const res = document.getElementById('cruzar-resultado');
-  if (res) res.style.display = 'none';
-  const archivoNombre = document.getElementById('archivo-datos-nombre');
-  if (archivoNombre) archivoNombre.textContent = 'Toca para seleccionar archivo';
+  const _cw = document.getElementById('archivo-columnas-wrap'); if (_cw) _cw.style.display = 'none';
+  const _tw = document.getElementById('trackings-detectados-wrap'); if (_tw) _tw.style.display = 'none';
+  const _tl = document.getElementById('trackings-detectados-list'); if (_tl) _tl.innerHTML = '';
+  const _cr = document.getElementById('cruzar-resultado'); if (_cr) _cr.style.display = 'none';
+  const _an = document.getElementById('archivo-datos-nombre'); if (_an) _an.textContent = 'Toca para seleccionar archivo';
   showScreen('scan');
 }
 
@@ -2741,11 +2736,8 @@ window.confirmarGuardadoConFoto = async function(sinFoto = false) {
   capturedFotos = [null, null];
   capturedFotosB64 = [null, null];
 
-  const remaining = files.filter(f => !f._done);
-  if (remaining.length === 0) {
-    showToast(`✓ Todas las etiquetas guardadas`);
-    updateStats();
-  }
+  showToast(`✓ Paquete guardado`);
+  updateStats();
 };
 
 
@@ -2908,7 +2900,7 @@ window.cruzarDatos = async function() {
       colonia:       colColonia   >= 0 ? String(fila[colColonia]   || '').trim() : '',
       cp:            colCp        >= 0 ? String(fila[colCp]        || '').trim() : '',
       municipio:     colMunicipio >= 0 ? String(fila[colMunicipio] || '').trim() : '',
-      ruta: currentRutaId || '',
+      ruta: rutaActiva || '',
       estado: 'pendiente',
       createdAt: new Date().toISOString(),
     };
