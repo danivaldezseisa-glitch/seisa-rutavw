@@ -11,7 +11,7 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
-<script src="https://unpkg.com/@zxing/library@0.19.1/umd/index.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css"/>
 <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.min.js"></script>
 <style>
@@ -923,15 +923,15 @@ select option { background: var(--surface2); }
 
       <!-- Visor de cámara -->
       <div id="scanner-wrap" style="position:relative;border-radius:14px;overflow:hidden;background:#000;aspect-ratio:4/3;margin-bottom:10px;display:none;">
-        <video id="scanner-video" style="width:100%;height:100%;object-fit:cover;" autoplay muted playsinline></video>
+        <div id="scanner-video" style="width:100%;height:100%;"></div>
         <!-- Línea de escaneo animada -->
         <div style="position:absolute;inset:0;pointer-events:none;">
-          <div style="position:absolute;left:10%;right:10%;top:50%;transform:translateY(-50%);height:60px;border:2px solid var(--accent);border-radius:8px;box-shadow:0 0 0 2000px rgba(0,0,0,.45);">
-            <div id="scan-line" style="position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent);box-shadow:0 0 8px var(--accent);animation:scanLine 1.5s ease-in-out infinite;"></div>
+          <div style="position:absolute;left:5%;right:5%;top:50%;transform:translateY(-50%);height:80px;border:2px solid var(--accent);border-radius:8px;box-shadow:0 0 0 2000px rgba(0,0,0,.45);">
+            <div id="scan-line" style="position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent);box-shadow:0 0 8px var(--accent);animation:scanLine 1.2s ease-in-out infinite;"></div>
           </div>
         </div>
         <!-- Último tracking detectado -->
-        <div id="scanner-last" style="position:absolute;bottom:0;left:0;right:0;padding:10px 14px;background:rgba(0,0,0,.7);font-size:13px;font-weight:700;color:var(--green);font-family:var(--mono);text-align:center;display:none;"></div>
+        <div id="scanner-last" style="position:absolute;bottom:0;left:0;right:0;padding:10px 14px;background:rgba(0,0,0,.75);font-size:13px;font-weight:700;color:var(--green);font-family:var(--mono);text-align:center;display:none;"></div>
       </div>
 
       <div id="scanner-btns" style="display:flex;gap:8px;margin-bottom:10px;">
@@ -2440,80 +2440,78 @@ window.marcarEntregadoDesdeCamera = async function() {
 }
 
 // ─── SCAN / UPLOAD ───────────────────────────────────────────────────
-// ─── ESCÁNER DE CÓDIGO DE BARRAS (ZXing) ─────────────────────────────
-let zxingReader = null;
+// ─── ESCÁNER DE CÓDIGO DE BARRAS (QuaggaJS) ──────────────────────────
 let scannerActivo = false;
-let ultimoTracking = '';
 let cooldown = false;
+let ultimoTracking = '';
 
-window.iniciarEscaner = async function() {
-  const video = document.getElementById('scanner-video');
-  const wrap  = document.getElementById('scanner-wrap');
+window.iniciarEscaner = function() {
+  const wrap   = document.getElementById('scanner-wrap');
   const btnIni = document.getElementById('btn-iniciar-scanner');
   const btnDet = document.getElementById('btn-detener-scanner');
 
-  try {
-    wrap.style.display = 'block';
-    btnIni.style.display = 'none';
-    btnDet.style.display = 'block';
-    scannerActivo = true;
+  wrap.style.display = 'block';
+  btnIni.style.display = 'none';
+  btnDet.style.display = 'block';
+  scannerActivo = true;
 
-    const hints = new Map();
-    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [
-      ZXing.BarcodeFormat.CODE_128,
-      ZXing.BarcodeFormat.CODE_39,
-      ZXing.BarcodeFormat.EAN_13,
-      ZXing.BarcodeFormat.QR_CODE,
-    ]);
-    zxingReader = new ZXing.BrowserMultiFormatReader(hints);
+  Quagga.init({
+    inputStream: {
+      name: 'Live',
+      type: 'LiveStream',
+      target: document.getElementById('scanner-video'),
+      constraints: {
+        facingMode: 'environment',
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+      },
+    },
+    locator: { patchSize: 'medium', halfSample: true },
+    numOfWorkers: 2,
+    frequency: 20,
+    decoder: {
+      readers: ['code_128_reader', 'code_39_reader', 'ean_reader'],
+      multiple: false,
+    },
+    locate: true,
+  }, function(err) {
+    if (err) {
+      console.error('Quagga init error:', err);
+      showToast('⚠️ No se pudo acceder a la cámara');
+      detenerEscaner();
+      return;
+    }
+    Quagga.start();
+  });
 
-    await zxingReader.decodeFromVideoDevice(null, video, (result, err) => {
-      if (!result || cooldown || !scannerActivo) return;
-      const raw = result.getText().trim().toUpperCase();
-      // Solo aceptar strings que parezcan tracking (alfanumérico >6 chars)
-      if (raw.length < 6) return;
-      if (raw === ultimoTracking) return;
+  Quagga.offDetected(); // limpiar listeners previos
+  Quagga.onDetected(function(data) {
+    if (!scannerActivo || cooldown) return;
+    const raw = (data.codeResult?.code || '').trim().toUpperCase();
+    if (!raw || raw.length < 6) return;
+    if (raw === ultimoTracking) return;
 
-      ultimoTracking = raw;
-      cooldown = true;
+    ultimoTracking = raw;
+    cooldown = true;
+    if (navigator.vibrate) navigator.vibrate(120);
 
-      // Vibrar si está disponible
-      if (navigator.vibrate) navigator.vibrate(120);
+    agregarTrackingDetectado(raw, 'escáner');
 
-      agregarTrackingDetectado(raw, 'escáner');
+    const lastEl = document.getElementById('scanner-last');
+    if (lastEl) { lastEl.style.display = 'block'; lastEl.textContent = '✅ ' + raw; }
+    showToast('✅ ' + raw);
 
-      const lastEl = document.getElementById('scanner-last');
-      lastEl.style.display = 'block';
-      lastEl.textContent = '✅ ' + raw;
-
-      showToast('✅ ' + raw);
-
-      // Pausa de 2s antes de aceptar otro
-      setTimeout(() => { cooldown = false; ultimoTracking = ''; }, 2000);
-    });
-
-  } catch(e) {
-    console.error('Error escáner:', e);
-    showToast('⚠️ No se pudo acceder a la cámara');
-    detenerEscaner();
-  }
+    setTimeout(() => { cooldown = false; ultimoTracking = ''; }, 1500);
+  });
 };
 
 window.detenerEscaner = function() {
   scannerActivo = false;
-  if (zxingReader) {
-    zxingReader.reset();
-    zxingReader = null;
-  }
-  const video = document.getElementById('scanner-video');
-  if (video && video.srcObject) {
-    video.srcObject.getTracks().forEach(t => t.stop());
-    video.srcObject = null;
-  }
-  const wrap  = document.getElementById('scanner-wrap');
+  try { Quagga.offDetected(); Quagga.stop(); } catch(e) {}
+  const wrap   = document.getElementById('scanner-wrap');
   const btnIni = document.getElementById('btn-iniciar-scanner');
   const btnDet = document.getElementById('btn-detener-scanner');
-  if (wrap)  wrap.style.display = 'none';
+  if (wrap)   wrap.style.display = 'none';
   if (btnIni) btnIni.style.display = 'block';
   if (btnDet) btnDet.style.display = 'none';
 };
