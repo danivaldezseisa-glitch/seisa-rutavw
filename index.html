@@ -10,6 +10,7 @@
 <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Outfit:wght@300;400;500;600;700&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css"/>
 <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.min.js"></script>
 <style>
@@ -899,24 +900,82 @@ select option { background: var(--surface2); }
 <div class="screen hidden" id="screen-scan">
   <div class="topbar">
     <button class="topbar-back" onclick="showScreen('home')">←</button>
-    <h2 id="scan-ruta-title">Escanear etiquetas</h2>
+    <h2 id="scan-ruta-title">Escanear guías</h2>
     <span class="topbar-sub" id="scan-count">0 imgs</span>
   </div>
   <div class="scroll">
-    <label class="upload-zone" id="drop-zone">
+
+    <!-- PASO 1: Escanear etiquetas (solo tracking) -->
+    <div style="padding:14px 16px 4px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+        <div style="width:28px;height:28px;border-radius:50%;background:var(--accent);color:var(--bg);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0;">1</div>
+        <div>
+          <div style="font-size:14px;font-weight:700;">Escanear guías</div>
+          <div style="font-size:11px;color:var(--text3);">Toma foto de cada etiqueta para leer el Tracking #</div>
+        </div>
+      </div>
+    </div>
+    <label class="upload-zone" id="drop-zone" style="margin:0 16px 10px;">
       <input type="file" id="file-input" accept="image/*" multiple>
       <div class="uz-icon">📷</div>
-      <p><strong>Toca para seleccionar</strong><br>o arrastra múltiples fotos</p>
+      <p><strong>Toca para fotografiar etiquetas</strong><br>Puedes seleccionar varias a la vez</p>
     </label>
     <div style="padding: 0 16px 12px; display:flex; gap:8px;">
-      <button class="btn btn-accent" id="btn-scan" disabled>▶ Procesar etiquetas</button>
+      <button class="btn btn-accent" id="btn-scan" disabled>▶ Leer Trackings</button>
       <button class="btn btn-ghost btn-sm" id="btn-clear-queue" onclick="clearQueue()" style="white-space:nowrap;">🗑 Limpiar</button>
     </div>
     <div class="prog-wrap" id="prog-wrap" style="display:none;">
-      <div class="prog-label"><span id="prog-label-text">Procesando...</span><span id="prog-count">0/0</span></div>
+      <div class="prog-label"><span id="prog-label-text">Leyendo tracking...</span><span id="prog-count">0/0</span></div>
       <div class="prog-bar"><div class="prog-fill" id="prog-fill" style="width:0%"></div></div>
     </div>
     <div class="queue-wrap" id="queue"></div>
+
+    <!-- Trackings detectados -->
+    <div id="trackings-detectados-wrap" style="display:none;padding:0 16px 10px;">
+      <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;font-weight:600;">Trackings detectados</div>
+      <div id="trackings-detectados-list" style="display:flex;flex-direction:column;gap:6px;"></div>
+    </div>
+
+    <!-- PASO 2: Subir archivo de datos -->
+    <div style="padding:14px 16px 4px;border-top:1px solid var(--border);margin-top:8px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+        <div style="width:28px;height:28px;border-radius:50%;background:var(--green);color:var(--bg);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0;">2</div>
+        <div>
+          <div style="font-size:14px;font-weight:700;">Subir archivo de datos</div>
+          <div style="font-size:11px;color:var(--text3);">Excel o CSV con los datos de los clientes</div>
+        </div>
+      </div>
+      <label style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-radius:12px;border:2px dashed var(--border);background:var(--surface2);cursor:pointer;" id="archivo-datos-label">
+        <span style="font-size:28px;">📂</span>
+        <div>
+          <div style="font-size:13px;font-weight:600;color:var(--text);" id="archivo-datos-nombre">Toca para seleccionar archivo</div>
+          <div style="font-size:11px;color:var(--text3);">Excel (.xlsx, .xls) o CSV (.csv)</div>
+        </div>
+        <input type="file" id="archivo-datos-input" accept=".xlsx,.xls,.csv" style="display:none;">
+      </label>
+
+      <!-- Preview de columnas detectadas -->
+      <div id="archivo-columnas-wrap" style="display:none;margin-top:10px;">
+        <div style="font-size:11px;color:var(--text3);margin-bottom:6px;">Mapear columnas del archivo:</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;" id="columnas-map-grid"></div>
+      </div>
+    </div>
+
+    <!-- PASO 3: Cargar datos -->
+    <div style="padding:10px 16px 28px;border-top:1px solid var(--border);margin-top:8px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+        <div style="width:28px;height:28px;border-radius:50%;background:var(--orange);color:var(--bg);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0;">3</div>
+        <div>
+          <div style="font-size:14px;font-weight:700;">Cruzar y cargar datos</div>
+          <div style="font-size:11px;color:var(--text3);">Busca cada tracking en el archivo y crea los registros</div>
+        </div>
+      </div>
+      <button class="btn btn-green" id="btn-cruzar-datos" onclick="cruzarDatos()" disabled style="font-size:15px;">
+        🔗 Cargar datos desde archivo
+      </button>
+      <div id="cruzar-resultado" style="margin-top:10px;display:none;font-size:13px;color:var(--text2);padding:10px 14px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);"></div>
+    </div>
+
   </div>
 </div>
 
@@ -968,16 +1027,24 @@ select option { background: var(--surface2); }
     <div id="c-fotos-entrega-wrap">
       <div class="sec-header" style="display:flex;align-items:center;justify-content:space-between;padding-right:16px;">
         <span>📸 Fotos de producto entregado</span>
-        <label for="c-entrega-file-input" style="
-          display:inline-flex;align-items:center;gap:5px;
-          padding:5px 12px;border-radius:99px;font-size:12px;font-weight:600;
-          background:rgba(0,212,255,.12);border:1px solid rgba(0,212,255,.3);
-          color:var(--accent);cursor:pointer;">
+        <label for="c-entrega-file-input" style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:99px;font-size:12px;font-weight:600;background:rgba(0,212,255,.12);border:1px solid rgba(0,212,255,.3);color:var(--accent);cursor:pointer;">
           ＋ Agregar
         </label>
       </div>
       <input type="file" id="c-entrega-file-input" accept="image/*" multiple style="display:none;">
       <div id="c-fotos-entrega-grid" style="display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 16px;"></div>
+    </div>
+
+    <!-- FOTOS DEL ARTÍCULO -->
+    <div id="c-fotos-articulo-wrap">
+      <div class="sec-header" style="display:flex;align-items:center;justify-content:space-between;padding-right:16px;">
+        <span>📦 Fotos del artículo</span>
+        <label for="c-articulo-file-input" style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:99px;font-size:12px;font-weight:600;background:rgba(0,230,118,.12);border:1px solid rgba(0,230,118,.3);color:var(--green);cursor:pointer;">
+          ＋ Agregar
+        </label>
+      </div>
+      <input type="file" id="c-articulo-file-input" accept="image/*" multiple style="display:none;">
+      <div id="c-fotos-articulo-grid" style="display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 16px;"></div>
     </div>
 
     <div id="c-fotos-excepcion-wrap">
@@ -1830,6 +1897,10 @@ window.openClient = function(id) {
   const entregaGrid = document.getElementById('c-fotos-entrega-grid');
   renderFotosEntregaGrid(fotosEntrega);
 
+  // ── FOTOS DEL ARTÍCULO ──
+  const fotosArticulo = Array.isArray(r.fotosArticulo) ? r.fotosArticulo : [];
+  renderFotosArticuloGrid(fotosArticulo);
+
   // ── FOTOS DE EXCEPCION ──
   const fotosExcepcion = Array.isArray(r.fotosExcepcion) ? r.fotosExcepcion : [];
   renderFotosExcepcionGrid(fotosExcepcion);
@@ -1941,6 +2012,40 @@ document.getElementById('c-entrega-file-input').addEventListener('change', async
       renderFotosEntregaGrid(merged);
       showToast(`📸 Foto ${merged.length} guardada`);
     } catch(e) { showToast('⚠️ Error al subir foto'); }
+  }
+  this.value = '';
+});
+
+// Fotos del artículo
+function renderFotosArticuloGrid(fotos) {
+  const grid = document.getElementById('c-fotos-articulo-grid');
+  if (!grid) return;
+  if (!fotos || !fotos.length) { grid.innerHTML = ''; return; }
+  grid.innerHTML = fotos.map(url =>
+    `<img src="${url}" style="width:72px;height:72px;object-fit:cover;border-radius:8px;border:2px solid var(--green);cursor:pointer;" onclick="window.open('${url}','_blank')">`
+  ).join('');
+}
+
+document.getElementById('c-articulo-file-input').addEventListener('change', async function() {
+  const files = Array.from(this.files);
+  if (!files.length || !currentClientId) return;
+  const r = allRecords.find(x => x.id === currentClientId);
+  showToast('⏳ Subiendo foto del artículo...');
+  for (const file of files) {
+    try {
+      const tracking = r?.tracking || r?.trackings?.[0] || 'sin-tracking';
+      const path = `articulos/${tracking}_art_${Date.now()}.jpg`;
+      const ref = storageRef(storage, path);
+      await uploadBytes(ref, file, { contentType: file.type || 'image/jpeg' });
+      const url = await getDownloadURL(ref);
+      const prevFotos = Array.isArray(r?.fotosArticulo) ? r.fotosArticulo : [];
+      const merged = [...prevFotos, url];
+      await updateDoc(doc(db, COL, currentClientId), { fotosArticulo: merged });
+      const idx = allRecords.findIndex(x => x.id === currentClientId);
+      if (idx >= 0) allRecords[idx].fotosArticulo = merged;
+      renderFotosArticuloGrid(merged);
+      showToast(`📦 Foto ${merged.length} guardada`);
+    } catch(e) { showToast('⚠️ Error al subir foto del artículo'); }
   }
   this.value = '';
 });
@@ -2586,83 +2691,59 @@ async function procesarSiguienteArchivo() {
   const next = processingQueue.find(f => !f._done);
   if (!next) {
     btnScan.disabled = false;
-    showToast(`✓ ${done} etiquetas procesadas y guardadas`);
-    updateStats();
+    showToast(`✓ ${done} trackings detectados`);
     return;
   }
 
   updateQI(next, 'proc');
   const labelEl = document.getElementById('prog-label-text');
-  if (labelEl) labelEl.textContent = next.name.substring(0, 25) + '...';
+  if (labelEl) labelEl.textContent = 'Leyendo tracking: ' + next.name.substring(0, 20) + '...';
 
-  let result = {};
   try {
     let mt = next.type || 'image/jpeg';
     if (mt === 'image/jpg') mt = 'image/jpeg';
     if (!['image/jpeg','image/png','image/gif','image/webp'].includes(mt)) mt = 'image/jpeg';
     const b64 = await fileToBase64(next);
-    result = await extractLabel(b64, mt);
-  } catch(e) {
-    console.error('Error extrayendo etiqueta:', e);
-    const msg = e.message || '';
-    if (msg.includes('quota') || msg.includes('529') || msg.includes('overloaded')) {
-      showToast('⚠️ Límite de API alcanzado — captura los datos manualmente');
+    const result = await extractLabel(b64, mt);
+    const tracking = (result.tracking || '').trim();
+    if (tracking) {
+      agregarTrackingDetectado(tracking, next.name);
+      updateQI(next, 'done');
+      showToast(`✅ ${tracking}`);
     } else {
-      showToast(`⚠️ Error al leer: ${msg.substring(0, 35) || 'sin conexión'}`);
+      updateQI(next, 'err');
+      showToast(`⚠️ No se detectó tracking en ${next.name.substring(0,20)}`);
     }
-    result = {};
+  } catch(e) {
+    console.error('Error extrayendo tracking:', e);
+    showToast(`⚠️ Error: ${(e.message || '').substring(0, 35)}`);
+    updateQI(next, 'err');
   }
 
-  // Siempre mostrar el modal para que el usuario confirme o edite
-  showFotoArticuloModal(result, next, next.name);
+  next._done = true;
+  // Avanzar automáticamente al siguiente
+  setTimeout(procesarSiguienteArchivo, 300);
 }
 
 async function extractLabel(b64, mt) {
   const GROQ_KEY = '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';
-  const prompt = `Eres un extractor de datos de etiquetas de paquetería de Walmart México / Bodega Aurrera.
-
-Extrae ÚNICAMENTE estos campos del área de destinatario (la sección que empieza con "Para"):
-
-1. "nombre" — Nombre completo después de "Para". Ej: "Fernanda Hernandez Castillo"
-2. "telefono" — Número de 10 dígitos que aparece junto al nombre. Ej: "5511458168"
-3. "calle" — Nombre de la calle o avenida. Ej: "Av Estado de Mexico Esquina Zacazonapan"
-4. "numero" — Número exterior o local. Ej: "4"
-5. "colonia" — Nombre de la colonia en MAYÚSCULAS. Ej: "SOLIDARIDAD 3RA. SECCION"
-6. "cp" — Código postal de 5 dígitos. Ej: "54948"
-7. "municipio" — Ciudad o municipio. Ej: "Tultitlán de Mariano Escobedo"
-8. "shipment_order" — El número junto a "Shipment Order No #:". Son 15 dígitos que empiezan con 6. Ej: "600000089411313"
-9. "tracking" — El número alfanumérico debajo de "Tracking #:" y del código de barras. Ej: "MXFDDWM18590997"
-10. "pdd" — Fecha junto a "PDD :" en formato YYYY-MM-DD. Ej: "2026-05-04"
-
-REGLAS:
-- Extrae SOLO lo que ves claramente. Si un campo no aparece devuelve "".
-- El shipment_order son exactamente 15 dígitos empezando con 6.
-- El tracking empieza con MXFDD seguido de letras y números.
-- NO inventes datos.
-
-Responde ÚNICAMENTE con JSON válido, sin markdown:
-{"nombre":"","telefono":"","calle":"","numero":"","colonia":"","cp":"","municipio":"","shipment_order":"","tracking":"","pdd":""}`;
+  const prompt = `Analiza esta etiqueta de paquetería de Walmart México y extrae ÚNICAMENTE el número de Tracking.
+El tracking está bajo "Tracking #:" seguido de un código de barras. Empieza con letras como MXFDD...
+Responde ÚNICAMENTE con JSON válido sin markdown: {"tracking":""}`;
 
   const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${GROQ_KEY}`
-    },
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${GROQ_KEY}` },
     body: JSON.stringify({
       model: 'meta-llama/llama-4-scout-17b-16e-instruct',
-      max_tokens: 500,
+      max_tokens: 80,
       temperature: 0,
-      messages: [{
-        role: 'user',
-        content: [
-          { type: 'image_url', image_url: { url: `data:${mt};base64,${b64}` } },
-          { type: 'text', text: prompt }
-        ]
-      }]
+      messages: [{ role: 'user', content: [
+        { type: 'image_url', image_url: { url: `data:${mt};base64,${b64}` } },
+        { type: 'text', text: prompt }
+      ]}]
     })
   });
-
   if (!res.ok) {
     const e = await res.json().catch(() => ({}));
     throw new Error(e?.error?.message || `HTTP ${res.status}`);
@@ -2672,10 +2753,191 @@ Responde ÚNICAMENTE con JSON válido, sin markdown:
   try {
     const match = text.match(/\{[\s\S]*\}/);
     return JSON.parse(match ? match[0] : text.replace(/```json|```/g, '').trim());
-  } catch(e) {
-    return {};
-  }
+  } catch(e) { return {}; }
 }
+
+// ─── TRACKINGS DETECTADOS ─────────────────────────────────────────────
+let trackingsDetectados = []; // [{tracking, fileName}]
+let archivoFilas = [];        // filas del Excel/CSV cargado
+let archivoHeaders = [];      // encabezados del archivo
+
+function agregarTrackingDetectado(tracking, fileName) {
+  if (!tracking) return;
+  // Evitar duplicados
+  if (trackingsDetectados.find(t => t.tracking === tracking)) return;
+  trackingsDetectados.push({ tracking, fileName });
+  renderTrackingsDetectados();
+  verificarBtnCruzar();
+}
+
+function renderTrackingsDetectados() {
+  const wrap = document.getElementById('trackings-detectados-wrap');
+  const list = document.getElementById('trackings-detectados-list');
+  if (!wrap || !list) return;
+  if (trackingsDetectados.length === 0) { wrap.style.display = 'none'; return; }
+  wrap.style.display = 'block';
+  list.innerHTML = trackingsDetectados.map((t, i) => `
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;background:var(--surface);border:1px solid var(--border);border-radius:10px;">
+      <span style="font-size:16px;">✅</span>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:700;font-family:var(--mono);color:var(--accent);">${t.tracking}</div>
+        <div style="font-size:10px;color:var(--text3);">${t.fileName}</div>
+      </div>
+      <button onclick="eliminarTracking(${i})" style="background:none;border:none;color:var(--red);font-size:18px;cursor:pointer;padding:4px;">✕</button>
+    </div>`).join('');
+}
+
+window.eliminarTracking = function(i) {
+  trackingsDetectados.splice(i, 1);
+  renderTrackingsDetectados();
+  verificarBtnCruzar();
+};
+
+// ─── ARCHIVO DATOS ────────────────────────────────────────────────────
+document.getElementById('archivo-datos-input')?.addEventListener('change', async function() {
+  const file = this.files[0];
+  if (!file) return;
+  document.getElementById('archivo-datos-nombre').textContent = file.name;
+
+  const buf = await file.arrayBuffer();
+  let filas = [];
+  let headers = [];
+
+  if (file.name.endsWith('.csv')) {
+    const text = new TextDecoder('utf-8').decode(buf);
+    const rows = text.split('\n').map(r => r.split(',').map(c => c.trim().replace(/^"|"$/g, '')));
+    headers = rows[0] || [];
+    filas = rows.slice(1).filter(r => r.some(c => c));
+  } else {
+    const wb = XLSX.read(buf, { type: 'array' });
+    const ws = wb.Sheets[wb.SheetNames[0]];
+    const json = XLSX.utils.sheet_to_json(ws, { header: 1 });
+    headers = (json[0] || []).map(String);
+    filas = json.slice(1).filter(r => r && r.some(c => c != null && c !== ''));
+  }
+
+  archivoHeaders = headers;
+  archivoFilas = filas;
+
+  // Mostrar mapeador de columnas
+  const wrap = document.getElementById('archivo-columnas-wrap');
+  const grid = document.getElementById('columnas-map-grid');
+  if (!wrap || !grid) return;
+  wrap.style.display = 'block';
+
+  const campos = [
+    { id: 'map-tracking',  label: '🔖 Tracking #' },
+    { id: 'map-nombre',    label: '👤 Nombre cliente' },
+    { id: 'map-telefono',  label: '📞 Teléfono' },
+    { id: 'map-order',     label: '📦 Núm. Pedido' },
+    { id: 'map-calle',     label: '🏠 Calle' },
+    { id: 'map-numero',    label: '#️⃣ Número ext.' },
+    { id: 'map-colonia',   label: '🏘 Colonia' },
+    { id: 'map-cp',        label: '📮 CP' },
+    { id: 'map-municipio', label: '🏙 Municipio' },
+  ];
+
+  const autoMap = (label) => {
+    const l = label.toLowerCase();
+    const idx = headers.findIndex(h => {
+      const hl = String(h).toLowerCase();
+      if (l.includes('tracking')) return hl.includes('track') || hl.includes('guia') || hl.includes('guía');
+      if (l.includes('nombre'))   return hl.includes('nombre') || hl.includes('cliente') || hl.includes('destinatario');
+      if (l.includes('teléfono')) return hl.includes('tel') || hl.includes('phone') || hl.includes('celular');
+      if (l.includes('pedido'))   return hl.includes('pedido') || hl.includes('order') || hl.includes('shipment');
+      if (l.includes('calle'))    return hl.includes('calle') || hl.includes('street') || hl.includes('direc');
+      if (l.includes('número'))   return hl.includes('num') || hl.includes('ext') || hl.includes('número');
+      if (l.includes('colonia'))  return hl.includes('colonia') || hl.includes('col') || hl.includes('barrio');
+      if (l.includes('cp'))       return hl.includes('cp') || hl.includes('postal') || hl.includes('zip');
+      if (l.includes('municipio'))return hl.includes('munici') || hl.includes('ciudad') || hl.includes('city');
+      return false;
+    });
+    return idx;
+  };
+
+  grid.innerHTML = campos.map(c => {
+    const auto = autoMap(c.label);
+    return `
+      <div style="display:flex;flex-direction:column;gap:3px;">
+        <label style="font-size:10px;color:var(--text3);">${c.label}</label>
+        <select id="${c.id}" style="background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:6px 8px;color:var(--text);font-size:12px;font-family:var(--sans);">
+          <option value="">— sin mapear —</option>
+          ${headers.map((h, i) => `<option value="${i}" ${i === auto ? 'selected' : ''}>${h}</option>`).join('')}
+        </select>
+      </div>`;
+  }).join('');
+
+  showToast(`✅ ${filas.length} filas cargadas`);
+  verificarBtnCruzar();
+});
+
+function verificarBtnCruzar() {
+  const btn = document.getElementById('btn-cruzar-datos');
+  if (btn) btn.disabled = !(trackingsDetectados.length > 0 && archivoFilas.length > 0);
+}
+
+// ─── CRUZAR DATOS ─────────────────────────────────────────────────────
+window.cruzarDatos = async function() {
+  const getCol = id => {
+    const sel = document.getElementById(id);
+    return sel && sel.value !== '' ? parseInt(sel.value) : -1;
+  };
+  const colTracking  = getCol('map-tracking');
+  const colNombre    = getCol('map-nombre');
+  const colTelefono  = getCol('map-telefono');
+  const colOrder     = getCol('map-order');
+  const colCalle     = getCol('map-calle');
+  const colNumero    = getCol('map-numero');
+  const colColonia   = getCol('map-colonia');
+  const colCp        = getCol('map-cp');
+  const colMunicipio = getCol('map-municipio');
+
+  if (colTracking === -1) { showToast('⚠️ Mapea la columna de Tracking primero'); return; }
+
+  let encontrados = 0, noEncontrados = 0;
+
+  for (const { tracking } of trackingsDetectados) {
+    const fila = archivoFilas.find(f => {
+      const val = String(f[colTracking] || '').trim().toUpperCase();
+      return val === tracking.toUpperCase() || val.includes(tracking.toUpperCase()) || tracking.toUpperCase().includes(val);
+    });
+
+    if (!fila) { noEncontrados++; continue; }
+
+    const record = {
+      tracking,
+      trackings: [tracking],
+      nombre:        colNombre    >= 0 ? String(fila[colNombre]    || '').trim() : '',
+      telefono:      colTelefono  >= 0 ? String(fila[colTelefono]  || '').trim() : '',
+      shipment_order:colOrder     >= 0 ? String(fila[colOrder]     || '').trim() : '',
+      calle:         colCalle     >= 0 ? String(fila[colCalle]     || '').trim() : '',
+      numero:        colNumero    >= 0 ? String(fila[colNumero]    || '').trim() : '',
+      colonia:       colColonia   >= 0 ? String(fila[colColonia]   || '').trim() : '',
+      cp:            colCp        >= 0 ? String(fila[colCp]        || '').trim() : '',
+      municipio:     colMunicipio >= 0 ? String(fila[colMunicipio] || '').trim() : '',
+      ruta: currentRutaId || '',
+      estado: 'pendiente',
+      createdAt: new Date().toISOString(),
+    };
+
+    try {
+      await saveRecord(record);
+      encontrados++;
+    } catch(e) { console.error('Error guardando', tracking, e); }
+  }
+
+  const res = document.getElementById('cruzar-resultado');
+  if (res) {
+    res.style.display = 'block';
+    res.innerHTML = `✅ <strong>${encontrados}</strong> registros creados${noEncontrados ? ` · ⚠️ <strong>${noEncontrados}</strong> trackings no encontrados en el archivo` : ''}`;
+  }
+
+  if (encontrados > 0) {
+    await loadRecords();
+    showToast(`✅ ${encontrados} clientes cargados`);
+    setTimeout(() => showScreen('home'), 1800);
+  }
+};
 
 function fileToBase64(f) {
   return new Promise((res, rej) => {
