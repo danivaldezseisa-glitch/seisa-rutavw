@@ -874,7 +874,7 @@ select option { background: var(--surface2); }
           style="font-size:15px;font-weight:600;text-align:center;letter-spacing:.02em;">
       </div>
     </div>
-    
+
     <div style="padding: 0 16px 8px;">
       <div id="nr-preview" style="
         background: var(--surface); border: 1px solid var(--border);
@@ -2849,6 +2849,21 @@ function verificarBtnCruzar() {
   if (btn) btn.disabled = !(trackingsDetectados.length > 0 && archivoFilas.length > 0);
 }
 
+// ─── GEOCODIFICACIÓN AUTOMÁTICA DE DIRECCIÓN ─────────────────────────
+async function geocodificarDireccion(record) {
+  const partes = [record.calle, record.numero, record.colonia, record.municipio, record.cp].filter(Boolean);
+  if (partes.length < 2) return null; // No hay suficientes datos
+  const query = partes.join(' ') + ', México';
+  try {
+    const lugar = await forwardGeocode(query);
+    if (!lugar) return null;
+    const lat = parseFloat(lugar.lat);
+    const lng = parseFloat(lugar.lon);
+    const plusCode = OLC.encode(lat, lng, 10);
+    return { lat, lng, plusCode, label: (lugar.display_name || query).split(',').slice(0,3).join(', ') };
+  } catch(e) { return null; }
+}
+
 // ─── CRUZAR DATOS ─────────────────────────────────────────────────────
 window.cruzarDatos = async function() {
   const getCol = id => {
@@ -2867,7 +2882,13 @@ window.cruzarDatos = async function() {
 
   if (colTracking === -1) { showToast('⚠️ Mapea la columna de Tracking primero'); return; }
 
-  let encontrados = 0, noEncontrados = 0;
+  const btn = document.getElementById('btn-cruzar-datos');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Cargando...'; }
+
+  const res = document.getElementById('cruzar-resultado');
+  if (res) { res.style.display = 'block'; res.innerHTML = '⏳ Guardando registros y buscando ubicaciones...'; }
+
+  let encontrados = 0, noEncontrados = 0, geocodificados = 0;
 
   for (const { tracking } of trackingsDetectados) {
     const fila = archivoFilas.find(f => {
@@ -2893,21 +2914,34 @@ window.cruzarDatos = async function() {
       createdAt: new Date().toISOString(),
     };
 
+    // Geocodificación automática antes de guardar
+    const geo = await geocodificarDireccion(record);
+    if (geo) {
+      record.plusCodes = [geo.plusCode];
+      record.lat = geo.lat;
+      record.lng = geo.lng;
+      geocodificados++;
+    }
+
     try {
       await saveRecord(record);
       encontrados++;
     } catch(e) { console.error('Error guardando', tracking, e); }
+
+    // Actualizar progreso en tiempo real
+    if (res) res.innerHTML = `⏳ Procesando ${encontrados + noEncontrados}/${trackingsDetectados.length}... (${geocodificados} con ubicación)`;
   }
 
-  const res = document.getElementById('cruzar-resultado');
   if (res) {
     res.style.display = 'block';
-    res.innerHTML = `✅ <strong>${encontrados}</strong> registros creados${noEncontrados ? ` · ⚠️ <strong>${noEncontrados}</strong> trackings no encontrados en el archivo` : ''}`;
+    res.innerHTML = `✅ <strong>${encontrados}</strong> registros creados · 📍 <strong>${geocodificados}</strong> con ubicación automática${noEncontrados ? ` · ⚠️ <strong>${noEncontrados}</strong> no encontrados` : ''}`;
   }
+
+  if (btn) { btn.disabled = false; btn.textContent = '🔗 Cargar datos desde archivo'; }
 
   if (encontrados > 0) {
     await loadRecords();
-    showToast(`✅ ${encontrados} clientes cargados`);
+    showToast(`✅ ${encontrados} clientes · 📍 ${geocodificados} ubicaciones`);
     setTimeout(() => showScreen('home'), 1800);
   }
 };
@@ -3063,7 +3097,28 @@ const OLC = (() => {
     return prefix + c;
   }
 
-  return { isFullCode, isShortCode, decode, expandShort };
+  // Encode lat/lng to Plus Code (10 chars = ~14m precision)
+  function encode(lat, lng, codeLen = 10) {
+    lat = Math.min(90, Math.max(-90, lat)) + 90;
+    lng = ((lng + 180) % 360 + 360) % 360;
+    let code = '';
+    let latVal = Math.floor(lat * 8000 * 3125);  // scale by 20^5
+    let lngVal = Math.floor(lng * 8000 * 3125);
+    // Use simpler pair-based encoding
+    let la = lat, lo = lng, res = 400;
+    for (let i = 0; i < Math.floor(codeLen / 2); i++) {
+      res /= 20;
+      const latD = Math.floor(la / res);
+      const lngD = Math.floor(lo / res);
+      code += CHARS[latD % 20] + CHARS[lngD % 20];
+      la -= (latD % 20) * res;
+      lo -= (lngD % 20) * res;
+    }
+    code = code.slice(0,8) + '+' + code.slice(8);
+    return code.toUpperCase();
+  }
+
+  return { isFullCode, isShortCode, decode, expandShort, encode };
 })();
 
 // Delay helper y control de rate-limit de Nominatim (max 1 req/seg)
