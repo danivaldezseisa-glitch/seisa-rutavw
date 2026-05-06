@@ -11,7 +11,6 @@
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css"/>
 <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.min.js"></script>
@@ -619,11 +618,8 @@ select option { background: var(--surface2); }
   width: 100% !important;
   height: 100% !important;
   object-fit: cover !important;
-  transform: none !important;
-  position: absolute !important;
-  top: 0 !important; left: 0 !important;
+  display: block !important;
 }
-#scanner-video canvas.drawingBuffer { display: none !important; }
 </style>
 </head>
 <body>
@@ -927,8 +923,8 @@ select option { background: var(--surface2); }
       <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
         <div style="width:28px;height:28px;border-radius:50%;background:var(--accent);color:var(--bg);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0;">1</div>
         <div>
-          <div style="font-size:14px;font-weight:700;">Escanear código de barras</div>
-          <div style="font-size:11px;color:var(--text3);">Apunta la cámara al código de barras del Tracking</div>
+          <div style="font-size:14px;font-weight:700;">Escanear código QR o de barras</div>
+          <div style="font-size:11px;color:var(--text3);">Apunta la cámara al código QR o código de barras del Tracking</div>
         </div>
       </div>
 
@@ -2589,156 +2585,122 @@ window.marcarEntregadoDesdeCamera = async function() {
 }
 
 // ─── SCAN / UPLOAD ───────────────────────────────────────────────────
-// ─── ESCÁNER: QR (jsQR nativo) + BARRAS (Quagga) ────────────────────
+// ─── ESCÁNER: getUserMedia + jsQR (QR y barras via jsQR) ─────────────
 let scannerActivo = false;
-let cooldown = false;
+let cooldown      = false;
 let ultimoTracking = '';
-let qrRafId = null;
-let mediaStream = null;   // stream nativo compartido
+let rafId         = null;
+let mediaStream   = null;
 
-// Prefijos válidos
 const PREFIJOS_VALIDOS = ['MXFDD', 'FLDSWM'];
-function esTrackingValido(code) {
+
+function esValido(code) {
   return PREFIJOS_VALIDOS.some(p => code.startsWith(p));
 }
 
-function procesarCodigoEscaneado(raw) {
+function onCodigoLeido(raw) {
   if (!scannerActivo || cooldown) return;
   const code = (raw || '').trim().toUpperCase();
-  if (!code || code.length < 6) return;
-  if (!esTrackingValido(code)) return;
-  if (code === ultimoTracking) return;
+  if (code.length < 6 || !esValido(code) || code === ultimoTracking) return;
 
   ultimoTracking = code;
   cooldown = true;
-  if (navigator.vibrate) navigator.vibrate(120);
+  if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
 
   agregarTrackingDetectado(code, 'escáner');
 
   const lastEl = document.getElementById('scanner-last');
-  if (lastEl) { lastEl.style.display = 'block'; lastEl.textContent = '✅ ' + code; }
+  if (lastEl) { lastEl.textContent = '✅ ' + code; lastEl.style.display = 'block'; }
   showToast('✅ ' + code);
 
-  setTimeout(() => { cooldown = false; ultimoTracking = ''; }, 1500);
-}
-
-// ── Loop jsQR — lee QR directamente del <video> nativo ───────────────
-function iniciarLoopQR(videoEl) {
-  const canvas = document.getElementById('qr-canvas');
-  if (!canvas || !videoEl) return;
-  const ctx = canvas.getContext('2d', { willReadFrequently: true });
-
-  let lastQrTick = 0;
-  function tick(ts) {
-    if (!scannerActivo) return;
-    // Procesar QR a ~10 fps para no saturar la CPU
-    if (ts - lastQrTick > 100) {
-      lastQrTick = ts;
-      if (videoEl.readyState === videoEl.HAVE_ENOUGH_DATA &&
-          videoEl.videoWidth > 0) {
-        canvas.width  = videoEl.videoWidth;
-        canvas.height = videoEl.videoHeight;
-        ctx.drawImage(videoEl, 0, 0);
-        const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-        const qr = jsQR(imgData.data, imgData.width, imgData.height,
-                        { inversionAttempts: 'attemptBoth' });
-        if (qr && qr.data) procesarCodigoEscaneado(qr.data);
-      }
-    }
-    qrRafId = requestAnimationFrame(tick);
-  }
-  qrRafId = requestAnimationFrame(tick);
+  setTimeout(() => { cooldown = false; ultimoTracking = ''; }, 2000);
 }
 
 window.iniciarEscaner = async function() {
+  if (scannerActivo) return;
+
   const wrap   = document.getElementById('scanner-wrap');
   const btnIni = document.getElementById('btn-iniciar-scanner');
   const btnDet = document.getElementById('btn-detener-scanner');
 
+  // Mostrar visor
   wrap.style.display = 'block';
   btnIni.style.display = 'none';
   btnDet.style.display = 'block';
-  scannerActivo = true;
 
-  // ── 1. Obtener stream nativo ────────────────────────────────────────
+  // Pedir cámara
   try {
     mediaStream = await navigator.mediaDevices.getUserMedia({
-      video: {
-        facingMode: { ideal: 'environment' },
-        width:  { ideal: 1280 },
-        height: { ideal: 720 },
-      },
-      audio: false,
+      video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
+      audio: false
     });
-  } catch(e) {
-    showToast('⚠️ No se pudo acceder a la cámara');
-    detenerEscaner();
+  } catch (e) {
+    showToast('⚠️ Sin acceso a la cámara');
+    wrap.style.display = 'none';
+    btnIni.style.display = 'block';
+    btnDet.style.display = 'none';
     return;
   }
 
-  // ── 2. Crear <video> y mostrarlo ────────────────────────────────────
+  scannerActivo = true;
+
+  // Crear video y conectar stream
   const videoWrap = document.getElementById('scanner-video');
   videoWrap.innerHTML = '';
-  const videoEl = document.createElement('video');
-  videoEl.setAttribute('playsinline', '');
-  videoEl.setAttribute('muted', '');
-  videoEl.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
-  videoEl.srcObject = mediaStream;
-  videoWrap.appendChild(videoEl);
-  await videoEl.play();
+  const vid = document.createElement('video');
+  vid.setAttribute('playsinline', '');
+  vid.muted = true;
+  vid.style.cssText = 'width:100%;height:100%;object-fit:cover;display:block;';
+  vid.srcObject = mediaStream;
+  videoWrap.appendChild(vid);
+  await vid.play().catch(() => {});
 
-  // ── 3. jsQR loop para QR ────────────────────────────────────────────
-  iniciarLoopQR(videoEl);
+  // Canvas de trabajo para jsQR
+  const cvs = document.getElementById('qr-canvas');
+  const ctx  = cvs.getContext('2d', { willReadFrequently: true });
 
-  // ── 4. Quagga para códigos de barras (apunta al mismo stream) ───────
-  Quagga.init({
-    inputStream: {
-      name: 'Live',
-      type: 'LiveStream',
-      target: videoWrap,
-      constraints: {
-        facingMode: { ideal: 'environment' },
-        width: { ideal: 1280 },
-        height: { ideal: 720 },
-      },
-    },
-    locator: { patchSize: 'large', halfSample: false },
-    numOfWorkers: 2,
-    frequency: 12,
-    decoder: {
-      readers: ['code_128_reader', 'code_39_reader'],
-      multiple: false,
-    },
-    locate: true,
-  }, function(err) {
-    if (err) {
-      console.warn('Quagga no disponible, solo QR activo:', err);
-      return;
-    }
-    // Ocultar canvas extra que Quagga crea
-    videoWrap.querySelectorAll('canvas').forEach(c => {
-      if (c.id !== 'qr-canvas') c.style.display = 'none';
-    });
-    Quagga.start();
-  });
+  let lastTick = 0;
+  function tick(ts) {
+    if (!scannerActivo) return;
+    rafId = requestAnimationFrame(tick);
 
-  Quagga.offDetected();
-  Quagga.onDetected(function(data) {
-    procesarCodigoEscaneado(data.codeResult?.code || '');
-  });
+    // Analizar a ~15 fps
+    if (ts - lastTick < 66) return;
+    lastTick = ts;
+
+    if (!vid.videoWidth || vid.readyState < 2) return;
+
+    cvs.width  = vid.videoWidth;
+    cvs.height = vid.videoHeight;
+    ctx.drawImage(vid, 0, 0);
+
+    const img = ctx.getImageData(0, 0, cvs.width, cvs.height);
+
+    // jsQR lee QR codes
+    const qr = jsQR(img.data, img.width, img.height, { inversionAttempts: 'attemptBoth' });
+    if (qr && qr.data) { onCodigoLeido(qr.data); return; }
+  }
+
+  rafId = requestAnimationFrame(tick);
 };
 
 window.detenerEscaner = function() {
   scannerActivo = false;
-  if (qrRafId) { cancelAnimationFrame(qrRafId); qrRafId = null; }
-  try { Quagga.offDetected(); Quagga.stop(); } catch(e) {}
+  if (rafId) { cancelAnimationFrame(rafId); rafId = null; }
   if (mediaStream) { mediaStream.getTracks().forEach(t => t.stop()); mediaStream = null; }
+
   const wrap   = document.getElementById('scanner-wrap');
   const btnIni = document.getElementById('btn-iniciar-scanner');
   const btnDet = document.getElementById('btn-detener-scanner');
-  if (wrap)   { wrap.style.display = 'none'; document.getElementById('scanner-video').innerHTML = ''; }
+  const videoWrap = document.getElementById('scanner-video');
+
+  if (videoWrap) videoWrap.innerHTML = '';
+  if (wrap)   wrap.style.display = 'none';
   if (btnIni) btnIni.style.display = 'block';
   if (btnDet) btnDet.style.display = 'none';
+
+  const lastEl = document.getElementById('scanner-last');
+  if (lastEl) lastEl.style.display = 'none';
 };
 
 window.agregarTrackingManual = function() {
