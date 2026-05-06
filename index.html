@@ -875,6 +875,18 @@ select option { background: var(--surface2); }
       </div>
     </div>
 
+    <div class="sec-header">Sugerencias rápidas</div>
+    <div class="ruta-suggestions">
+      <div class="ruta-chip" onclick="setRutaName('Ruta Norte')">🧭 Ruta Norte</div>
+      <div class="ruta-chip" onclick="setRutaName('Ruta Sur')">🧭 Ruta Sur</div>
+      <div class="ruta-chip" onclick="setRutaName('Ruta Centro')">🧭 Ruta Centro</div>
+      <div class="ruta-chip" onclick="setRutaName('Ruta Oriente')">🧭 Ruta Oriente</div>
+      <div class="ruta-chip" onclick="setRutaName('Ruta Poniente')">🧭 Ruta Poniente</div>
+      <div class="ruta-chip" onclick="setRutaName('Ruta Mañana')">🌅 Ruta Mañana</div>
+      <div class="ruta-chip" onclick="setRutaName('Ruta Tarde')">🌇 Ruta Tarde</div>
+      <div class="ruta-chip" onclick="setRutaName('Ruta Extra')">⭐ Ruta Extra</div>
+    </div>
+
     <div style="padding: 0 16px 8px;">
       <div id="nr-preview" style="
         background: var(--surface); border: 1px solid var(--border);
@@ -1009,39 +1021,122 @@ select option { background: var(--surface2); }
     <span id="client-status-badge"></span>
   </div>
   <div class="scroll">
+
+    <!-- ── HERO ── -->
     <div class="client-hero">
       <div class="client-name" id="c-nombre">—</div>
-      <div class="client-addr" id="c-addr">—</div>
+      <!-- Teléfono inline con ícono y tap-to-call -->
+      <div id="c-tel-hero" style="display:flex;align-items:center;gap:6px;margin-top:5px;">
+        <span style="font-size:14px;">📞</span>
+        <a id="c-tel-link" href="#" style="font-size:14px;color:var(--accent);font-weight:600;text-decoration:none;">—</a>
+      </div>
     </div>
-    <div class="data-grid">
-      <div class="data-cell">
-        <div class="dl">Teléfono</div>
-        <div class="dv" id="c-tel">—</div>
+
+    <!-- ── TARJETA DOMICILIO ── -->
+    <div style="padding:14px 16px 0;">
+      <div style="
+        background:linear-gradient(135deg,var(--surface) 0%,var(--surface2) 100%);
+        border:1px solid var(--border);border-radius:16px;overflow:hidden;
+      ">
+        <!-- Encabezado -->
+        <div style="
+          display:flex;align-items:center;gap:10px;
+          padding:12px 14px 10px;
+          border-bottom:1px solid var(--border);
+          background:rgba(0,212,255,.05);
+        ">
+          <div style="width:32px;height:32px;border-radius:10px;background:rgba(0,212,255,.15);border:1px solid rgba(0,212,255,.25);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">🏠</div>
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.09em;">Domicilio de entrega</div>
+            <div id="c-municipio-label" style="font-size:11px;color:var(--text3);margin-top:1px;"></div>
+          </div>
+          <button onclick="copiarDireccion()" style="margin-left:auto;background:transparent;border:none;color:var(--text3);font-size:18px;cursor:pointer;padding:4px;" title="Copiar dirección">⎘</button>
+        </div>
+
+        <!-- Campos de dirección -->
+        <div style="padding:12px 14px;display:flex;flex-direction:column;gap:8px;">
+
+          <!-- Calle + Número -->
+          <div style="display:flex;align-items:baseline;gap:10px;">
+            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;font-weight:600;width:52px;flex-shrink:0;">Calle</div>
+            <div id="c-calle-num" style="font-size:15px;font-weight:700;color:var(--text);flex:1;"></div>
+          </div>
+
+          <div style="height:1px;background:var(--border);opacity:.5;"></div>
+
+          <!-- Colonia -->
+          <div style="display:flex;align-items:baseline;gap:10px;">
+            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;font-weight:600;width:52px;flex-shrink:0;">Colonia</div>
+            <div id="c-colonia" style="font-size:14px;color:var(--text);flex:1;font-weight:500;"></div>
+          </div>
+
+          <div style="height:1px;background:var(--border);opacity:.5;"></div>
+
+          <!-- CP + Municipio en fila -->
+          <div style="display:flex;gap:16px;">
+            <div style="flex:1;">
+              <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-bottom:3px;">C.P.</div>
+              <div id="c-cp" style="font-size:14px;font-weight:600;font-family:var(--mono);color:var(--text);">—</div>
+            </div>
+            <div style="flex:2;">
+              <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-bottom:3px;">Municipio</div>
+              <div id="c-municipio" style="font-size:14px;font-weight:500;color:var(--text);">—</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Botón Google Maps -->
+        <button onclick="abrirEnMaps()" style="
+          width:100%;display:flex;align-items:center;justify-content:center;gap:8px;
+          padding:11px 14px;border:none;cursor:pointer;
+          background:rgba(0,212,255,.08);border-top:1px solid var(--border);
+          color:var(--accent);font-size:13px;font-weight:600;font-family:var(--sans);
+          transition:background .15s;
+        " onmousedown="this.style.background='rgba(0,212,255,.16)'" onmouseup="this.style.background='rgba(0,212,255,.08)'">
+          <span style="font-size:16px;">🗺️</span> Abrir en Google Maps
+        </button>
       </div>
-      <div class="data-cell">
-        <div class="dl">CP</div>
-        <div class="dv" id="c-cp">—</div>
+    </div>
+
+    <!-- ── PAQUETES ── -->
+    <div style="padding:14px 16px 0;">
+      <div style="
+        background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;
+      ">
+        <div style="
+          display:flex;align-items:center;gap:10px;padding:12px 14px 10px;
+          border-bottom:1px solid var(--border);background:rgba(0,230,118,.04);
+        ">
+          <div style="width:32px;height:32px;border-radius:10px;background:rgba(0,230,118,.12);border:1px solid rgba(0,230,118,.25);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">📦</div>
+          <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.09em;">Paquetes</div>
+          <div id="c-pdd-badge" style="margin-left:auto;display:none;">
+            <span style="font-size:11px;font-weight:600;color:var(--orange);background:rgba(255,145,0,.12);border:1px solid rgba(255,145,0,.25);padding:3px 9px;border-radius:99px;">📅 PDD: <span id="c-pdd"></span></span>
+          </div>
+        </div>
+        <div id="c-paquetes-lista" style="padding:10px 14px;display:flex;flex-direction:column;gap:6px;"></div>
       </div>
-      <div class="data-cell full">
-        <div class="dl">Shipment Order</div>
-        <div class="dv" id="c-order">—</div>
+    </div>
+
+    <!-- ── FOTOS ESCANEO ── -->
+    <div id="c-foto-wrap" style="display:none;padding:14px 16px 0;">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;">
+        <div style="padding:12px 14px 10px;border-bottom:1px solid var(--border);">
+          <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.09em;">📷 Fotos del escaneo</div>
+        </div>
+        <div id="c-fotos-paquetes" style="padding:12px 14px;"></div>
       </div>
-      <div class="data-cell full">
-        <div class="dl">Tracking #</div>
-        <div class="dv" id="c-tracking">—</div>
+    </div>
+
+      <!-- FOTOS DEL ARTÍCULO -->
+    <div id="c-fotos-articulo-wrap">
+      <div class="sec-header" style="display:flex;align-items:center;justify-content:space-between;padding-right:16px;">
+        <span>📦 Fotos del artículo</span>
+        <label for="c-articulo-file-input" style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:99px;font-size:12px;font-weight:600;background:rgba(0,230,118,.12);border:1px solid rgba(0,230,118,.3);color:var(--green);cursor:pointer;">
+          ＋ Agregar
+        </label>
       </div>
-      <div class="data-cell full" id="c-trackings-extra-wrap" style="display:none;">
-        <div class="dl">📦 Paquetes adicionales</div>
-        <div id="c-trackings-extra"></div>
-      </div>
-      <div class="data-cell full">
-        <div class="dl">📅 Fecha PDD</div>
-        <div class="dv" id="c-pdd">—</div>
-      </div>
-      <div class="data-cell full" id="c-foto-wrap" style="display:none;">
-        <div class="dl">📷 Fotos del escaneo</div>
-        <div id="c-fotos-paquetes"></div>
-      </div>
+      <input type="file" id="c-articulo-file-input" accept="image/*" multiple style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">
+      <div id="c-fotos-articulo-grid" style="display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 16px;"></div>
     </div>
 
     <div id="c-fotos-entrega-wrap">
@@ -1051,21 +1146,11 @@ select option { background: var(--surface2); }
           ＋ Agregar
         </label>
       </div>
-      <input type="file" id="c-entrega-file-input" accept="image/*" multiple style="display:none;">
+      <input type="file" id="c-entrega-file-input" accept="image/*" multiple style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">
       <div id="c-fotos-entrega-grid" style="display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 16px;"></div>
     </div>
 
-    <!-- FOTOS DEL ARTÍCULO -->
-    <div id="c-fotos-articulo-wrap">
-      <div class="sec-header" style="display:flex;align-items:center;justify-content:space-between;padding-right:16px;">
-        <span>📦 Fotos del artículo</span>
-        <label for="c-articulo-file-input" style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:99px;font-size:12px;font-weight:600;background:rgba(0,230,118,.12);border:1px solid rgba(0,230,118,.3);color:var(--green);cursor:pointer;">
-          ＋ Agregar
-        </label>
-      </div>
-      <input type="file" id="c-articulo-file-input" accept="image/*" multiple style="display:none;">
-      <div id="c-fotos-articulo-grid" style="display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 16px;"></div>
-    </div>
+  
 
     <div id="c-fotos-excepcion-wrap">
       <div class="sec-header" style="display:flex;align-items:center;justify-content:space-between;padding-right:16px;">
@@ -1078,7 +1163,7 @@ select option { background: var(--surface2); }
           ＋ Agregar
         </label>
       </div>
-      <input type="file" id="c-excepcion-file-input" accept="image/*" multiple style="display:none;">
+      <input type="file" id="c-excepcion-file-input" accept="image/*" multiple style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">
       <div id="c-fotos-excepcion-grid" style="display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 16px;"></div>
     </div>
 
@@ -1837,39 +1922,88 @@ window.toggleDaySection = function(dayKey) {
   if (arrow) arrow.style.transform = open ? 'rotate(0deg)' : 'rotate(90deg)';
 };
 
+window.copiarTexto = function(txt) {
+  navigator.clipboard?.writeText(txt).then(() => showToast('✓ Copiado')).catch(() => showToast('⚠️ No se pudo copiar'));
+};
+
+window.copiarDireccion = function() {
+  const r = allRecords.find(x => x.id === currentClientId);
+  if (!r) return;
+  const addr = [r.calle, r.numero ? 'No. ' + r.numero : '', r.colonia, r.cp, r.municipio].filter(Boolean).join(', ');
+  copiarTexto(addr);
+};
+
+window.abrirEnMaps = function() {
+  const r = allRecords.find(x => x.id === currentClientId);
+  if (!r) return;
+  // Intentar con Plus Code si existe, si no con dirección
+  const pc = Array.isArray(r.plusCodes) && r.plusCodes.length ? r.plusCodes[0] : null;
+  if (pc) {
+    window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(pc)}`, '_blank');
+  } else {
+    const addr = [r.calle, r.numero, r.colonia, r.cp, r.municipio, 'México'].filter(Boolean).join(' ');
+    window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`, '_blank');
+  }
+};
+
 // ─── OPEN CLIENT ─────────────────────────────────────────────────────
 window.openClient = function(id) {
   const r = allRecords.find(x => x.id === id);
   if (!r) return;
   currentClientId = id;
+
+  // ── Nombre ──
   document.getElementById('c-nombre').textContent = r.nombre || '—';
   document.getElementById('client-topbar-name').textContent = r.nombre?.split(' ')[0] || 'Cliente';
-  document.getElementById('c-addr').textContent = [r.calle, r.numero, r.colonia, r.cp].filter(Boolean).join(', ');
-  document.getElementById('c-tel').textContent = r.telefono || '—';
-  document.getElementById('c-cp').textContent = r.cp || '—';
-  document.getElementById('c-pdd').textContent = r.pdd || '—';
 
-  // ── TRACKING(S) ──
-  const trackings = r.trackings || (r.tracking ? [r.tracking] : []);
-  document.getElementById('c-tracking').textContent = trackings[0] || '—';
-  const extraWrap = document.getElementById('c-trackings-extra-wrap');
-  const extraDiv  = document.getElementById('c-trackings-extra');
-  if (trackings.length > 1) {
-    extraWrap.style.display = 'block';
-    const orders = r.shipmentOrders || (r.shipment_order ? [r.shipment_order] : []);
-    extraDiv.innerHTML = trackings.slice(1).map((t, i) => `
-      <div style="padding:8px 0;border-top:1px solid var(--border);margin-top:6px;">
-        <div style="font-size:12px;font-family:var(--mono);color:var(--accent);">📦 Paquete ${i + 2}</div>
-        <div style="font-size:13px;font-weight:600;margin-top:3px;">${t}</div>
-        ${orders[i + 1] ? `<div style="font-size:11px;color:var(--text3);margin-top:2px;">SO: ${orders[i + 1]}</div>` : ''}
-      </div>`).join('');
+  // ── Teléfono en hero ──
+  const tel = r.telefono || '—';
+  document.getElementById('c-tel-link').textContent = tel;
+  document.getElementById('c-tel-link').href = tel !== '—' ? `tel:${tel}` : '#';
+
+  // ── Tarjeta domicilio ──
+  const calle  = r.calle  || '';
+  const numero = r.numero || '';
+  const colonia   = r.colonia   || '';
+  const cp        = r.cp        || '';
+  const municipio = r.municipio || '';
+
+  document.getElementById('c-calle-num').textContent = [calle, numero].filter(Boolean).join(' No. ') || '—';
+  document.getElementById('c-colonia').textContent   = colonia   || '—';
+  document.getElementById('c-cp').textContent        = cp        || '—';
+  document.getElementById('c-municipio').textContent = municipio || '—';
+  document.getElementById('c-municipio-label').textContent = municipio || '';
+
+  // ── PDD badge ──
+  const pddBadge = document.getElementById('c-pdd-badge');
+  if (r.pdd) {
+    document.getElementById('c-pdd').textContent = r.pdd;
+    pddBadge.style.display = 'block';
   } else {
-    extraWrap.style.display = 'none';
+    pddBadge.style.display = 'none';
   }
 
-  // ── SHIPMENT ORDER (primer paquete) ──
-  const orders = r.shipmentOrders || (r.shipment_order ? [r.shipment_order] : []);
-  document.getElementById('c-order').textContent = orders[0] || '—';
+  // ── PAQUETES lista ──
+  const trackings = r.trackings || (r.tracking ? [r.tracking] : []);
+  const orders    = r.shipmentOrders || (r.shipment_order ? [r.shipment_order] : []);
+  const paqList   = document.getElementById('c-paquetes-lista');
+  if (trackings.length === 0) {
+    paqList.innerHTML = `<div style="font-size:13px;color:var(--text3);">Sin trackings registrados</div>`;
+  } else {
+    paqList.innerHTML = trackings.map((t, i) => `
+      <div style="
+        display:flex;align-items:center;gap:10px;
+        background:var(--surface2);border:1px solid var(--border);
+        border-radius:10px;padding:10px 12px;
+      ">
+        <div style="width:26px;height:26px;border-radius:8px;background:rgba(0,230,118,.15);border:1px solid rgba(0,230,118,.3);display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:var(--green);font-family:var(--mono);flex-shrink:0;">${i+1}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:12px;font-family:var(--mono);font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${t}</div>
+          ${orders[i] ? `<div style="font-size:11px;color:var(--text3);margin-top:2px;">SO: ${orders[i]}</div>` : ''}
+        </div>
+        <button onclick="copiarTexto('${t}')" style="background:transparent;border:none;color:var(--text3);font-size:16px;cursor:pointer;padding:2px 4px;flex-shrink:0;" title="Copiar">⎘</button>
+      </div>`).join('');
+  }
 
   // ── FOTOS ESCANEO: una sección por paquete ──
   const fotosEtiqueta = Array.isArray(r.fotosEtiqueta) && r.fotosEtiqueta.length
