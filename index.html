@@ -875,6 +875,18 @@ select option { background: var(--surface2); }
       </div>
     </div>
 
+    <div class="sec-header">Sugerencias rápidas</div>
+    <div class="ruta-suggestions">
+      <div class="ruta-chip" onclick="setRutaName('Ruta Norte')">🧭 Ruta Norte</div>
+      <div class="ruta-chip" onclick="setRutaName('Ruta Sur')">🧭 Ruta Sur</div>
+      <div class="ruta-chip" onclick="setRutaName('Ruta Centro')">🧭 Ruta Centro</div>
+      <div class="ruta-chip" onclick="setRutaName('Ruta Oriente')">🧭 Ruta Oriente</div>
+      <div class="ruta-chip" onclick="setRutaName('Ruta Poniente')">🧭 Ruta Poniente</div>
+      <div class="ruta-chip" onclick="setRutaName('Ruta Mañana')">🌅 Ruta Mañana</div>
+      <div class="ruta-chip" onclick="setRutaName('Ruta Tarde')">🌇 Ruta Tarde</div>
+      <div class="ruta-chip" onclick="setRutaName('Ruta Extra')">⭐ Ruta Extra</div>
+    </div>
+
     <div style="padding: 0 16px 8px;">
       <div id="nr-preview" style="
         background: var(--surface); border: 1px solid var(--border);
@@ -1115,18 +1127,6 @@ select option { background: var(--surface2); }
       </div>
     </div>
 
-      <!-- FOTOS DEL ARTÍCULO -->
-    <div id="c-fotos-articulo-wrap">
-      <div class="sec-header" style="display:flex;align-items:center;justify-content:space-between;padding-right:16px;">
-        <span>📦 Fotos del artículo</span>
-        <label for="c-articulo-file-input" style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:99px;font-size:12px;font-weight:600;background:rgba(0,230,118,.12);border:1px solid rgba(0,230,118,.3);color:var(--green);cursor:pointer;">
-          ＋ Agregar
-        </label>
-      </div>
-      <input type="file" id="c-articulo-file-input" accept="image/*" multiple style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">
-      <div id="c-fotos-articulo-grid" style="display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 16px;"></div>
-    </div>
-
     <div id="c-fotos-entrega-wrap">
       <div class="sec-header" style="display:flex;align-items:center;justify-content:space-between;padding-right:16px;">
         <span>📸 Fotos de producto entregado</span>
@@ -1138,7 +1138,17 @@ select option { background: var(--surface2); }
       <div id="c-fotos-entrega-grid" style="display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 16px;"></div>
     </div>
 
-  
+    <!-- FOTOS DEL ARTÍCULO -->
+    <div id="c-fotos-articulo-wrap">
+      <div class="sec-header" style="display:flex;align-items:center;justify-content:space-between;padding-right:16px;">
+        <span>📦 Fotos del artículo</span>
+        <label for="c-articulo-file-input" style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:99px;font-size:12px;font-weight:600;background:rgba(0,230,118,.12);border:1px solid rgba(0,230,118,.3);color:var(--green);cursor:pointer;">
+          ＋ Agregar
+        </label>
+      </div>
+      <input type="file" id="c-articulo-file-input" accept="image/*" multiple style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">
+      <div id="c-fotos-articulo-grid" style="display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 16px;"></div>
+    </div>
 
     <div id="c-fotos-excepcion-wrap">
       <div class="sec-header" style="display:flex;align-items:center;justify-content:space-between;padding-right:16px;">
@@ -1495,6 +1505,10 @@ let rutaFechaActiva = localStorage.getItem('rutaFechaActiva') || '';
 
 // ─── NUEVA RUTA ───────────────────────────────────────────────────────
 window.showScreen = function(name) {
+  // Detener escáner si estábamos en la pantalla de scan y salimos
+  if (currentScreen === 'scan' && name !== 'scan' && scannerActivo) {
+    detenerEscaner();
+  }
   document.querySelectorAll('.screen').forEach(s => {
     s.classList.add('hidden');
     s.classList.remove('slide-left');
@@ -1510,6 +1524,10 @@ window.showScreen = function(name) {
   if (name === 'navegacion') renderNavStops();
   // Si había navegación activa y regresamos a nav-guiada, restaurar mapa
   if (name === 'nav-guiada' && navParadas.length > 0) renderNavGuiada();
+  // Iniciar escáner automáticamente al entrar a la pantalla de scan
+  if (name === 'scan') {
+    setTimeout(function() { if (!scannerActivo) iniciarEscaner(); }, 300);
+  }
 }
 
 function initNuevaRutaScreen() {
