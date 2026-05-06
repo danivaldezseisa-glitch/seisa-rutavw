@@ -12,6 +12,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script src="https://cdn.sheetjs.com/xlsx-0.20.2/package/dist/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/quagga/0.12.1/quagga.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.css"/>
 <script src="https://unpkg.com/leaflet-routing-machine@3.2.12/dist/leaflet-routing-machine.min.js"></script>
 <style>
@@ -942,6 +943,8 @@ select option { background: var(--surface2); }
         </div>
         <!-- Último tracking detectado -->
         <div id="scanner-last" style="position:absolute;bottom:0;left:0;right:0;padding:10px 14px;background:rgba(0,0,0,.75);font-size:13px;font-weight:700;color:var(--green);font-family:var(--mono);text-align:center;display:none;"></div>
+        <!-- Canvas oculto para lectura de QR con jsQR -->
+        <canvas id="qr-canvas" style="display:none;"></canvas>
       </div>
 
       <div id="scanner-btns" style="display:flex;gap:8px;margin-bottom:10px;">
@@ -2586,10 +2589,64 @@ window.marcarEntregadoDesdeCamera = async function() {
 }
 
 // ─── SCAN / UPLOAD ───────────────────────────────────────────────────
-// ─── ESCÁNER DE CÓDIGO DE BARRAS (QuaggaJS) ──────────────────────────
+// ─── ESCÁNER: CÓDIGO DE BARRAS (QuaggaJS) + QR (jsQR) ───────────────
 let scannerActivo = false;
 let cooldown = false;
 let ultimoTracking = '';
+let qrRafId = null;   // requestAnimationFrame id para el loop de jsQR
+
+// Prefijos válidos (mayúsculas)
+const PREFIJOS_VALIDOS = ['MXFDD', 'FLDSWM'];
+
+function esTrackingValido(code) {
+  return PREFIJOS_VALIDOS.some(p => code.startsWith(p));
+}
+
+function procesarCodigoEscaneado(raw) {
+  if (!scannerActivo || cooldown) return;
+  const code = raw.trim().toUpperCase();
+  if (!code || code.length < 6) return;
+  if (!esTrackingValido(code)) return;   // ← solo prefijos válidos
+  if (code === ultimoTracking) return;
+
+  ultimoTracking = code;
+  cooldown = true;
+  if (navigator.vibrate) navigator.vibrate(120);
+
+  agregarTrackingDetectado(code, 'escáner');
+
+  const lastEl = document.getElementById('scanner-last');
+  if (lastEl) { lastEl.style.display = 'block'; lastEl.textContent = '✅ ' + code; }
+  showToast('✅ ' + code);
+
+  setTimeout(() => { cooldown = false; ultimoTracking = ''; }, 1500);
+}
+
+// ── Loop jsQR para leer QR ──────────────────────────────────────────
+function iniciarLoopQR() {
+  const canvas = document.getElementById('qr-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+
+  function tick() {
+    if (!scannerActivo) return;
+    const video = document.querySelector('#scanner-video video');
+    if (video && video.readyState === video.HAVE_ENOUGH_DATA) {
+      canvas.width  = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      const qr = jsQR(imageData.data, imageData.width, imageData.height, {
+        inversionAttempts: 'dontInvert',
+      });
+      if (qr && qr.data) {
+        procesarCodigoEscaneado(qr.data);
+      }
+    }
+    qrRafId = requestAnimationFrame(tick);
+  }
+  qrRafId = requestAnimationFrame(tick);
+}
 
 window.iniciarEscaner = function() {
   const wrap   = document.getElementById('scanner-wrap');
@@ -2619,7 +2676,7 @@ window.iniciarEscaner = function() {
     numOfWorkers: 2,
     frequency: 15,
     decoder: {
-      readers: ['code_128_reader'],
+      readers: ['code_128_reader', 'code_39_reader', 'ean_reader'],
       multiple: false,
     },
     locate: true,
@@ -2638,31 +2695,20 @@ window.iniciarEscaner = function() {
     const canvas = document.querySelector('#scanner-video canvas');
     if (canvas) canvas.style.cssText = 'display:none!important;';
     Quagga.start();
+    // Iniciar loop de lectura QR en paralelo
+    iniciarLoopQR();
   });
 
   Quagga.offDetected();
   Quagga.onDetected(function(data) {
-    if (!scannerActivo || cooldown) return;
-    const raw = (data.codeResult?.code || '').trim().toUpperCase();
-    if (!raw || raw.length < 6) return;
-    if (raw === ultimoTracking) return;
-
-    ultimoTracking = raw;
-    cooldown = true;
-    if (navigator.vibrate) navigator.vibrate(120);
-
-    agregarTrackingDetectado(raw, 'escáner');
-
-    const lastEl = document.getElementById('scanner-last');
-    if (lastEl) { lastEl.style.display = 'block'; lastEl.textContent = '✅ ' + raw; }
-    showToast('✅ ' + raw);
-
-    setTimeout(() => { cooldown = false; ultimoTracking = ''; }, 1500);
+    const raw = (data.codeResult?.code || '').trim();
+    procesarCodigoEscaneado(raw);
   });
 };
 
 window.detenerEscaner = function() {
   scannerActivo = false;
+  if (qrRafId) { cancelAnimationFrame(qrRafId); qrRafId = null; }
   try { Quagga.offDetected(); Quagga.stop(); } catch(e) {}
   const wrap   = document.getElementById('scanner-wrap');
   const btnIni = document.getElementById('btn-iniciar-scanner');
