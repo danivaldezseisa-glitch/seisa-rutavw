@@ -1951,6 +1951,12 @@ async function saveRecord(data) {
   data.createdAt = Date.now();
   data.entregado = false;
 
+  // ── Vincular operador al paquete (necesario para el panel admin) ──
+  if (currentUser) {
+    data.operadorUid    = currentUser.uid;
+    data.operadorNombre = currentUser.nombre || currentUser.email;
+  }
+
   // Fecha del día — usar la fecha de la ruta activa si está definida, si no la del sistema
   let fechaDia;
   if (rutaFechaActiva) {
@@ -3454,6 +3460,8 @@ window.cruzarDatos = async function() {
       ruta: rutaActiva || '',
       estado: 'pendiente',
       createdAt: new Date().toISOString(),
+      operadorUid:    currentUser?.uid    || '',
+      operadorNombre: currentUser?.nombre || currentUser?.email || '',
     };
 
     // Geocodificación automática antes de guardar
