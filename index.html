@@ -961,7 +961,7 @@ select option { background: var(--surface2); }
     <!-- Acciones -->
     <div class="nav-actions">
       <button class="btn btn-ghost" onclick="retrocederParada()" style="font-size:12px;">← Ant</button>
-      <button class="btn btn-green" onclick="marcarParadaHecha()" style="font-size:13px;">✓ Entregado</button>
+      <button class="btn btn-green" onclick="irAClienteYEntregar()" style="font-size:13px;">📦 Entregar</button>
       <button class="btn btn-ghost" onclick="saltarParada()" style="font-size:12px;color:var(--orange);">Sig →</button>
     </div>
 
@@ -1388,7 +1388,13 @@ select option { background: var(--surface2); }
       </div>
 
       <button class="btn btn-red" id="btn-mark-done" style="margin-top:4px;">
-        ✓ Marcar como entregado
+        ✅ Entregar
+      </button>
+      <button class="btn" id="btn-en-camino" onclick="toggleEnCamino()" style="margin-top:6px;display:none;background:rgba(0,200,255,.15);color:var(--accent);border:1px solid var(--accent);font-size:13px;">
+        🚗 Marcar en camino
+      </button>
+      <button class="btn btn-ghost" id="btn-undo-done" onclick="deshacerEntrega()" style="margin-top:6px;display:none;color:var(--orange);border-color:var(--orange);font-size:13px;">
+        ↩ Deshacer entrega
       </button>
     </div>
   </div>
@@ -1633,7 +1639,7 @@ select option { background: var(--surface2); }
 <!-- Firebase -->
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, where } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, where, setDoc, getDoc } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
 import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
@@ -1706,9 +1712,13 @@ onAuthStateChanged(auth, async (user) => {
     ocultarLogin();
     actualizarUIUsuario();
     await loadRecords();
+    await loadNavParadas();
+    renderNavStops();
     updateStats();
   } else {
     currentUser = null;
+    navParadas = [];
+    navParadaActual = 0;
     mostrarLogin();
     document.getElementById('login-btn').textContent = 'Iniciar sesión';
     document.getElementById('login-btn').disabled = false;
@@ -2380,12 +2390,31 @@ window.openClient = function(id) {
   renderFotosExcepcionGrid(fotosExcepcion);
 
   const badge = document.getElementById('client-status-badge');
+  const esEntregado = r.entregado === true || (typeof r.entregado === 'number' && r.entregado > 0);
+  const btnUndo = document.getElementById('btn-undo-done');
+  const btnDone = document.getElementById('btn-mark-done');
+  const btnCamino = document.getElementById('btn-en-camino');
+
   if (r.excepcion || r.excTipo) {
     badge.innerHTML = '<span class="badge badge-orange">⚠️ Excepción de entrega</span>';
+    if (btnDone)   btnDone.style.display = 'none';
+    if (btnUndo)   btnUndo.style.display = 'none';
+    if (btnCamino) btnCamino.style.display = 'none';
+  } else if (esEntregado) {
+    badge.innerHTML = '<span class="badge badge-green">✓ Entregado</span>';
+    if (btnDone)   btnDone.style.display = 'none';
+    if (btnUndo)   btnUndo.style.display = '';
+    if (btnCamino) btnCamino.style.display = 'none';
+  } else if (r.enCamino) {
+    badge.innerHTML = '<span class="badge badge-blue">🚗 En camino</span>';
+    if (btnDone)   btnDone.style.display = '';
+    if (btnUndo)   btnUndo.style.display = 'none';
+    if (btnCamino) { btnCamino.style.display = ''; btnCamino.textContent = '✕ Cancelar en camino'; btnCamino.style.background = 'rgba(255,145,0,.15)'; btnCamino.style.color = 'var(--orange)'; btnCamino.style.borderColor = 'var(--orange)'; }
   } else {
-    badge.innerHTML = r.entregado
-      ? '<span class="badge badge-green">✓ Entregado</span>'
-      : '<span class="badge badge-orange">Pendiente</span>';
+    badge.innerHTML = '<span class="badge badge-orange">Pendiente</span>';
+    if (btnDone)   btnDone.style.display = '';
+    if (btnUndo)   btnUndo.style.display = 'none';
+    if (btnCamino) { btnCamino.style.display = ''; btnCamino.textContent = '🚗 Marcar en camino'; btnCamino.style.background = 'rgba(0,200,255,.15)'; btnCamino.style.color = 'var(--accent)'; btnCamino.style.borderColor = 'var(--accent)'; }
   }
 
   // ── PLUS CODES ──
@@ -2614,9 +2643,62 @@ document.getElementById('btn-whatsapp-camino').addEventListener('click', () => {
 document.getElementById('btn-mark-done').addEventListener('click', async () => {
   if (!currentClientId) return;
   await updateRecord(currentClientId, { entregado: true });
-  showToast('✓ Marcado como entregado');
-  showScreen('home');
+  showToast('✓ Entregado');
+
+  // Si venimos de la navegación guiada, avanzar a la siguiente parada
+  if (navParadas && navParadas.length > 0) {
+    navParadas[navParadaActual].hecha = true;
+    if (navParadaActual < navParadas.length - 1) {
+      navParadaActual++;
+      renderNavGuiada();
+      showScreen('nav-guiada');
+      showToast(`✓ Entregado · Siguiente: parada ${navParadaActual + 1}`);
+    } else {
+      // Última parada — ruta completa
+      renderNavGuiada();
+      showScreen('nav-guiada');
+      showToast('🎉 ¡Ruta completada!');
+    }
+  } else {
+    showScreen('home');
+  }
 });
+
+// ─── DESHACER ENTREGA ─────────────────────────────────────────────────
+window.deshacerEntrega = async function() {
+  if (!currentClientId) return;
+  if (!confirm('¿Deshacer la entrega de este cliente?')) return;
+  await updateRecord(currentClientId, { entregado: false });
+  const badge = document.getElementById('client-status-badge');
+  if (badge) badge.innerHTML = '<span class="badge badge-orange">Pendiente</span>';
+  const btnDone = document.getElementById('btn-mark-done');
+  const btnUndo = document.getElementById('btn-undo-done');
+  const btnCamino = document.getElementById('btn-en-camino');
+  if (btnDone)   btnDone.style.display = '';
+  if (btnUndo)   btnUndo.style.display = 'none';
+  if (btnCamino) { btnCamino.style.display = ''; btnCamino.textContent = '🚗 Marcar en camino'; btnCamino.style.background = 'rgba(0,200,255,.15)'; btnCamino.style.color = 'var(--accent)'; btnCamino.style.borderColor = 'var(--accent)'; }
+  showToast('↩ Entrega deshecha');
+};
+
+// ─── EN CAMINO ────────────────────────────────────────────────────────
+window.toggleEnCamino = async function() {
+  if (!currentClientId) return;
+  const r = allRecords.find(x => x.id === currentClientId);
+  if (!r) return;
+  const nuevoEstado = !r.enCamino;
+  await updateRecord(currentClientId, { enCamino: nuevoEstado });
+  const badge = document.getElementById('client-status-badge');
+  const btnCamino = document.getElementById('btn-en-camino');
+  if (nuevoEstado) {
+    if (badge) badge.innerHTML = '<span class="badge badge-blue">🚗 En camino</span>';
+    if (btnCamino) { btnCamino.textContent = '✕ Cancelar en camino'; btnCamino.style.background = 'rgba(255,145,0,.15)'; btnCamino.style.color = 'var(--orange)'; btnCamino.style.borderColor = 'var(--orange)'; }
+    showToast('🚗 Marcado en camino');
+  } else {
+    if (badge) badge.innerHTML = '<span class="badge badge-orange">Pendiente</span>';
+    if (btnCamino) { btnCamino.textContent = '🚗 Marcar en camino'; btnCamino.style.background = 'rgba(0,200,255,.15)'; btnCamino.style.color = 'var(--accent)'; btnCamino.style.borderColor = 'var(--accent)'; }
+    showToast('↩ En camino cancelado');
+  }
+};
 
 // ─── EDIT CLIENT ─────────────────────────────────────────────────────
 document.getElementById('btn-edit-client').addEventListener('click', () => {
@@ -2870,7 +2952,25 @@ window.sendPhotosToWhatsApp = async function() {
   if (camModo === 'entrega') {
     document.getElementById('btn-mark-done-camera').style.display = 'flex';
   }
-}
+
+  // Si es excepción, avanzar a la siguiente parada en nav-guiada
+  if (camModo === 'excepcion') {
+    if (navParadas && navParadas.length > 0) {
+      navParadas[navParadaActual].hecha = true;
+      if (navParadaActual < navParadas.length - 1) {
+        navParadaActual++;
+        renderNavGuiada();
+        showToast(`⚠️ Excepción registrada · Siguiente: parada ${navParadaActual + 1}`);
+      } else {
+        renderNavGuiada();
+        showToast('🎉 ¡Ruta completada!');
+      }
+      showScreen('nav-guiada');
+    } else {
+      showScreen('client');
+    }
+  }
+};
 
 // ─── MARCAR ENTREGADO DESDE CÁMARA ────────────────────────────────────
 window.marcarEntregadoDesdeCamera = async function() {
@@ -2880,12 +2980,27 @@ window.marcarEntregadoDesdeCamera = async function() {
     const idx = allRecords.findIndex(x => x.id === currentClientId);
     if (idx >= 0) allRecords[idx].entregado = true;
     document.getElementById('btn-mark-done-camera').style.display = 'none';
-    showToast('✅ Marcado como entregado');
     renderRouteList();
-    showScreen('client');
     // Actualizar badge en pantalla de cliente
     const badge = document.getElementById('client-status-badge');
     if (badge) badge.innerHTML = '<span class="badge badge-green">✓ Entregado</span>';
+
+    // Regresar a nav-guiada en la siguiente parada
+    if (navParadas && navParadas.length > 0) {
+      navParadas[navParadaActual].hecha = true;
+      if (navParadaActual < navParadas.length - 1) {
+        navParadaActual++;
+        renderNavGuiada();
+        showToast(`✅ Entregado · Siguiente: parada ${navParadaActual + 1}`);
+      } else {
+        renderNavGuiada();
+        showToast('🎉 ¡Ruta completada!');
+      }
+      showScreen('nav-guiada');
+    } else {
+      showToast('✅ Marcado como entregado');
+      showScreen('client');
+    }
   } catch(e) {
     showToast('⚠️ Error al marcar como entregado');
   }
@@ -3550,7 +3665,7 @@ function renderDB() {
       <div class="db-item" onclick="openClient('${r.id}')">
         <div class="db-item-top">
           <div class="db-item-name">${r.nombre || '—'}</div>
-          <span class="badge ${r.entregado ? 'badge-green' : 'badge-orange'}">${r.entregado ? '✓ Entregado' : 'Pendiente'}</span>
+          <span class="badge ${r.entregado ? 'badge-green' : r.enCamino ? 'badge-blue' : 'badge-orange'}">${r.entregado ? '✓ Entregado' : r.enCamino ? '🚗 En camino' : 'Pendiente'}</span>
         </div>
         <div class="db-item-addr">${[r.calle, r.numero, r.colonia, r.cp].filter(Boolean).join(', ')}</div>
         <div class="db-item-track">${r.tracking || ''}</div>
@@ -3590,6 +3705,33 @@ window.exportCSV = function() {
 // ─── NAVEGACIÓN GUIADA ────────────────────────────────────────────────
 let navParadas = [];       // { plusCode, label, lat, lng, hecha }
 let navParadaActual = 0;
+
+// ── Persistencia de paradas en Firestore ────────────────────────────────────
+// Se guarda en: rutas_nav/{uid}  →  { paradas: [...], paradaActual: N }
+// Esto sobrevive cierre de sesion, recarga y cambio de dispositivo.
+
+async function saveNavParadas() {
+  if (!currentUser) return;
+  try {
+    await setDoc(doc(db, 'rutas_nav', currentUser.uid), {
+      paradas: navParadas,
+      paradaActual: navParadaActual,
+      updatedAt: new Date().toISOString()
+    });
+  } catch(e) { console.warn('saveNavParadas error:', e); }
+}
+
+async function loadNavParadas() {
+  if (!currentUser) return;
+  try {
+    const snap = await getDoc(doc(db, 'rutas_nav', currentUser.uid));
+    if (snap.exists()) {
+      const data = snap.data();
+      navParadas = Array.isArray(data.paradas) ? data.paradas : [];
+      navParadaActual = typeof data.paradaActual === 'number' ? data.paradaActual : 0;
+    }
+  } catch(e) { console.warn('loadNavParadas error:', e); }
+}
 
 // ── Open Location Code decoder (OLC / Plus Codes) ───────────────────
 const OLC = (() => {
@@ -3809,6 +3951,7 @@ window.agregarParada = async function() {
       hecha: false
     });
     input.value = '';
+    saveNavParadas();
     renderNavStops();
     showToast(`📍 Parada ${navParadas.length} agregada`);
   } catch(e) {
@@ -3832,11 +3975,14 @@ window.pegarDesdeClipboard = async function() {
 
 window.eliminarParada = function(idx) {
   navParadas.splice(idx, 1);
+  saveNavParadas();
   renderNavStops();
 }
 
 window.limpiarParadas = function() {
   navParadas = [];
+  navParadaActual = 0;
+  saveNavParadas();
   renderNavStops();
   showToast('🗑 Paradas eliminadas');
 }
@@ -3949,6 +4095,7 @@ window.calcularYNavegar = async function() {
 
   navParadas = paradasParaOrdenar.map(p => ({ ...p, hecha: false }));
   navParadaActual = 0;
+  saveNavParadas();
 
   // Calcular km totales
   btn.textContent = '⏳ Calculando ruta...';
@@ -4136,14 +4283,30 @@ window.toggleListaParadas = function() {
   if (!visible) renderListaParadas();
 }
 
+window.irAClienteYEntregar = function() {
+  const parada = navParadas[navParadaActual];
+  if (!parada || parada.esRetorno) { showToast('Esta parada es de retorno'); return; }
+  const clienteId = parada.clienteId;
+  if (clienteId) {
+    openClient(clienteId);
+  } else {
+    const nombre = parada.clienteNombre || parada.label?.split('·')[0]?.trim();
+    const r = allRecords.find(x => x.nombre?.startsWith(nombre));
+    if (r) openClient(r.id);
+    else showToast('⚠️ Cliente no encontrado en la lista');
+  }
+};
+
 window.marcarParadaHecha = function() {
   navParadas[navParadaActual].hecha = true;
   if (navParadaActual < navParadas.length - 1) {
     navParadaActual++;
+    saveNavParadas();
     renderNavGuiada();
     showToast(`✓ Entregado · Siguiente: parada ${navParadaActual + 1}`);
   } else {
     const hechas = navParadas.filter(p => p.hecha).length;
+    saveNavParadas();
     document.getElementById('nav-guiada-title').textContent = '✅ Ruta completada';
     document.getElementById('nav-prog-fill').style.width = '100%';
     document.getElementById('nav-prog-label').textContent = `${hechas}/${navParadas.length} ✓`;
@@ -4161,6 +4324,7 @@ window.retrocederParada = function() {
   if (navParadaActual <= 0) { showToast('Ya estás en la primera parada'); return; }
   navParadas[navParadaActual - 1].hecha = false;
   navParadaActual--;
+  saveNavParadas();
   renderNavGuiada();
   showToast(`↩ Regresando a parada ${navParadaActual + 1}`);
 }
@@ -4168,6 +4332,7 @@ window.retrocederParada = function() {
 window.saltarParada = function() {
   if (navParadaActual >= navParadas.length - 1) { showToast('Ya estás en la última parada'); return; }
   navParadaActual++;
+  saveNavParadas();
   renderNavGuiada();
   showToast(`⏭ Parada ${navParadaActual + 1}`);
 }
@@ -4265,6 +4430,7 @@ async function sincronizarNavParadas(plusCodes, r) {
   if (!plusCodes || plusCodes.length === 0) {
     // Quitar solo las paradas de este cliente que ya no estén
     navParadas = navParadas.filter(p => !p.clienteId || p.clienteId !== currentClientId);
+    saveNavParadas();
     renderNavStops();
     return;
   }
@@ -4285,6 +4451,7 @@ async function sincronizarNavParadas(plusCodes, r) {
     ...navParadas.filter(p => p.clienteId !== currentClientId),
     ...resueltos
   ];
+  saveNavParadas();
   renderNavStops();
   document.getElementById('nav-stop-count').textContent = `${navParadas.length} paradas`;
 }
