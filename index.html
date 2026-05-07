@@ -1943,8 +1943,10 @@ window.copiarDireccion = function() {
 window.abrirEnMaps = function() {
   const r = allRecords.find(x => x.id === currentClientId);
   if (!r) return;
-  const addr = [r.cp, r.calle].filter(Boolean).join(' ');
-  window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addr)}`, '_blank');
+  const cp    = (r.cp    || '').trim();
+  const calle = (r.calle || '').split(',')[0].trim();
+  const query = [cp, calle].filter(Boolean).join(' ');
+  window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, '_blank');
 };
 
 // ─── OPEN CLIENT ─────────────────────────────────────────────────────
