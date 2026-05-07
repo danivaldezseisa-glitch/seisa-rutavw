@@ -620,17 +620,119 @@ select option { background: var(--surface2); }
   object-fit: cover !important;
   display: block !important;
 }
+
+/* ── LOGIN ── */
+#screen-login {
+  position: fixed; inset: 0; z-index: 9999;
+  background: var(--bg);
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  padding: 32px 24px;
+}
+#screen-login.hidden { display: none; }
+.login-logo { font-size: 52px; margin-bottom: 8px; }
+.login-title { font-size: 26px; font-weight: 800; color: var(--accent); letter-spacing: .05em; margin-bottom: 4px; }
+.login-sub { font-size: 13px; color: var(--text3); margin-bottom: 28px; }
+.login-card { background: var(--bg2); border: 1px solid var(--border); border-radius: 18px; padding: 24px; width: 100%; max-width: 360px; display: flex; flex-direction: column; gap: 14px; }
+.login-field { display: flex; flex-direction: column; gap: 5px; }
+.login-field label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: .08em; font-weight: 600; }
+.login-field input { background: var(--surface2); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; color: var(--text); font-size: 15px; font-family: var(--sans); outline: none; transition: border .15s; width: 100%; }
+.login-field input:focus { border-color: var(--accent); }
+.login-error { font-size: 12px; color: var(--red); text-align: center; min-height: 16px; }
+.login-btn { padding: 14px; border-radius: 12px; border: none; background: var(--accent); color: var(--bg); font-size: 16px; font-weight: 700; font-family: var(--sans); cursor: pointer; transition: opacity .15s; width: 100%; }
+.login-btn:active { opacity: .8; }
+.user-badge { display: flex; align-items: center; gap: 6px; padding: 4px 10px; border-radius: 99px; background: var(--surface2); border: 1px solid var(--border); font-size: 12px; font-weight: 600; color: var(--text2); cursor: pointer; }
+.user-badge-dot { width: 7px; height: 7px; border-radius: 50%; background: var(--green); }
+.admin-user-card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; }
+.admin-user-avatar { width: 40px; height: 40px; border-radius: 50%; background: var(--accent); color: var(--bg); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: 16px; flex-shrink: 0; }
 </style>
 </head>
 <body>
+
+<!-- ══════════════════════════════════════════
+     SCREEN: LOGIN
+══════════════════════════════════════════ -->
+<div id="screen-login">
+  <div class="login-logo">📦</div>
+  <div class="login-title">SEISA Rutas</div>
+  <div class="login-sub">Sistema de gestión de entregas</div>
+  <div class="login-card">
+    <div class="login-field">
+      <label>Correo electrónico</label>
+      <input type="email" id="login-email" placeholder="usuario@seisa.com" autocomplete="email"
+        onkeydown="if(event.key==='Enter')document.getElementById('login-pass').focus()">
+    </div>
+    <div class="login-field">
+      <label>Contraseña</label>
+      <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password"
+        onkeydown="if(event.key==='Enter')doLogin()">
+    </div>
+    <div class="login-error" id="login-error"></div>
+    <button class="login-btn" id="login-btn" onclick="doLogin()">Iniciar sesión</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SCREEN: ADMIN (solo admin)
+══════════════════════════════════════════ -->
+<div class="screen hidden" id="screen-admin">
+  <div class="topbar">
+    <button class="topbar-back" onclick="showScreen('home')">←</button>
+    <h2>⚙️ Panel de Admin</h2>
+  </div>
+  <div class="scroll" style="padding:16px;display:flex;flex-direction:column;gap:16px;">
+
+    <!-- Crear usuario -->
+    <div class="card">
+      <div style="font-size:13px;font-weight:700;margin-bottom:12px;color:var(--accent);">➕ Crear usuario</div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div class="field"><label>Nombre</label><input type="text" id="nu-nombre" placeholder="Juan Pérez"></div>
+        <div class="field"><label>Correo</label><input type="email" id="nu-email" placeholder="juan@seisa.com"></div>
+        <div class="field"><label>Contraseña</label><input type="password" id="nu-pass" placeholder="mínimo 6 caracteres"></div>
+        <div class="field">
+          <label>Rol</label>
+          <select id="nu-rol" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--text);font-family:var(--sans);font-size:14px;">
+            <option value="operador">🚚 Operador</option>
+            <option value="admin">⚙️ Administrador</option>
+          </select>
+        </div>
+        <div id="nu-error" style="font-size:12px;color:var(--red);min-height:14px;"></div>
+        <button class="btn btn-accent" onclick="crearUsuario()">Crear usuario</button>
+      </div>
+    </div>
+
+    <!-- Lista de usuarios -->
+    <div class="card">
+      <div style="font-size:13px;font-weight:700;margin-bottom:12px;color:var(--accent);">👥 Usuarios registrados</div>
+      <div id="admin-users-list" style="display:flex;flex-direction:column;gap:10px;">
+        <div style="color:var(--text3);font-size:13px;">Cargando...</div>
+      </div>
+    </div>
+
+  </div>
+</div>
 
 <!-- ══════════════════════════════════════════
      SCREEN: HOME / RUTA
 ══════════════════════════════════════════ -->
 <div class="screen" id="screen-home">
   <div class="home-header">
-    <div class="home-greeting">Bienvenido,</div>
-    <div class="home-name">Daniel <span>Ulises</span></div>
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div class="home-greeting">Bienvenido,</div>
+        <div class="home-name" id="home-user-name">—</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+        <div class="user-badge" onclick="doLogout()">
+          <div class="user-badge-dot"></div>
+          <span id="home-user-rol">operador</span>
+          <span style="font-size:10px;color:var(--text3);">· Salir</span>
+        </div>
+        <div id="admin-btn-wrap" style="display:none;">
+          <button class="btn btn-ghost btn-sm" onclick="abrirAdmin()" style="font-size:11px;padding:4px 10px;">⚙️ Admin</button>
+        </div>
+      </div>
+    </div>
   </div>
   <div class="stats-row">
     <div class="stat-card"><div class="stat-n" id="stat-total">0</div><div class="stat-l">Total</div></div>
@@ -1469,8 +1571,9 @@ select option { background: var(--surface2); }
 <!-- Firebase -->
 <script type="module">
 import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query, orderBy, where } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 import { getStorage, ref as storageRef, uploadBytes, getDownloadURL } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-storage.js';
+import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged, createUserWithEmailAndPassword } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
 // ─── FIREBASE CONFIG ────────────────────────────────────────────────
 const firebaseConfig = {
@@ -1484,9 +1587,146 @@ const firebaseConfig = {
 const fireApp = initializeApp(firebaseConfig);
 const db = getFirestore(fireApp);
 const storage = getStorage(fireApp);
+const auth = getAuth(fireApp);
 const COL = 'paquetes';
+const COL_USERS = 'usuarios';
 
-// ─── EXTRACCIÓN DE ETIQUETAS — usa Claude API (Anthropic) ───────────
+// Usuario actual
+let currentUser = null;  // { uid, email, nombre, rol } rol: 'admin' | 'operador'
+
+// ─── AUTH ──────────────────────────────────────────────────────────────
+function mostrarLogin() { document.getElementById('screen-login').classList.remove('hidden'); }
+function ocultarLogin() { document.getElementById('screen-login').classList.add('hidden'); }
+
+window.doLogin = async function() {
+  const email = document.getElementById('login-email').value.trim();
+  const pass  = document.getElementById('login-pass').value;
+  const errEl = document.getElementById('login-error');
+  const btn   = document.getElementById('login-btn');
+  errEl.textContent = '';
+  if (!email || !pass) { errEl.textContent = 'Ingresa correo y contraseña'; return; }
+  btn.textContent = 'Entrando...'; btn.disabled = true;
+  try {
+    await signInWithEmailAndPassword(auth, email, pass);
+  } catch(e) {
+    btn.textContent = 'Iniciar sesión'; btn.disabled = false;
+    const msgs = {
+      'auth/user-not-found':'Usuario no encontrado',
+      'auth/wrong-password':'Contraseña incorrecta',
+      'auth/invalid-credential':'Correo o contraseña incorrectos',
+      'auth/too-many-requests':'Demasiados intentos. Espera un momento',
+      'auth/invalid-email':'Correo inválido',
+    };
+    errEl.textContent = msgs[e.code] || 'Error al iniciar sesión';
+  }
+};
+
+window.doLogout = async function() {
+  if (!confirm('¿Cerrar sesión?')) return;
+  await signOut(auth);
+};
+
+onAuthStateChanged(auth, async (user) => {
+  if (user) {
+    try {
+      const snap = await getDocs(query(collection(db, COL_USERS), where('uid', '==', user.uid)));
+      if (!snap.empty) {
+        const data = snap.docs[0].data();
+        currentUser = { uid: user.uid, email: user.email, nombre: data.nombre || user.email, rol: data.rol || 'operador' };
+      } else {
+        // Si no hay perfil, crear uno automáticamente como admin (primer usuario)
+        currentUser = { uid: user.uid, email: user.email, nombre: user.email, rol: 'admin' };
+        await addDoc(collection(db, COL_USERS), { uid: user.uid, nombre: user.email, email: user.email, rol: 'admin', createdAt: new Date().toISOString() });
+      }
+    } catch(e) {
+      currentUser = { uid: user.uid, email: user.email, nombre: user.email, rol: 'operador' };
+    }
+    ocultarLogin();
+    actualizarUIUsuario();
+    await loadRecords();
+    updateStats();
+  } else {
+    currentUser = null;
+    mostrarLogin();
+    document.getElementById('login-btn').textContent = 'Iniciar sesión';
+    document.getElementById('login-btn').disabled = false;
+  }
+});
+
+function actualizarUIUsuario() {
+  if (!currentUser) return;
+  const partes = currentUser.nombre.split(' ');
+  const el = document.getElementById('home-user-name');
+  if (el) el.innerHTML = `${partes[0]} <span>${partes.slice(1).join(' ')}</span>`;
+  const rolEl = document.getElementById('home-user-rol');
+  if (rolEl) rolEl.textContent = currentUser.rol === 'admin' ? '⚙️ Admin' : '🚚 Operador';
+  const adminBtn = document.getElementById('admin-btn-wrap');
+  if (adminBtn) adminBtn.style.display = currentUser.rol === 'admin' ? 'block' : 'none';
+}
+
+// ─── ADMIN ────────────────────────────────────────────────────────────
+window.abrirAdmin = function() {
+  if (currentUser?.rol !== 'admin') return;
+  showScreen('admin');
+  cargarUsuarios();
+};
+
+async function cargarUsuarios() {
+  const list = document.getElementById('admin-users-list');
+  if (!list) return;
+  list.innerHTML = '<div style="color:var(--text3);font-size:13px;">Cargando...</div>';
+  try {
+    const snap = await getDocs(collection(db, COL_USERS));
+    if (snap.empty) { list.innerHTML = '<div style="color:var(--text3);font-size:13px;">Sin usuarios</div>'; return; }
+    list.innerHTML = snap.docs.map(d => {
+      const u = d.data();
+      const init = (u.nombre || u.email || '?')[0].toUpperCase();
+      return `<div class="admin-user-card">
+        <div class="admin-user-avatar">${init}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:14px;font-weight:700;">${u.nombre || '—'}</div>
+          <div style="font-size:11px;color:var(--text3);">${u.email}</div>
+          <div style="font-size:11px;margin-top:2px;color:${u.rol==='admin'?'var(--accent)':'var(--green)'};">${u.rol==='admin'?'⚙️ Admin':'🚚 Operador'}</div>
+        </div>
+        <button onclick="eliminarUsuario('${d.id}','${u.email}')" style="background:none;border:none;color:var(--red);font-size:20px;cursor:pointer;padding:4px;">🗑</button>
+      </div>`;
+    }).join('');
+  } catch(e) {
+    list.innerHTML = '<div style="color:var(--red);font-size:13px;">Error al cargar</div>';
+  }
+}
+
+window.crearUsuario = async function() {
+  const nombre = document.getElementById('nu-nombre').value.trim();
+  const email  = document.getElementById('nu-email').value.trim();
+  const pass   = document.getElementById('nu-pass').value;
+  const rol    = document.getElementById('nu-rol').value;
+  const errEl  = document.getElementById('nu-error');
+  errEl.textContent = '';
+  if (!nombre || !email || !pass) { errEl.textContent = 'Completa todos los campos'; return; }
+  if (pass.length < 6) { errEl.textContent = 'Contraseña mínimo 6 caracteres'; return; }
+  try {
+    const cred = await createUserWithEmailAndPassword(auth, email, pass);
+    await addDoc(collection(db, COL_USERS), { uid: cred.user.uid, nombre, email, rol, createdAt: new Date().toISOString() });
+    document.getElementById('nu-nombre').value = '';
+    document.getElementById('nu-email').value = '';
+    document.getElementById('nu-pass').value = '';
+    showToast(`✅ Usuario ${nombre} creado`);
+    cargarUsuarios();
+  } catch(e) {
+    const msgs = { 'auth/email-already-in-use':'Correo ya registrado', 'auth/invalid-email':'Correo inválido', 'auth/weak-password':'Contraseña muy débil' };
+    errEl.textContent = msgs[e.code] || ('Error: ' + e.message);
+  }
+};
+
+window.eliminarUsuario = async function(docId, email) {
+  if (!confirm(`¿Eliminar usuario ${email}?`)) return;
+  try {
+    await deleteDoc(doc(db, COL_USERS, docId));
+    showToast('Usuario eliminado');
+    cargarUsuarios();
+  } catch(e) { showToast('Error al eliminar'); }
+};
 
 // ─── MESSAGES ────────────────────────────────────────────────────────
 const MSG_PRESENTACION = `¡ Hola ! Soy Daniel Ulises Valdes Torres de paqueteria y estare a cargo de la ruta que te entregara tu pedido de Grupo Walmart. Te avisare cuando vaya en camino a tu domicilio. Es importante que muestres tu orden de compra, ya sea impresa o digital. Te agradeceria que nos compartas referencias o indicaciones adicionales sobre tu direccion si es necesario. Si requieres asistencia, puedes comunicarte con nuestro equipo de atencion a clientes al 800 WALMART (9256278)`;
@@ -1521,6 +1761,7 @@ window.showScreen = function(name) {
   currentScreen = name;
   if (name === 'db') renderDB();
   if (name === 'home') renderRoute();
+  if (name === 'admin') cargarUsuarios();
   if (name === 'nueva-ruta') initNuevaRutaScreen();
   if (name === 'navegacion') renderNavStops();
   // Si había navegación activa y regresamos a nav-guiada, restaurar mapa
@@ -4344,7 +4585,7 @@ window.enviarFinDeRuta = async function() {
 };
 
 // ─── INIT ─────────────────────────────────────────────────────────────
-loadRecords();
+// La carga de datos se maneja en onAuthStateChanged
 updateRutaActivaBar();
 </script>
 <!-- ══════════════════════════════════════════
