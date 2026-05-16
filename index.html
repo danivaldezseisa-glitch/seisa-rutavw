@@ -8242,213 +8242,41 @@ function renderExcGuiasList() {
   const container = document.getElementById('cam-exc-guias-list');
   if (!container) return;
 
-  // Recopilar todas las guías de los registros activos en la ruta
+  // Guías: usar trackingsDetectados (etiquetas escaneadas) primero,
+  // luego allRecords como respaldo
   const guias = [];
   const seen  = new Set();
 
-  // 1. Guías de las paradas de navParadas (via clientId → allRecords)
-  if (typeof navParadas !== 'undefined') {
-    navParadas.forEach(function(p) {
-      if (p.esRetorno) return;
-      const cid = p.clientId || p.id;
-      const r = (typeof allRecords !== 'undefined' ? allRecords : []).find(x => x.id === cid);
-      if (r) {
-        const gs = Array.isArray(r.trackings) ? r.trackings : (r.tracking ? [r.tracking] : []);
-        gs.forEach(function(g) {
-          if (g && !seen.has(g)) { seen.add(g); guias.push({ guia: g, nombre: r.nombre || '', entregada: !!r.entregado }); }
-        });
+  // Fuente 1: etiquetas escaneadas con el escáner masivo
+  if (typeof trackingsDetectados !== 'undefined' && trackingsDetectados.length) {
+    trackingsDetectados.forEach(function(t) {
+      const g = t.tracking || t;
+      if (g && !seen.has(g)) {
+        seen.add(g);
+        // buscar si ya tiene registro en allRecords
+        const r = (typeof allRecords !== 'undefined' ? allRecords : [])
+          .find(function(x) {
+            const gs = Array.isArray(x.trackings) ? x.trackings : (x.tracking ? [x.tracking] : []);
+            return gs.includes(g);
+          });
+        guias.push({ guia: g, nombre: r?.nombre || '', entregada: !!(r?.entregado) });
       }
     });
   }
 
-  // 2. Si no hay guías de navParadas, usar allRecords del día
-  if (!guias.length && typeof allRecords !== 'undefined') {
+  // Fuente 2: allRecords (paquetes en ruta)
+  if (typeof allRecords !== 'undefined') {
     allRecords.forEach(function(r) {
       const gs = Array.isArray(r.trackings) ? r.trackings : (r.tracking ? [r.tracking] : []);
       gs.forEach(function(g) {
-        if (g && !seen.has(g)) { seen.add(g); guias.push({ guia: g, nombre: r.nombre || '', entregada: !!r.entregado }); }
+        if (g && !seen.has(g)) {
+          seen.add(g);
+          guias.push({ guia: g, nombre: r.nombre || '', entregada: !!r.entregado });
+        }
       });
     });
   }
-
-  if (!guias.length) {
-    container.innerHTML = '<div style="font-size:12px;color:var(--text3);padding:8px;text-align:center;">Sin guías en la ruta activa</div>';
-    return;
-  }
-
-  // Crear elementos DOM para evitar problemas de escape en template literals
-  container.innerHTML = '';
-  guias.forEach(function(item) {
-    const isSelected  = item.guia === _excGuia;
-    const div = document.createElement('div');
-    div.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 13px;'
-      + 'background:' + (isSelected ? 'rgba(255,145,0,.15)' : 'var(--surface2)') + ';'
-      + 'border:1.5px solid ' + (isSelected ? 'var(--orange)' : 'var(--border)') + ';'
-      + 'border-radius:10px;cursor:pointer;transition:all .15s;';
-    div.innerHTML = '<div style="flex:1;min-width:0;">'
-      + '<div style="font-size:13px;font-weight:700;font-family:var(--mono);color:var(--orange);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'
-      + (isSelected ? '✓ ' : '') + item.guia + '</div>'
-      + (item.nombre ? '<div style="font-size:10px;color:var(--text3);margin-top:1px;">' + item.nombre.split(' ')[0] + '</div>' : '')
-      + '</div>'
-      + (item.entregada ? '<span style="font-size:10px;color:var(--green);font-weight:600;">✓ Entregada</span>' : '');
-    div.addEventListener('click', (function(g) { return function() { excSeleccionarGuia(g); }; })(item.guia));
-    container.appendChild(div);
-  });
 }
-
-window.excSeleccionarGuia = function(guia) {
-  _excGuia = guia;
-  // Actualizar input manual
-  const input = document.getElementById('cam-exc-guia');
-  if (input) input.value = guia;
-  // Mostrar guía seleccionada
-  const val  = document.getElementById('cam-exc-guia-val');
-  const valT = document.getElementById('cam-exc-guia-val-text');
-  if (val)  val.style.display = 'block';
-  if (valT) valT.textContent  = guia;
-  // Re-renderizar lista para marcar seleccionada
-  renderExcGuiasList();
-};
-
-window.excAbrirEscaner = function() {
-  const wrap  = document.getElementById('cam-exc-scanner-wrap');
-  const video = document.getElementById('cam-exc-video');
-  if (!wrap || !video) return;
-  wrap.style.display = 'block';
-  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-    .then(function(stream) {
-      _excStream = stream;
-      video.srcObject = stream;
-      video.play();
-      _excLeerFrames(video);
-    })
-    .catch(function(e) { wrap.style.display = 'none'; showToast('No se pudo acceder a la cámara'); });
-};
-
-window.excDetenerEscaner = function() {
-  if (_excFrame) { cancelAnimationFrame(_excFrame); _excFrame = null; }
-  if (_excStream) { _excStream.getTracks().forEach(t => t.stop()); _excStream = null; }
-  const wrap = document.getElementById('cam-exc-scanner-wrap');
-  if (wrap) wrap.style.display = 'none';
-};
-
-function _excLeerFrames(video) {
-  const canvas = document.getElementById('cam-exc-canvas');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-  function frame() {
-    if (!_excStream) return;
-    if (video.readyState === video.HAVE_ENOUGH_DATA) {
-      canvas.width = video.videoWidth; canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0);
-      const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      if (typeof jsQR === 'function') {
-        const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
-        if (code && code.data && code.data.length > 3) {
-          const g = code.data.trim().toUpperCase();
-          if (g.startsWith('MX') || g.startsWith('FLD')) {
-            _excGuiaDetectada(code.data.trim());
-            return;
-          }
-        }
-      }
-    }
-    _excFrame = requestAnimationFrame(frame);
-  }
-  _excFrame = requestAnimationFrame(frame);
-}
-
-function _excGuiaDetectada(guia) {
-  excDetenerEscaner();
-  excSeleccionarGuia(guia);
-  if (navigator.vibrate) navigator.vibrate(120);
-  showToast('✅ Guía: ' + guia.slice(0, 20));
-}
-
-window.excGuiaManual = function() {
-  const input = document.getElementById('cam-exc-guia');
-  if (!input || !input.value.trim()) return;
-  excSeleccionarGuia(input.value.trim());
-  input.value = '';
-};
-
-window.abrirModalExcepcion = function(tipo, icon, label) {
-  // Cerrar overlay de excepción si está abierto
-  const ov = document.getElementById('exc-parada-overlay');
-  if (ov) ov.remove();
-  const dd = document.getElementById('exc-dropdown');
-  if (dd) dd.classList.remove('open');
-  const ar = document.getElementById('exc-arrow');
-  if (ar) ar.textContent = '▲';
-
-  // Si viene de navParadas, asegurar que currentClientId esté seteado
-  if (!currentClientId && typeof navParadas !== 'undefined' && navParadas[navParadaActual]) {
-    const pActual = navParadas[navParadaActual];
-    currentClientId = pActual.clientId || pActual.id || null;
-  }
-
-  excTipo = tipo;
-  excLabel = label;
-  camModo = 'excepcion';
-  _excGuia = '';
-
-  // Resetear estado de la pantalla de cámara
-  const r = allRecords.find(x => x.id === currentClientId);
-  capturedPhotos = [];
-  document.getElementById('photos-thumbs').innerHTML = '';
-  document.getElementById('photos-preview').style.display = 'none';
-  document.getElementById('btn-send-photos').style.display = 'none';
-  document.getElementById('btn-mark-done-camera').style.display = 'none';
-  document.getElementById('cam-file-input').value = '';
-  document.getElementById('cam-client-name').textContent = r?.nombre?.split(' ')[0] || '';
-
-  // Configurar modo excepción
-  document.getElementById('cam-screen-title').textContent = '⚠️ Registrar Excepción';
-  document.getElementById('cam-entrega-cards').style.display = 'none';
-  document.getElementById('cam-excepcion-card').style.display = 'block';
-  document.getElementById('cam-exc-icon').textContent = icon;
-  document.getElementById('cam-exc-label').textContent = label;
-  document.getElementById('cam-exc-comentario').value = '';
-  const excGuiaInput = document.getElementById('cam-exc-guia'); if (excGuiaInput) excGuiaInput.value = '';
-  const excGuiaVal   = document.getElementById('cam-exc-guia-val'); if (excGuiaVal) excGuiaVal.style.display = 'none';
-  const excGuiaValT  = document.getElementById('cam-exc-guia-val-text'); if (excGuiaValT) excGuiaValT.textContent = '';
-  if (typeof excDetenerEscaner === 'function') excDetenerEscaner();
-  // Cargar lista de guías de la ruta activa
-  if (typeof renderExcGuiasList === 'function') renderExcGuiasList();
-
-  showScreen('camera');
-};
-
-// ─── FOTOS EXCEPCION EN PANTALLA CLIENTE ─────────────────────────────
-document.getElementById('c-excepcion-file-input').addEventListener('change', async function() {
-  const files = Array.from(this.files);
-  if (!files.length || !currentClientId) return;
-  const r = allRecords.find(x => x.id === currentClientId);
-  const grid = document.getElementById('c-fotos-excepcion-grid');
-  for (const file of files) {
-    const reader = new FileReader();
-    const dataUrl = await new Promise(res => { reader.onload = e => res(e.target.result); reader.readAsDataURL(file); });
-    const img = document.createElement('img');
-    img.src = dataUrl;
-    img.style.cssText = 'width:80px;height:80px;object-fit:cover;border-radius:8px;border:2px solid var(--orange);cursor:pointer;';
-    img.onclick = () => verFotoCompleta(dataUrl);
-    grid.appendChild(img);
-    try {
-      const tracking = r?.tracking || r?.trackings?.[0] || 'sin-tracking';
-      const path = `excepciones/${tracking}_${Date.now()}.jpg`;
-      const ref = storageRef(storage, path);
-      await uploadBytes(ref, file, { contentType: file.type || 'image/jpeg' });
-      const url = await getDownloadURL(ref);
-      const prevFotos = Array.isArray(r?.fotosExcepcion) ? r.fotosExcepcion : [];
-      const mergedFotos = [...prevFotos, url];
-      await updateDoc(doc(db, COL, currentClientId), { fotosExcepcion: mergedFotos });
-      const idx = allRecords.findIndex(x => x.id === currentClientId);
-      if (idx >= 0) allRecords[idx] = { ...allRecords[idx], fotosExcepcion: mergedFotos };
-      showToast(`⚠️ Foto de excepción guardada`);
-    } catch(e) { showToast('⚠️ Foto local lista, error al subir'); }
-  }
-  this.value = '';
-});
 
 // ─── FIN DE RUTA ─────────────────────────────────────────────────────
 let finRutaFotos = [];
