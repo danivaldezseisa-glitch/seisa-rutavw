@@ -2568,6 +2568,49 @@ let allRecords = [];
 // navPuntoInicial, navPuntoFinal y savePuntosFijos declarados en script pre-módulo
 let currentClientId = null;
 let currentScreen = 'home';
+
+// ── Botón físico de atrás (Android/iOS) ──────────────────────────────────
+// Mapa: en qué pantalla estoy → a dónde regreso
+const _backMap = {
+  'scan':         'home',
+  'scan-entrega': 'nav-guiada',
+  'client':       'home',
+  'camera':       'client',
+  'nueva-ruta':   'home',
+  'navegacion':   'home',
+  'nav-guiada':   'home',
+  'db':           'home',
+  'historial':    'home',
+  'admin':        'home',
+};
+
+window.addEventListener('popstate', function() {
+  // Siempre re-insertar la entrada trampa para que nunca salga de la app
+  history.pushState({ app: true }, '');
+
+  // 1. Cerrar overlays flotantes primero
+  const overlay = document.getElementById('se-dup-overlay') ||
+                  document.getElementById('exc-parada-overlay');
+  if (overlay) { overlay.remove(); return; }
+
+  // 2. Cerrar modal abierto
+  const modal = document.querySelector('.modal.open');
+  if (modal) { if (typeof closeModal === 'function') closeModal(modal.id); return; }
+
+  // 3. scan-entrega: cerrar escáner limpiamente
+  if (currentScreen === 'scan-entrega') {
+    if (typeof cerrarScanEntrega === 'function') cerrarScanEntrega();
+    return;
+  }
+
+  // 4. En home: no hacer nada (ya reinsertamos la trampa arriba)
+  if (currentScreen === 'home') return;
+
+  // 5. Navegar a pantalla anterior
+  const dest = _backMap[currentScreen] || 'home';
+  if (typeof showScreen === 'function') showScreen(dest);
+});
+
 let capturedPhotos = [];
 let camReceptor = 'cliente';
 let camVerificacion = 'nopedido';
@@ -2622,6 +2665,8 @@ window.showScreen = function(name) {
   currentScreen = name;
   // Guardar pantalla actual para restaurarla al regresar
   saveCurrentScreen(name, name === 'client' ? currentClientId : null);
+  // Pushear al historial del navegador para soporte del botón físico de atrás
+  history.pushState({ app: true, screen: name }, '');
   if (name === 'db') renderDB();
   if (name === 'home') renderRoute();
   if (name === 'admin') cargarUsuarios();
@@ -8646,6 +8691,11 @@ window._moduloCargado = true;
 document.dispatchEvent(new Event('modulo-listo'));
 console.log('✅ Módulo completo cargado');
 updateRutaActivaBar();
+// Sembrar dos entradas en el historial:
+// - La primera es la 'trampa' que atrapa el popstate sin salir de la app
+// - La segunda es la actual (home)
+history.replaceState({ app: true, screen: 'home' }, '');
+history.pushState({ app: true, screen: 'home' }, '');
 </script>
 
 <!-- ─── MÓDULO: ESCANEO DE GUÍA EN ENTREGA ──────────────────────────────── -->
