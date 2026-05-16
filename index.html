@@ -6230,27 +6230,9 @@ window.widgetEntregada = function() {
 
 window.widgetFallida = function() {
   const p = navParadas[navParadaActual];
-  if (p && !p.esRetorno) {
-    const horaFallida = new Date().toISOString();
-    p.fallida = true;
-    p.hecha = true;
-    p.horaFallida = horaFallida;
-    saveNavParadas();
-    // Refrescar lista ANTES de avanzar para que se vea la hora
-    if (typeof renderListaParadas === 'function') renderListaParadas();
-    // Avanzar
-    navParadaActual = Math.min(navParadaActual + 1, navParadas.length - 1);
-    saveNavParadas();
-    showToast('⚠️ Fallida · ' + (() => { const d=new Date(horaFallida); const h=d.getHours()%12||12; const m=String(d.getMinutes()).padStart(2,'0'); const ap=d.getHours()>=12?'PM':'AM'; return h+':'+m+' '+ap; })());
-    if (typeof actualizarWidgetNav === 'function') actualizarWidgetNav();
-    if (typeof renderNavGuiada === 'function') renderNavGuiada();
-    if (typeof renderListaParadas === 'function') renderListaParadas();
-    // Abrir Maps hacia siguiente
-    const sig = navParadas[navParadaActual];
-    if (sig) setTimeout(() => {
-      window.open('https://www.google.com/maps/dir/?api=1&destination=' + sig.lat + ',' + sig.lng + '&travelmode=driving', '_blank');
-    }, 600);
-  }
+  if (!p || p.esRetorno) return;
+  // Abrir menú de excepciones → cámara → WhatsApp → siguiente parada
+  abrirExcepcionParada(navParadaActual);
 }
 
 // ── Deshacer última entregada o fallida ──────────────────────────────
