@@ -8696,6 +8696,49 @@ updateRutaActivaBar();
 // - La segunda es la actual (home)
 history.replaceState({ app: true, screen: 'home' }, '');
 history.pushState({ app: true, screen: 'home' }, '');
+
+// ── Registrar Service Worker para modo PWA standalone ────────────────
+// En modo standalone Android ya no captura el gesto de atrás
+if ('serviceWorker' in navigator) {
+  const swCode = `
+    self.addEventListener('install', e => self.skipWaiting());
+    self.addEventListener('activate', e => clients.claim());
+    self.addEventListener('fetch', e => e.respondWith(fetch(e.request).catch(() => caches.match(e.request))));
+  `;
+  const swBlob = new Blob([swCode], { type: 'application/javascript' });
+  const swUrl  = URL.createObjectURL(swBlob);
+  navigator.serviceWorker.register(swUrl, { scope: './' })
+    .then(() => console.log('✅ Service Worker registrado — PWA activa'))
+    .catch(e => console.warn('SW:', e));
+}
+
+// ── Detectar si está corriendo como PWA standalone ───────────────────
+window._isPWA = window.matchMedia('(display-mode: standalone)').matches
+             || window.navigator.standalone === true;
+if (window._isPWA) {
+  console.log('✅ Modo PWA standalone — gestos del sistema desactivados');
+} else {
+  console.log('⚠️ Modo navegador — instala la app para desactivar gestos');
+  // Mostrar banner de instalación si no está instalada
+  window.addEventListener('beforeinstallprompt', function(e) {
+    e.preventDefault();
+    window._installPrompt = e;
+    // Mostrar botón de instalación discreto
+    const banner = document.createElement('div');
+    banner.id = 'pwa-install-banner';
+    banner.style.cssText = 'position:fixed;bottom:70px;left:50%;transform:translateX(-50%);'
+      + 'background:var(--accent);color:var(--bg);padding:10px 20px;border-radius:20px;'
+      + 'font-size:13px;font-weight:700;cursor:pointer;z-index:8000;box-shadow:0 4px 20px rgba(0,212,255,.4);'
+      + 'white-space:nowrap;';
+    banner.textContent = '📲 Instalar app SEISA';
+    banner.onclick = function() {
+      window._installPrompt.prompt();
+      banner.remove();
+    };
+    document.body.appendChild(banner);
+    setTimeout(() => { if (banner.parentNode) banner.remove(); }, 8000);
+  });
+}
 </script>
 
 <!-- ─── MÓDULO: ESCANEO DE GUÍA EN ENTREGA ──────────────────────────────── -->
