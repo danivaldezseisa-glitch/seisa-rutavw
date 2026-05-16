@@ -1921,16 +1921,23 @@ Casa verde, 8Q4F+HP México" style="
           <span id="cam-exc-icon" style="font-size:22px;">⚠️</span>
           <span id="cam-exc-label" style="font-size:15px;font-weight:700;color:var(--orange);">—</span>
         </div>
-        <!-- Guía de la excepción -->
-        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">🔖 Guía</div>
-        <div style="display:flex;gap:8px;margin-bottom:10px;">
-          <input type="text" id="cam-exc-guia" placeholder="Escanea o escribe la guía..."
-            style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--text);font-size:13px;font-family:var(--mono);outline:none;"
-            onkeydown="if(event.key==='Enter')excGuiaManual()">
-          <button class="btn btn-ghost btn-sm" onclick="excAbrirEscaner()" style="flex-shrink:0;padding:8px 12px;">📷</button>
+        <!-- Guías de la ruta para seleccionar -->
+        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;font-weight:600;">🔖 Seleccionar guía</div>
+        <!-- Lista de guías de la ruta -->
+        <div id="cam-exc-guias-list" style="display:flex;flex-direction:column;gap:6px;max-height:180px;overflow-y:auto;margin-bottom:8px;"></div>
+        <!-- Guía seleccionada -->
+        <div id="cam-exc-guia-val" style="display:none;padding:10px 13px;background:rgba(255,145,0,.12);border:1px solid rgba(255,145,0,.4);border-radius:10px;margin-bottom:8px;">
+          <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px;">Guía seleccionada</div>
+          <div id="cam-exc-guia-val-text" style="font-size:14px;font-weight:700;color:var(--orange);font-family:var(--mono);word-break:break-all;"></div>
         </div>
-        <div id="cam-exc-guia-val" style="display:none;padding:8px 12px;background:rgba(255,145,0,.1);border:1px solid rgba(255,145,0,.3);border-radius:8px;font-size:13px;font-weight:700;color:var(--orange);font-family:var(--mono);margin-bottom:10px;word-break:break-all;"></div>
-        <!-- Escáner inline para excepción -->
+        <!-- Campo manual + escáner -->
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <input type="text" id="cam-exc-guia" placeholder="O escribe/escanea la guía..."
+            style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px 13px;color:var(--text);font-size:13px;font-family:var(--mono);outline:none;"
+            onkeydown="if(event.key==='Enter')excGuiaManual()">
+          <button class="btn btn-ghost btn-sm" onclick="excAbrirEscaner()" style="flex-shrink:0;padding:8px 12px;" title="Escanear">📷</button>
+        </div>
+        <!-- Escáner inline -->
         <div id="cam-exc-scanner-wrap" style="display:none;position:relative;border-radius:10px;overflow:hidden;background:#000;aspect-ratio:4/3;margin-bottom:10px;">
           <video id="cam-exc-video" playsinline autoplay style="width:100%;height:100%;object-fit:cover;"></video>
           <canvas id="cam-exc-canvas" style="display:none;"></canvas>
@@ -8230,6 +8237,79 @@ let _excStream = null;
 let _excFrame  = null;
 let _excGuia   = '';
 
+// ── Renderizar lista de guías de la ruta para selección en excepción ─────
+function renderExcGuiasList() {
+  const container = document.getElementById('cam-exc-guias-list');
+  if (!container) return;
+
+  // Recopilar todas las guías de los registros activos en la ruta
+  const guias = [];
+  const seen  = new Set();
+
+  // 1. Guías de las paradas de navParadas (via clientId → allRecords)
+  if (typeof navParadas !== 'undefined') {
+    navParadas.forEach(function(p) {
+      if (p.esRetorno) return;
+      const cid = p.clientId || p.id;
+      const r = (typeof allRecords !== 'undefined' ? allRecords : []).find(x => x.id === cid);
+      if (r) {
+        const gs = Array.isArray(r.trackings) ? r.trackings : (r.tracking ? [r.tracking] : []);
+        gs.forEach(function(g) {
+          if (g && !seen.has(g)) { seen.add(g); guias.push({ guia: g, nombre: r.nombre || '', entregada: !!r.entregado }); }
+        });
+      }
+    });
+  }
+
+  // 2. Si no hay guías de navParadas, usar allRecords del día
+  if (!guias.length && typeof allRecords !== 'undefined') {
+    allRecords.forEach(function(r) {
+      const gs = Array.isArray(r.trackings) ? r.trackings : (r.tracking ? [r.tracking] : []);
+      gs.forEach(function(g) {
+        if (g && !seen.has(g)) { seen.add(g); guias.push({ guia: g, nombre: r.nombre || '', entregada: !!r.entregado }); }
+      });
+    });
+  }
+
+  if (!guias.length) {
+    container.innerHTML = '<div style="font-size:12px;color:var(--text3);padding:8px;text-align:center;">Sin guías en la ruta activa</div>';
+    return;
+  }
+
+  // Crear elementos DOM para evitar problemas de escape en template literals
+  container.innerHTML = '';
+  guias.forEach(function(item) {
+    const isSelected  = item.guia === _excGuia;
+    const div = document.createElement('div');
+    div.style.cssText = 'display:flex;align-items:center;gap:10px;padding:10px 13px;'
+      + 'background:' + (isSelected ? 'rgba(255,145,0,.15)' : 'var(--surface2)') + ';'
+      + 'border:1.5px solid ' + (isSelected ? 'var(--orange)' : 'var(--border)') + ';'
+      + 'border-radius:10px;cursor:pointer;transition:all .15s;';
+    div.innerHTML = '<div style="flex:1;min-width:0;">'
+      + '<div style="font-size:13px;font-weight:700;font-family:var(--mono);color:var(--orange);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'
+      + (isSelected ? '✓ ' : '') + item.guia + '</div>'
+      + (item.nombre ? '<div style="font-size:10px;color:var(--text3);margin-top:1px;">' + item.nombre.split(' ')[0] + '</div>' : '')
+      + '</div>'
+      + (item.entregada ? '<span style="font-size:10px;color:var(--green);font-weight:600;">✓ Entregada</span>' : '');
+    div.addEventListener('click', (function(g) { return function() { excSeleccionarGuia(g); }; })(item.guia));
+    container.appendChild(div);
+  });
+}
+
+window.excSeleccionarGuia = function(guia) {
+  _excGuia = guia;
+  // Actualizar input manual
+  const input = document.getElementById('cam-exc-guia');
+  if (input) input.value = guia;
+  // Mostrar guía seleccionada
+  const val  = document.getElementById('cam-exc-guia-val');
+  const valT = document.getElementById('cam-exc-guia-val-text');
+  if (val)  val.style.display = 'block';
+  if (valT) valT.textContent  = guia;
+  // Re-renderizar lista para marcar seleccionada
+  renderExcGuiasList();
+};
+
 window.excAbrirEscaner = function() {
   const wrap  = document.getElementById('cam-exc-scanner-wrap');
   const video = document.getElementById('cam-exc-video');
@@ -8280,11 +8360,7 @@ function _excLeerFrames(video) {
 
 function _excGuiaDetectada(guia) {
   excDetenerEscaner();
-  _excGuia = guia;
-  const input = document.getElementById('cam-exc-guia');
-  const val   = document.getElementById('cam-exc-guia-val');
-  if (input) input.value = guia;
-  if (val)   { val.textContent = '✅ ' + guia; val.style.display = 'block'; }
+  excSeleccionarGuia(guia);
   if (navigator.vibrate) navigator.vibrate(120);
   showToast('✅ Guía: ' + guia.slice(0, 20));
 }
@@ -8292,7 +8368,8 @@ function _excGuiaDetectada(guia) {
 window.excGuiaManual = function() {
   const input = document.getElementById('cam-exc-guia');
   if (!input || !input.value.trim()) return;
-  _excGuiaDetectada(input.value.trim());
+  excSeleccionarGuia(input.value.trim());
+  input.value = '';
 };
 
 window.abrirModalExcepcion = function(tipo, icon, label) {
@@ -8333,8 +8410,11 @@ window.abrirModalExcepcion = function(tipo, icon, label) {
   document.getElementById('cam-exc-label').textContent = label;
   document.getElementById('cam-exc-comentario').value = '';
   const excGuiaInput = document.getElementById('cam-exc-guia'); if (excGuiaInput) excGuiaInput.value = '';
-  const excGuiaVal   = document.getElementById('cam-exc-guia-val'); if (excGuiaVal) { excGuiaVal.textContent = ''; excGuiaVal.style.display = 'none'; }
-  excDetenerEscaner();
+  const excGuiaVal   = document.getElementById('cam-exc-guia-val'); if (excGuiaVal) excGuiaVal.style.display = 'none';
+  const excGuiaValT  = document.getElementById('cam-exc-guia-val-text'); if (excGuiaValT) excGuiaValT.textContent = '';
+  if (typeof excDetenerEscaner === 'function') excDetenerEscaner();
+  // Cargar lista de guías de la ruta activa
+  if (typeof renderExcGuiasList === 'function') renderExcGuiasList();
 
   showScreen('camera');
 };
