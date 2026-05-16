@@ -1921,9 +1921,29 @@ Casa verde, 8Q4F+HP México" style="
           <span id="cam-exc-icon" style="font-size:22px;">⚠️</span>
           <span id="cam-exc-label" style="font-size:15px;font-weight:700;color:var(--orange);">—</span>
         </div>
+        <!-- Guía de la excepción -->
+        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">🔖 Guía</div>
+        <div style="display:flex;gap:8px;margin-bottom:10px;">
+          <input type="text" id="cam-exc-guia" placeholder="Escanea o escribe la guía..."
+            style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--text);font-size:13px;font-family:var(--mono);outline:none;"
+            onkeydown="if(event.key==='Enter')excGuiaManual()">
+          <button class="btn btn-ghost btn-sm" onclick="excAbrirEscaner()" style="flex-shrink:0;padding:8px 12px;">📷</button>
+        </div>
+        <div id="cam-exc-guia-val" style="display:none;padding:8px 12px;background:rgba(255,145,0,.1);border:1px solid rgba(255,145,0,.3);border-radius:8px;font-size:13px;font-weight:700;color:var(--orange);font-family:var(--mono);margin-bottom:10px;word-break:break-all;"></div>
+        <!-- Escáner inline para excepción -->
+        <div id="cam-exc-scanner-wrap" style="display:none;position:relative;border-radius:10px;overflow:hidden;background:#000;aspect-ratio:4/3;margin-bottom:10px;">
+          <video id="cam-exc-video" playsinline autoplay style="width:100%;height:100%;object-fit:cover;"></video>
+          <canvas id="cam-exc-canvas" style="display:none;"></canvas>
+          <div style="position:absolute;inset:0;pointer-events:none;">
+            <div style="position:absolute;left:5%;right:5%;top:50%;transform:translateY(-50%);height:60px;border:2px solid var(--orange);border-radius:8px;box-shadow:0 0 0 2000px rgba(0,0,0,.45);">
+              <div style="position:absolute;top:0;left:0;right:0;height:2px;background:var(--orange);animation:scanLine 1.2s ease-in-out infinite;"></div>
+            </div>
+          </div>
+          <button onclick="excDetenerEscaner()" style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.6);border:1px solid var(--border);color:#fff;border-radius:8px;padding:4px 10px;font-size:12px;cursor:pointer;">✕ Cerrar</button>
+        </div>
         <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">Comentarios</div>
         <textarea id="cam-exc-comentario" placeholder="Describe la situación..."
-          style="width:100%;height:80px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--text);font-size:14px;font-family:var(--sans);outline:none;resize:none;"></textarea>
+          style="width:100%;height:70px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--text);font-size:14px;font-family:var(--sans);outline:none;resize:none;"></textarea>
       </div>
 
       <div id="photos-preview" style="display:none;" class="card">
@@ -3692,24 +3712,22 @@ window.sendPhotosToWhatsApp = async function() {
   let texto;
 
   if (camModo === 'excepcion') {
-    const comentario = document.getElementById('cam-exc-comentario').value.trim();
-    const guiaLabel = guias.length > 1 ? 'Guías' : 'Guía';
-    const ordenLabel = ordenes.length > 1 ? 'Núms. Pedido' : 'Núm. Pedido';
+    const comentario = document.getElementById('cam-exc-comentario')?.value?.trim() || '';
+    // Usar guía escaneada en la excepción, o la del registro
+    const guiaExc = (_excGuia && _excGuia.length > 0) ? _excGuia
+      : (document.getElementById('cam-exc-guia')?.value?.trim() || tracking);
     texto =
 `⚠️ *EXCEPCIÓN DE ENTREGA*
 ━━━━━━━━━━━━━━━━━━━
 📋 *Tipo:* ${excLabel}
-👤 *Cliente:* ${nombre}
-📦 *${ordenLabel}:* ${orden}
-🔖 *${guiaLabel}:* ${tracking}${comentario ? `\n💬 *Comentario:* ${comentario}` : ''}
+🔖 *Guía:* ${guiaExc}${comentario ? `\n💬 *Comentario:* ${comentario}` : ''}
 ━━━━━━━━━━━━━━━━━━━`;
-    // Guardar excepción en Firestore para el resumen de fin de ruta
+    // Guardar excepción en Firestore
     if (currentClientId) {
       try {
-        await updateDoc(doc(db, COL, currentClientId), { excTipo: excLabel, excComentario: comentario, excepcion: true });
+        await updateDoc(doc(db, COL, currentClientId), { excTipo: excLabel, excComentario: comentario, excepcion: true, guiaEscaneada: guiaExc });
         const idx = allRecords.findIndex(x => x.id === currentClientId);
-        if (idx >= 0) allRecords[idx] = { ...allRecords[idx], excTipo: excLabel, excComentario: comentario, excepcion: true };
-        // Actualizar badge en pantalla del cliente
+        if (idx >= 0) allRecords[idx] = { ...allRecords[idx], excTipo: excLabel, excComentario: comentario, excepcion: true, guiaEscaneada: guiaExc };
         const badge = document.getElementById('client-status-badge');
         if (badge) badge.innerHTML = '<span class="badge badge-orange">⚠️ Excepción de entrega</span>';
       } catch(e) { console.error('Error guardando excepción:', e); }
@@ -6202,12 +6220,36 @@ function actualizarWidgetNav() {
   const refs = [parada.comentario, parada.referencias].filter(Boolean).join(' · ');
   if (refs) { refsEl.textContent = refs; refsEl.style.display = 'block'; }
   else { refsEl.style.display = 'none'; }
+  // Actualizar notificación del sistema
+  if (typeof mostrarNotificacionRuta === 'function') mostrarNotificacionRuta();
 }
 
 window.mostrarWidget = function() {
   crearWidgetNav();
   const w = document.getElementById('nav-widget');
   if (w) { w.style.display = 'flex'; actualizarWidgetNav(); }
+  // También mostrar notificación persistente del sistema (visible fuera de la app)
+  mostrarNotificacionRuta();
+};
+
+// ── Notificación persistente del sistema (visible en barra de notificaciones) ──
+window.mostrarNotificacionRuta = function() {
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
+  const p = navParadas[navParadaActual];
+  if (!p) return;
+  const nombre = p.esRetorno ? '🏠 Regreso a base' : (p.label ? p.label.split(',')[0] : 'Parada ' + (navParadaActual + 1));
+  const total  = navParadas.filter(x => !x.esRetorno).length;
+  const body   = p.esRetorno ? 'Ruta finalizada' : `Parada ${navParadaActual + 1} de ${total}`;
+  try {
+    new Notification('🗺️ SEISA — Ruta en curso', {
+      body:    nombre + '\n' + body,
+      icon:    'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjgwIiBmaWxsPSIjMGExNjI4Ii8+PHRleHQgeD0iMjU2IiB5PSIzMjAiIGZvbnQtZmFtaWx5PSJBcmlhbCBCbGFjayIgZm9udC1zaXplPSIyNDAiIGZpbGw9IiMwMGQ0ZmYiIHRleHQtYW5jaG9yPSJtaWRkbGUiPvCfk608L3RleHQ+PC9zdmc+',
+      tag:     'seisa-ruta-activa',
+      renotify: true,
+      requireInteraction: false,
+      silent:  true,
+    });
+  } catch(e) {}
 }
 
 window.verNavGuiada = function() {
@@ -8199,6 +8241,76 @@ document.addEventListener('click', function(e) {
   }
 });
 
+// ── Variables escáner de guía en excepción ───────────────────────────────
+let _excStream = null;
+let _excFrame  = null;
+let _excGuia   = '';
+
+window.excAbrirEscaner = function() {
+  const wrap  = document.getElementById('cam-exc-scanner-wrap');
+  const video = document.getElementById('cam-exc-video');
+  if (!wrap || !video) return;
+  wrap.style.display = 'block';
+  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
+    .then(function(stream) {
+      _excStream = stream;
+      video.srcObject = stream;
+      video.play();
+      _excLeerFrames(video);
+    })
+    .catch(function(e) { wrap.style.display = 'none'; showToast('No se pudo acceder a la cámara'); });
+};
+
+window.excDetenerEscaner = function() {
+  if (_excFrame) { cancelAnimationFrame(_excFrame); _excFrame = null; }
+  if (_excStream) { _excStream.getTracks().forEach(t => t.stop()); _excStream = null; }
+  const wrap = document.getElementById('cam-exc-scanner-wrap');
+  if (wrap) wrap.style.display = 'none';
+};
+
+function _excLeerFrames(video) {
+  const canvas = document.getElementById('cam-exc-canvas');
+  if (!canvas) return;
+  const ctx = canvas.getContext('2d');
+  function frame() {
+    if (!_excStream) return;
+    if (video.readyState === video.HAVE_ENOUGH_DATA) {
+      canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0);
+      const img = ctx.getImageData(0, 0, canvas.width, canvas.height);
+      if (typeof jsQR === 'function') {
+        const code = jsQR(img.data, img.width, img.height, { inversionAttempts: 'dontInvert' });
+        if (code && code.data && code.data.length > 3) {
+          const g = code.data.trim().toUpperCase();
+          if (g.startsWith('MX') || g.startsWith('FLD')) {
+            _excGuiaDetectada(code.data.trim());
+            return;
+          }
+        }
+      }
+    }
+    _excFrame = requestAnimationFrame(frame);
+  }
+  _excFrame = requestAnimationFrame(frame);
+}
+
+function _excGuiaDetectada(guia) {
+  excDetenerEscaner();
+  _excGuia = guia;
+  const input = document.getElementById('cam-exc-guia');
+  const val   = document.getElementById('cam-exc-guia-val');
+  if (input) input.value = guia;
+  if (val)   { val.textContent = '✅ ' + guia; val.style.display = 'block'; }
+  if (navigator.vibrate) navigator.vibrate(120);
+  showToast('✅ Guía: ' + guia.slice(0, 20));
+}
+
+window.excGuiaManual = function() {
+  const input = document.getElementById('cam-exc-guia');
+  if (!input || !input.value.trim()) return;
+  _excGuiaDetectada(input.value.trim());
+};
+
 window.abrirModalExcepcion = function(tipo, icon, label) {
   // Cerrar overlay de excepción si está abierto
   const ov = document.getElementById('exc-parada-overlay');
@@ -8217,6 +8329,7 @@ window.abrirModalExcepcion = function(tipo, icon, label) {
   excTipo = tipo;
   excLabel = label;
   camModo = 'excepcion';
+  _excGuia = '';
 
   // Resetear estado de la pantalla de cámara
   const r = allRecords.find(x => x.id === currentClientId);
@@ -8235,6 +8348,9 @@ window.abrirModalExcepcion = function(tipo, icon, label) {
   document.getElementById('cam-exc-icon').textContent = icon;
   document.getElementById('cam-exc-label').textContent = label;
   document.getElementById('cam-exc-comentario').value = '';
+  const excGuiaInput = document.getElementById('cam-exc-guia'); if (excGuiaInput) excGuiaInput.value = '';
+  const excGuiaVal   = document.getElementById('cam-exc-guia-val'); if (excGuiaVal) { excGuiaVal.textContent = ''; excGuiaVal.style.display = 'none'; }
+  excDetenerEscaner();
 
   showScreen('camera');
 };
