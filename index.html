@@ -6225,22 +6225,22 @@ window.mostrarWidget = function() {
 
 // ── Notificación persistente del sistema (visible en barra de notificaciones) ──
 window.mostrarNotificacionRuta = function() {
-  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return;
   const p = navParadas[navParadaActual];
   if (!p) return;
-  const nombre = p.esRetorno ? '🏠 Regreso a base' : (p.label ? p.label.split(',')[0] : 'Parada ' + (navParadaActual + 1));
   const total  = navParadas.filter(x => !x.esRetorno).length;
-  const body   = p.esRetorno ? 'Ruta finalizada' : `Parada ${navParadaActual + 1} de ${total}`;
-  try {
-    new Notification('🗺️ SEISA — Ruta en curso', {
-      body:    nombre + '\n' + body,
-      icon:    'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCA1MTIgNTEyIj48cmVjdCB3aWR0aD0iNTEyIiBoZWlnaHQ9IjUxMiIgcng9IjgwIiBmaWxsPSIjMGExNjI4Ii8+PHRleHQgeD0iMjU2IiB5PSIzMjAiIGZvbnQtZmFtaWx5PSJBcmlhbCBCbGFjayIgZm9udC1zaXplPSIyNDAiIGZpbGw9IiMwMGQ0ZmYiIHRleHQtYW5jaG9yPSJtaWRkbGUiPvCfk608L3RleHQ+PC9zdmc+',
-      tag:     'seisa-ruta-activa',
-      renotify: true,
-      requireInteraction: false,
-      silent:  true,
+  const nombre = p.esRetorno
+    ? '🏠 Regreso a base'
+    : (p.label ? p.label.split(',')[0] : 'Parada ' + (navParadaActual + 1));
+
+  if (typeof notifMostrarParada === 'function') {
+    notifMostrarParada({
+      numero:    navParadaActual + 1,
+      total:     total,
+      nombre:    nombre,
+      plusCode:  p.plusCode || '',
+      esRetorno: !!p.esRetorno
     });
-  } catch(e) {}
+  }
 }
 
 window.verNavGuiada = function() {
