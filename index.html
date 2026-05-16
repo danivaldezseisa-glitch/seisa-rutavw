@@ -7436,6 +7436,57 @@ window.navAccionEntregada = function() {
   abrirScanEntrega(p.clientId || p.id, p);
 };
 
+// ── Abrir menú de excepciones desde parada (nav-guiada o lista) ──────────
+window.abrirExcepcionParada = function(idx) {
+  const p = navParadas[idx];
+  if (!p || p.esRetorno) return;
+  // Asegurar currentClientId para que abrirModalExcepcion guarde en el registro correcto
+  const clientId = p.clientId || p.id;
+  if (clientId) { currentClientId = clientId; navParadaActual = idx; }
+
+  // Eliminar overlay previo si existe
+  const prev = document.getElementById('exc-parada-overlay');
+  if (prev) prev.remove();
+
+  const overlay = document.createElement('div');
+  overlay.id = 'exc-parada-overlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.65);'
+    + 'display:flex;align-items:flex-end;';
+
+  overlay.innerHTML = `
+    <div style="background:var(--bg2);border-radius:20px 20px 0 0;width:100%;padding:20px 16px 36px;
+                display:flex;flex-direction:column;gap:10px;">
+      <div style="font-size:14px;font-weight:700;color:var(--orange);margin-bottom:4px;text-align:center;">
+        ⚠️ Registrar excepción
+      </div>
+      <button onclick="document.getElementById('exc-parada-overlay').remove();abrirModalExcepcion('cliente_ausente','🚪','Cliente Ausente')" 
+        class="btn" style="background:var(--surface2);color:var(--text);font-size:14px;justify-content:flex-start;gap:12px;">
+        🚪 Cliente Ausente
+      </button>
+      <button onclick="document.getElementById('exc-parada-overlay').remove();abrirModalExcepcion('cancelado_entrega','❌','Cancelado en la Entrega')" 
+        class="btn" style="background:var(--surface2);color:var(--text);font-size:14px;justify-content:flex-start;gap:12px;">
+        ❌ Cancelado en la Entrega
+      </button>
+      <button onclick="document.getElementById('exc-parada-overlay').remove();abrirModalExcepcion('reprogramar','📅','Reprogramar')" 
+        class="btn" style="background:var(--surface2);color:var(--text);font-size:14px;justify-content:flex-start;gap:12px;">
+        📅 Reprogramar
+      </button>
+      <button onclick="document.getElementById('exc-parada-overlay').remove();abrirModalExcepcion('datos_incorrectos','⚠️','Datos Incorrectos')" 
+        class="btn" style="background:var(--surface2);color:var(--text);font-size:14px;justify-content:flex-start;gap:12px;">
+        ⚠️ Datos Incorrectos
+      </button>
+      <button onclick="document.getElementById('exc-parada-overlay').remove()" 
+        class="btn btn-ghost" style="font-size:14px;margin-top:4px;">
+        Cancelar
+      </button>
+    </div>`;
+
+  overlay.addEventListener('click', function(e) {
+    if (e.target === overlay) overlay.remove();
+  });
+  document.body.appendChild(overlay);
+};
+
 window.navAccionFallida = function() {
   const p = navParadas[navParadaActual];
   if (!p || p.esRetorno) { showToast('Esta es la parada de retorno'); return; }
