@@ -1771,54 +1771,24 @@ Casa verde, 8Q4F+HP México" style="
       </button>
     </div>
 
-    <div class="sec-header">Acciones</div>
-    <div class="action-list">
-      <button class="btn btn-accent" id="btn-whatsapp-intro">
-        💬 Enviar mensaje de presentación
-      </button>
-      <button class="btn btn-ghost" id="btn-whatsapp-camino">
-        🚗 Avisar que voy en camino
-      </button>
-      <button class="btn btn-green" id="btn-open-camera">
-        📸 Abrir cámara de entrega
-      </button>
-      <button class="btn btn-ghost" id="btn-edit-client">
-        ✏️ Editar datos
-      </button>
-
-      <!-- BOTÓN EXCEPCIONES con menú desplegable -->
-      <div class="exc-btn-wrap" id="exc-btn-wrap">
-        <div class="exc-dropdown" id="exc-dropdown">
-          <button class="exc-option" onclick="abrirModalExcepcion('cliente_ausente','🚪','Cliente Ausente')">
-            <span class="exc-option-icon">🚪</span>
-            <span>Cliente Ausente</span>
-          </button>
-          <button class="exc-option" onclick="abrirModalExcepcion('cancelado_entrega','❌','Cancelado en la Entrega')">
-            <span class="exc-option-icon">❌</span>
-            <span>Cancelado en la Entrega</span>
-          </button>
-          <button class="exc-option" onclick="abrirModalExcepcion('reprogramar','📅','Reprogramar')">
-            <span class="exc-option-icon">📅</span>
-            <span>Reprogramar</span>
-          </button>
-          <button class="exc-option" onclick="abrirModalExcepcion('datos_incorrectos','⚠️','Datos Incorrectos')">
-            <span class="exc-option-icon">⚠️</span>
-            <span>Datos Incorrectos</span>
-          </button>
-        </div>
+    <!-- botones ocultos — solo para compatibilidad con JS existente -->
+    <div class="action-list" style="display:none;">
+      <button id="btn-whatsapp-intro"></button>
+      <button id="btn-whatsapp-camino"></button>
+      <button id="btn-open-camera"></button>
+      <button id="btn-edit-client"></button>
+      <div id="exc-btn-wrap">
+        <div id="exc-dropdown"></div>
         <button class="exc-btn" onclick="toggleExcDropdown()">
-          ⚠️ Excepciones
-          <span id="exc-arrow" style="margin-left:auto;font-size:12px;">▲</span>
+          <span id="exc-arrow"></span>
         </button>
       </div>
-
-      <button class="btn btn-red" id="btn-mark-done" style="margin-top:4px;">
-        ✅ Entregar
-      </button>
-      <button class="btn" id="btn-en-camino" onclick="toggleEnCamino()" style="margin-top:6px;display:none;background:rgba(0,200,255,.15);color:var(--accent);border:1px solid var(--accent);font-size:13px;">
-        🚗 Marcar en camino
-      </button>
-      <button class="btn btn-ghost" id="btn-undo-done" onclick="deshacerEntrega()" style="margin-top:6px;display:none;color:var(--orange);border-color:var(--orange);font-size:13px;">
+      <button id="btn-mark-done"></button>
+      <button id="btn-en-camino"></button>
+    </div>
+    <!-- único botón visible: deshacer entrega -->
+    <div style="padding:0 16px 16px;">
+      <button class="btn btn-ghost" id="btn-undo-done" onclick="deshacerEntrega()" style="display:none;color:var(--orange);border-color:var(--orange);font-size:13px;">
         ↩ Deshacer entrega
       </button>
     </div>
@@ -3797,9 +3767,44 @@ window.sendPhotosToWhatsApp = async function() {
   document.getElementById('photos-thumbs').innerHTML = '';
   document.getElementById('photos-preview').style.display = 'none';
   document.getElementById('btn-send-photos').style.display = 'none';
+
+  // ── Si venimos de scan-entrega (entrega con guías escaneadas) ──────────
+  if (window._seGuiasOverride && window._seGuiasOverride.length > 0 && camModo === 'entrega') {
+    const guias    = window._seGuiasOverride.slice();
+    const parada   = window._seParada;
+    const clientId = window._seClientId || currentClientId;
+    window._seGuiasOverride = null;
+    const horaEnt = new Date().toISOString();
+    if (parada) {
+      parada.hecha = true; parada.fallida = false; parada.horaEntrega = horaEnt;
+      parada.guiasEscaneadas = guias; parada.guiaEscaneada = guias[0] || '';
+    }
+    if (clientId && typeof updateRecord === 'function') {
+      updateRecord(clientId, { entregado: true, horaEntrega: horaEnt, guiasEscaneadas: guias, guiaEscaneada: guias[0]||'' }).catch(()=>{});
+    }
+    if (typeof saveNavParadas === 'function') saveNavParadas();
+    if (typeof navParadas !== 'undefined') {
+      window.navParadaActual = Math.min(navParadaActual + 1, navParadas.length - 1);
+      if (typeof saveNavParadas === 'function') saveNavParadas();
+    }
+    if (typeof renderListaParadas === 'function') renderListaParadas();
+    if (typeof renderNavGuiada    === 'function') renderNavGuiada();
+    if (typeof actualizarWidgetNav === 'function') actualizarWidgetNav();
+    const n = guias.length;
+    if (typeof showToast === 'function') showToast('✅ ' + n + ' guía' + (n!==1?'s':'') + ' entregada' + (n!==1?'s':''));
+    const sig = typeof navParadas !== 'undefined' ? navParadas[navParadaActual] : null;
+    setTimeout(function() {
+      if (sig) window.open('https://www.google.com/maps/dir/?api=1&destination=' + sig.lat + ',' + sig.lng + '&travelmode=driving', '_blank');
+      showScreen(window._seOrigenPantalla === 'client' ? 'home' : 'nav-guiada');
+    }, 600);
+    return;
+  }
+
+  // ── Flujo normal (no scan-entrega) ────────────────────────────────────
   if (camModo === 'entrega') {
     document.getElementById('btn-mark-done-camera').style.display = 'flex';
   }
+  window._seGuiasOverride = null;
 
   // Si es excepción, avanzar a la siguiente parada en nav-guiada
   if (camModo === 'excepcion') {
@@ -7425,25 +7430,8 @@ window.navAccionEntregada = function() {
 window.navAccionFallida = function() {
   const p = navParadas[navParadaActual];
   if (!p || p.esRetorno) { showToast('Esta es la parada de retorno'); return; }
-  const horaFallida = new Date().toISOString();
-  p.fallida = true; p.hecha = true; p.horaFallida = horaFallida;
-  saveNavParadas();
-  navParadaActual = Math.min(navParadaActual + 1, navParadas.length - 1);
-  saveNavParadas();
-  const d = new Date(horaFallida);
-  const h = d.getHours()%12||12, mm = String(d.getMinutes()).padStart(2,'0'), ap = d.getHours()>=12?'PM':'AM';
-  showToast('⚠️ Fallida · ' + h + ':' + mm + ' ' + ap);
-  if (typeof renderListaParadas === 'function') renderListaParadas();
-  renderNavGuiada();
-  actualizarWidgetNav();
-  const sig = navParadas[navParadaActual];
-  if (sig && !sig.esRetorno) {
-    showToast('🗺️ Abriendo Parada ' + (navParadaActual + 1) + ' en Google Maps…');
-    setTimeout(() => window.open('https://www.google.com/maps/dir/?api=1&destination=' + sig.lat + ',' + sig.lng + '&travelmode=driving', '_blank'), 800);
-  } else if (sig && sig.esRetorno) {
-    showToast('🏠 ¡Última parada! Regresando a base…');
-    setTimeout(() => window.open('https://www.google.com/maps/dir/?api=1&destination=' + sig.lat + ',' + sig.lng + '&travelmode=driving', '_blank'), 800);
-  }
+  // Abrir menú de excepciones → cámara → WhatsApp → siguiente parada
+  abrirExcepcionParada(navParadaActual);
 };
 
 window.navAccionDeshacer = function() {
@@ -8160,9 +8148,19 @@ document.addEventListener('click', function(e) {
 });
 
 window.abrirModalExcepcion = function(tipo, icon, label) {
-  // Cerrar dropdown
-  document.getElementById('exc-dropdown').classList.remove('open');
-  document.getElementById('exc-arrow').textContent = '▲';
+  // Cerrar overlay de excepción si está abierto
+  const ov = document.getElementById('exc-parada-overlay');
+  if (ov) ov.remove();
+  const dd = document.getElementById('exc-dropdown');
+  if (dd) dd.classList.remove('open');
+  const ar = document.getElementById('exc-arrow');
+  if (ar) ar.textContent = '▲';
+
+  // Si viene de navParadas, asegurar que currentClientId esté seteado
+  if (!currentClientId && typeof navParadas !== 'undefined' && navParadas[navParadaActual]) {
+    const pActual = navParadas[navParadaActual];
+    currentClientId = pActual.clientId || pActual.id || null;
+  }
 
   excTipo = tipo;
   excLabel = label;
@@ -8927,85 +8925,57 @@ function _seApplyVerificacion(val) {
 }
 
 // ── Enviar entrega por WhatsApp y marcar como entregada ───────────────────────
-window.scanEntregaEnviarWap = async function() {
-  if (!_seGuia) { if (typeof showToast === 'function') showToast('Escanea o ingresa la guía primero'); return; }
-
-  // Texto del método de entrega
-  const receptorTextos = {
-    cliente:  '👤 Cliente titular',
-    familiar: '👨‍👩‍👦 Familiar del cliente'
-  };
-  const verificacionTextos = {
-    nopedido:      '🔢 Validación de No. de pedido',
-    ine:           '🪪 Validación por INE',
-    wapedido:      '📲 No. de pedido por WhatsApp',
-    codigoentrega: '🔑 Código de entrega'
-  };
-  const receptorTxt     = receptorTextos[_seReceptor]     || _seReceptor;
-  const verificacionTxt = verificacionTextos[_seVerificacion] || _seVerificacion;
-  const familiarNombre  = _seReceptor === 'familiar'
-    ? (document.getElementById('se-familiar-nombre')?.value?.trim() || '')
-    : '';
-  const ubicacion = (_seLat && _seLng)
-    ? '\n📍 *Ubicación:* https://maps.google.com/?q=' + _seLat + ',' + _seLng
-    : '';
-
-  const texto =
-`✅ *ENTREGA REALIZADA*
-━━━━━━━━━━━━━━━━━━━
-🔖 *Guía:* ${_seGuia}
-📬 *Recibe:* ${receptorTxt}${familiarNombre ? '\n💬 *Familiar:* ' + familiarNombre : ''}
-✔️ *Verificación:* ${verificacionTxt}${ubicacion}
-━━━━━━━━━━━━━━━━━━━`;
-
-  // Obtener teléfono del cliente para abrir chat directo si está disponible
-  const r = (typeof allRecords !== 'undefined' ? allRecords : []).find(x => x.id === _seClientId);
-  const tel = r?.telefono ? r.telefono.replace(/\D/g, '') : '';
-  const wapUrl = tel
-    ? 'https://wa.me/52' + tel + '?text=' + encodeURIComponent(texto)
-    : 'https://wa.me/?text=' + encodeURIComponent(texto);
-
-  window.open(wapUrl, '_blank');
-
-  // Marcar parada como entregada en navParadas
-  if (_seParada) {
-    const horaEntrega = new Date().toISOString();
-    _seParada.hecha       = true;
-    _seParada.fallida     = false;
-    _seParada.horaEntrega = horaEntrega;
-    _seParada.guiaEscaneada = _seGuia;
-    const clientId = _seParada.clientId || _seParada.id;
-    if (clientId && typeof updateRecord === 'function') {
-      updateRecord(clientId, { entregado: true, horaEntrega, guiaEscaneada: _seGuia }).catch(()=>{});
-    }
-    if (typeof saveNavParadas === 'function') saveNavParadas();
-    // Avanzar parada
-    if (typeof navParadas !== 'undefined' && typeof navParadaActual !== 'undefined') {
-      window.navParadaActual = Math.min(navParadaActual + 1, navParadas.length - 1);
-      if (typeof saveNavParadas === 'function') saveNavParadas();
-    }
-    if (typeof renderListaParadas === 'function') renderListaParadas();
-    if (typeof renderNavGuiada    === 'function') renderNavGuiada();
-    if (typeof actualizarWidgetNav === 'function') actualizarWidgetNav();
+window.scanEntregaEnviarWap = function() {
+  if (!_seGuias || _seGuias.length === 0) {
+    if (typeof showToast === 'function') showToast('Escanea o ingresa al menos una guía');
+    return;
   }
 
+  // Detener escáner
   _seDetenerEscaner();
-  if (typeof showToast === 'function') showToast('✅ Entrega registrada · ' + _seGuia.slice(0,16));
 
-  // Navegar a siguiente parada
-  setTimeout(function() {
-    if (typeof navParadas !== 'undefined') {
-      const sig = navParadas[navParadaActual];
-      if (sig && !sig.esRetorno) {
-        window.open('https://www.google.com/maps/dir/?api=1&destination=' + sig.lat + ',' + sig.lng + '&travelmode=driving', '_blank');
-      } else if (sig && sig.esRetorno) {
-        if (typeof showToast === 'function') showToast('🏠 ¡Última entrega! Regresando a base…');
-        window.open('https://www.google.com/maps/dir/?api=1&destination=' + sig.lat + ',' + sig.lng + '&travelmode=driving', '_blank');
-      }
-    }
-    showScreen('nav-guiada');
-  }, 800);
+  // Guardar override para que sendPhotosToWhatsApp use las guías escaneadas
+  window._seGuiasOverride = _seGuias.slice();
+  window._seClientId = _seClientId;
+
+  // Asegurar currentClientId para que la cámara guarde en el registro correcto
+  if (_seClientId) currentClientId = _seClientId;
+
+  // Configurar screen-camera en modo entrega con los datos ya elegidos
+  const r = (typeof allRecords !== 'undefined' ? allRecords : []).find(x => x.id === _seClientId);
+  const elCamName = document.getElementById('cam-client-name');
+  if (elCamName) elCamName.textContent = r?.nombre?.split(' ')[0] || '';
+
+  camModo        = 'entrega';
+  camReceptor    = _seReceptor;
+  camVerificacion = _seVerificacion;
+  capturedPhotos  = [];
+
+  const elThumbs  = document.getElementById('photos-thumbs');
+  const elPreview = document.getElementById('photos-preview');
+  const elSend    = document.getElementById('btn-send-photos');
+  const elDone    = document.getElementById('btn-mark-done-camera');
+  const elTitle   = document.getElementById('cam-screen-title');
+  const elEntCards = document.getElementById('cam-entrega-cards');
+  const elExcCard  = document.getElementById('cam-excepcion-card');
+
+  if (elThumbs)   elThumbs.innerHTML = '';
+  if (elPreview)  elPreview.style.display = 'none';
+  if (elSend)     elSend.style.display = 'none';
+  if (elDone)     elDone.style.display = 'none';
+  if (elTitle)    elTitle.textContent = '📸 Foto de entrega';
+  if (elEntCards) elEntCards.style.display = 'none';
+  if (elExcCard)  elExcCard.style.display  = 'none';
+
+  // Aplicar selección de receptor y verificación en la pantalla de cámara
+  if (typeof setCamOpt === 'function') {
+    setCamOpt('receptor', _seReceptor);
+    setCamOpt('verificacion', _seVerificacion);
+  }
+
+  showScreen('camera');
 };
+
 
 </script>
 <!-- ══════════════════════════════════════════
