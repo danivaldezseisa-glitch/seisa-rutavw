@@ -7420,52 +7420,61 @@ window.navAccionEntregada = function() {
 
 // ── Abrir menú de excepciones desde parada (nav-guiada o lista) ──────────
 window.abrirExcepcionParada = function(idx) {
+  // Usar navParadaActual si idx no tiene parada válida
+  if (typeof idx === 'undefined' || !navParadas[idx]) idx = navParadaActual;
   const p = navParadas[idx];
-  if (!p || p.esRetorno) return;
-  // Asegurar currentClientId para que abrirModalExcepcion guarde en el registro correcto
-  const clientId = p.clientId || p.id;
-  if (clientId) { currentClientId = clientId; navParadaActual = idx; }
+  if (!p || p.esRetorno) { showToast('Sin parada activa'); return; }
 
-  // Eliminar overlay previo si existe
+  // Asegurar currentClientId
+  const clientId = p.clientId || p.id;
+  if (clientId) currentClientId = clientId;
+  navParadaActual = idx;
+
+  // Eliminar overlay previo
   const prev = document.getElementById('exc-parada-overlay');
   if (prev) prev.remove();
 
   const overlay = document.createElement('div');
   overlay.id = 'exc-parada-overlay';
-  overlay.style.cssText = 'position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.65);'
-    + 'display:flex;align-items:flex-end;';
+  overlay.style.cssText = 'position:fixed;top:0;left:0;right:0;bottom:0;z-index:99999;'
+    + 'background:rgba(0,0,0,.75);display:flex;align-items:flex-end;';
 
-  overlay.innerHTML = `
-    <div style="background:var(--bg2);border-radius:20px 20px 0 0;width:100%;padding:20px 16px 36px;
-                display:flex;flex-direction:column;gap:10px;">
-      <div style="font-size:14px;font-weight:700;color:var(--orange);margin-bottom:4px;text-align:center;">
-        ⚠️ Registrar excepción
-      </div>
-      <button onclick="document.getElementById('exc-parada-overlay').remove();abrirModalExcepcion('cliente_ausente','🚪','Cliente Ausente')" 
-        class="btn" style="background:var(--surface2);color:var(--text);font-size:14px;justify-content:flex-start;gap:12px;">
-        🚪 Cliente Ausente
-      </button>
-      <button onclick="document.getElementById('exc-parada-overlay').remove();abrirModalExcepcion('cancelado_entrega','❌','Cancelado en la Entrega')" 
-        class="btn" style="background:var(--surface2);color:var(--text);font-size:14px;justify-content:flex-start;gap:12px;">
-        ❌ Cancelado en la Entrega
-      </button>
-      <button onclick="document.getElementById('exc-parada-overlay').remove();abrirModalExcepcion('reprogramar','📅','Reprogramar')" 
-        class="btn" style="background:var(--surface2);color:var(--text);font-size:14px;justify-content:flex-start;gap:12px;">
-        📅 Reprogramar
-      </button>
-      <button onclick="document.getElementById('exc-parada-overlay').remove();abrirModalExcepcion('datos_incorrectos','⚠️','Datos Incorrectos')" 
-        class="btn" style="background:var(--surface2);color:var(--text);font-size:14px;justify-content:flex-start;gap:12px;">
-        ⚠️ Datos Incorrectos
-      </button>
-      <button onclick="document.getElementById('exc-parada-overlay').remove()" 
-        class="btn btn-ghost" style="font-size:14px;margin-top:4px;">
-        Cancelar
-      </button>
-    </div>`;
+  const opciones = [
+    { tipo: 'cliente_ausente',    icon: '🚪', label: 'Cliente Ausente' },
+    { tipo: 'cancelado_entrega',  icon: '❌', label: 'Cancelado en la Entrega' },
+    { tipo: 'reprogramar',        icon: '📅', label: 'Reprogramar' },
+    { tipo: 'datos_incorrectos',  icon: '⚠️', label: 'Datos Incorrectos' },
+  ];
 
-  overlay.addEventListener('click', function(e) {
-    if (e.target === overlay) overlay.remove();
+  const sheet = document.createElement('div');
+  sheet.style.cssText = 'background:var(--bg2,#0d1b2a);border-radius:20px 20px 0 0;width:100%;'
+    + 'padding:20px 16px 40px;display:flex;flex-direction:column;gap:10px;';
+
+  sheet.innerHTML = '<div style="font-size:15px;font-weight:700;color:var(--orange,#ff9100);'
+    + 'margin-bottom:6px;text-align:center;">⚠️ Registrar excepción</div>';
+
+  opciones.forEach(function(op) {
+    const btn = document.createElement('button');
+    btn.className = 'btn';
+    btn.style.cssText = 'background:var(--surface2,#172540);color:var(--text,#dceeff);'
+      + 'font-size:15px;justify-content:flex-start;gap:12px;padding:14px 16px;border-radius:12px;';
+    btn.textContent = op.icon + ' ' + op.label;
+    btn.onclick = function() {
+      overlay.remove();
+      abrirModalExcepcion(op.tipo, op.icon, op.label);
+    };
+    sheet.appendChild(btn);
   });
+
+  const btnCancel = document.createElement('button');
+  btnCancel.className = 'btn btn-ghost';
+  btnCancel.style.cssText = 'font-size:14px;margin-top:4px;';
+  btnCancel.textContent = 'Cancelar';
+  btnCancel.onclick = function() { overlay.remove(); };
+  sheet.appendChild(btnCancel);
+
+  overlay.appendChild(sheet);
+  overlay.addEventListener('click', function(e) { if (e.target === overlay) overlay.remove(); });
   document.body.appendChild(overlay);
 };
 
