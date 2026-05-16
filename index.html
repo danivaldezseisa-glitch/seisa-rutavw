@@ -4350,8 +4350,69 @@ function renderTrackingsDetectados() {
 
 window.eliminarTracking = function(i) {
   trackingsDetectados.splice(i, 1);
+  _saveTrackings();
   renderTrackingsDetectados();
   verificarBtnCruzar();
+};
+
+window.limpiarTrackings = function() {
+  trackingsDetectados = [];
+  _saveTrackings();
+  renderTrackingsDetectados();
+  verificarBtnCruzar();
+};
+
+window.cargarEtiquetasEnLista = async function() {
+  const activos = trackingsDetectados.filter(Boolean);
+  if (!activos.length) { showToast('Escanea al menos una guía'); return; }
+
+  const btn = document.getElementById('btn-cargar-etiquetas');
+  const res = document.getElementById('cargar-etiquetas-resultado');
+  if (btn) { btn.disabled = true; btn.textContent = '⏳ Cargando...'; }
+  if (res) res.style.display = 'none';
+
+  let cargados = 0, duplicados = 0, errores = 0;
+
+  for (const t of activos) {
+    const tracking = (typeof t === 'object' ? t.tracking : t) || '';
+    if (!tracking) continue;
+    try {
+      const existe = allRecords.find(function(r) {
+        const gs = Array.isArray(r.trackings) ? r.trackings : (r.tracking ? [r.tracking] : []);
+        return gs.includes(tracking);
+      });
+      if (existe) { duplicados++; continue; }
+      await saveRecord({
+        nombre:          'Guía ' + tracking.slice(-8),
+        tracking:        tracking,
+        calle: '', numero: '', colonia: '', cp: '',
+        telefono: '', shipment_order: '',
+        origen: 'escaner'
+      });
+      cargados++;
+    } catch(e) {
+      console.error('Error cargando:', tracking, e);
+      errores++;
+    }
+  }
+
+  const partes = [];
+  if (cargados)   partes.push('✅ ' + cargados + ' cargada' + (cargados !== 1 ? 's' : ''));
+  if (duplicados) partes.push('⚠️ ' + duplicados + ' duplicada' + (duplicados !== 1 ? 's' : ''));
+  if (errores)    partes.push('❌ ' + errores + ' con error');
+  const msg = partes.join(' · ') || 'Sin cambios';
+  if (res) { res.textContent = msg; res.style.display = 'block'; }
+  showToast(msg);
+  if (btn) { btn.disabled = false; btn.textContent = '📋 Cargar etiquetas en lista'; }
+
+  if (cargados > 0) {
+    setTimeout(function() {
+      trackingsDetectados = [];
+      _saveTrackings();
+      renderTrackingsDetectados();
+      showScreen('home');
+    }, 1800);
+  }
 };
 
 // ─── ARCHIVO DATOS ────────────────────────────────────────────────────
