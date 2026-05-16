@@ -8215,6 +8215,54 @@ let excLabel = '';
 let excFotos = [];
 let camModo = 'entrega'; // 'entrega' | 'excepcion'
 
+window.abrirModalExcepcion = function(tipo, icon, label) {
+  // Cerrar overlay de excepción si está abierto
+  const ov = document.getElementById('exc-parada-overlay');
+  if (ov) ov.remove();
+  const dd = document.getElementById('exc-dropdown');
+  if (dd) dd.classList.remove('open');
+  const ar = document.getElementById('exc-arrow');
+  if (ar) ar.textContent = '▲';
+
+  // Si viene de navParadas, asegurar que currentClientId esté seteado
+  if (!currentClientId && typeof navParadas !== 'undefined' && navParadas[navParadaActual]) {
+    const pActual = navParadas[navParadaActual];
+    currentClientId = pActual.clientId || pActual.id || null;
+  }
+
+  excTipo  = tipo;
+  excLabel = label;
+  _excGuia = '';
+  camModo  = 'excepcion';
+
+  // Resetear estado de la pantalla de cámara
+  const r = allRecords.find(x => x.id === currentClientId);
+  capturedPhotos = [];
+  const elThumbs   = document.getElementById('photos-thumbs');   if (elThumbs)   elThumbs.innerHTML = '';
+  const elPreview  = document.getElementById('photos-preview');  if (elPreview)  elPreview.style.display  = 'none';
+  const elSend     = document.getElementById('btn-send-photos'); if (elSend)     elSend.style.display     = 'none';
+  const elDone     = document.getElementById('btn-mark-done-camera'); if (elDone) elDone.style.display    = 'none';
+  const elFileIn   = document.getElementById('cam-file-input'); if (elFileIn)   elFileIn.value           = '';
+  const elName     = document.getElementById('cam-client-name'); if (elName)    elName.textContent        = r?.nombre?.split(' ')[0] || '';
+  const elTitle    = document.getElementById('cam-screen-title'); if (elTitle)  elTitle.textContent       = '⚠️ Registrar Excepción';
+  const elEntCards = document.getElementById('cam-entrega-cards'); if (elEntCards) elEntCards.style.display = 'none';
+  const elExcCard  = document.getElementById('cam-excepcion-card'); if (elExcCard) elExcCard.style.display = 'block';
+  const elExcIcon  = document.getElementById('cam-exc-icon');  if (elExcIcon)  elExcIcon.textContent      = icon  || '⚠️';
+  const elExcLabel = document.getElementById('cam-exc-label'); if (elExcLabel) elExcLabel.textContent     = label || '';
+  const elComment  = document.getElementById('cam-exc-comentario'); if (elComment) elComment.value        = '';
+
+  // Resetear campos de guía
+  const elGuiaIn = document.getElementById('cam-exc-guia'); if (elGuiaIn) elGuiaIn.value = '';
+  const elGuiaVal = document.getElementById('cam-exc-guia-val'); if (elGuiaVal) elGuiaVal.style.display = 'none';
+  const elGuiaValT = document.getElementById('cam-exc-guia-val-text'); if (elGuiaValT) elGuiaValT.textContent = '';
+  if (typeof excDetenerEscaner === 'function') excDetenerEscaner();
+
+  // Cargar lista de guías escaneadas
+  if (typeof renderExcGuiasList === 'function') renderExcGuiasList();
+
+  showScreen('camera');
+};
+
 window.toggleExcDropdown = function() {
   const dd = document.getElementById('exc-dropdown');
   const arrow = document.getElementById('exc-arrow');
