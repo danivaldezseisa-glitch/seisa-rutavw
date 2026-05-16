@@ -2665,17 +2665,7 @@ window.showScreen = function(name) {
   if (name === 'navegacion') { renderNavStops(); renderPuntosFijos(); }
   // Si había navegación activa y regresamos a nav-guiada, restaurar mapa
   if (name === 'nav-guiada' && navParadas.length > 0) renderNavGuiada();
-  // Mostrar widget flotante si hay ruta activa y no estamos en nav-guiada
-  if (name !== 'nav-guiada' && navParadas.length > 0) {
-    if (typeof crearWidgetNav === 'function') crearWidgetNav();
-    const w = document.getElementById('nav-widget');
-    if (w) { w.style.display = 'flex'; if (typeof actualizarWidgetNav === 'function') actualizarWidgetNav(); }
-  }
-  // Ocultar widget cuando estamos en nav-guiada (pantalla principal de nav)
-  if (name === 'nav-guiada') {
-    const w = document.getElementById('nav-widget');
-    if (w) w.style.display = 'none';
-  }
+
   // Iniciar escáner automáticamente al entrar a la pantalla de scan
   if (name === 'scan') {
     setTimeout(function() { if (!scannerActivo) iniciarEscaner(); }, 300);
@@ -4726,12 +4716,8 @@ document.addEventListener('visibilitychange', async function() {
     await loadNavParadas();
     if (currentScreen === 'navegacion') renderNavStops();
     if (currentScreen === 'nav-guiada' && navParadas.length > 0) renderNavGuiada();
-    // Restaurar widget si hay ruta activa
-    if (navParadas.length > 0 && currentScreen !== 'nav-guiada') {
-      if (typeof crearWidgetNav === 'function') crearWidgetNav();
-      const w = document.getElementById('nav-widget');
-      if (w) { w.style.display = 'flex'; if (typeof actualizarWidgetNav === 'function') actualizarWidgetNav(); }
-    }
+    // Actualizar notificación del sistema si hay ruta activa
+    if (navParadas.length > 0 && typeof mostrarNotificacionRuta === 'function') mostrarNotificacionRuta();
   }
 });
 
@@ -6225,10 +6211,8 @@ function actualizarWidgetNav() {
 }
 
 window.mostrarWidget = function() {
-  crearWidgetNav();
-  const w = document.getElementById('nav-widget');
-  if (w) { w.style.display = 'flex'; actualizarWidgetNav(); }
-  // También mostrar notificación persistente del sistema (visible fuera de la app)
+  // El widget flotante ya no se muestra dentro de la app
+  // Solo mostramos notificación del sistema (visible en la barra de notificaciones)
   mostrarNotificacionRuta();
 };
 
@@ -8862,12 +8846,10 @@ updateRutaActivaBar();
 // - La segunda es la actual (home)
 history.replaceState({ app: true, screen: 'home' }, '');
 history.pushState({ app: true, screen: 'home' }, '');
-// Mostrar widget si hay ruta guardada al arrancar
+// Mostrar notificación del sistema si hay ruta guardada al arrancar
 setTimeout(function() {
-  if (typeof navParadas !== 'undefined' && navParadas.length > 0 && currentScreen !== 'nav-guiada') {
-    if (typeof crearWidgetNav === 'function') crearWidgetNav();
-    const w = document.getElementById('nav-widget');
-    if (w) { w.style.display = 'flex'; if (typeof actualizarWidgetNav === 'function') actualizarWidgetNav(); }
+  if (typeof navParadas !== 'undefined' && navParadas.length > 0) {
+    if (typeof mostrarNotificacionRuta === 'function') mostrarNotificacionRuta();
   }
 }, 1500);
 
