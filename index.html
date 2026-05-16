@@ -1772,7 +1772,7 @@ Casa verde, 8Q4F+HP México" style="
     </div>
 
     <!-- botones ocultos — solo para compatibilidad con JS existente -->
-    <div class="action-list" style="display:none;">
+    <div id="hidden-action-btns" style="position:absolute;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;">
       <button id="btn-whatsapp-intro"></button>
       <button id="btn-whatsapp-camino"></button>
       <button id="btn-open-camera"></button>
@@ -2645,6 +2645,17 @@ window.showScreen = function(name) {
   if (name === 'navegacion') { renderNavStops(); renderPuntosFijos(); }
   // Si había navegación activa y regresamos a nav-guiada, restaurar mapa
   if (name === 'nav-guiada' && navParadas.length > 0) renderNavGuiada();
+  // Mostrar widget flotante si hay ruta activa y no estamos en nav-guiada
+  if (name !== 'nav-guiada' && navParadas.length > 0) {
+    if (typeof crearWidgetNav === 'function') crearWidgetNav();
+    const w = document.getElementById('nav-widget');
+    if (w) { w.style.display = 'flex'; if (typeof actualizarWidgetNav === 'function') actualizarWidgetNav(); }
+  }
+  // Ocultar widget cuando estamos en nav-guiada (pantalla principal de nav)
+  if (name === 'nav-guiada') {
+    const w = document.getElementById('nav-widget');
+    if (w) w.style.display = 'none';
+  }
   // Iniciar escáner automáticamente al entrar a la pantalla de scan
   if (name === 'scan') {
     setTimeout(function() { if (!scannerActivo) iniciarEscaner(); }, 300);
@@ -3202,13 +3213,11 @@ window.openClient = function(id) {
   const btnDone = document.getElementById('btn-mark-done');
   const btnCamino = document.getElementById('btn-en-camino');
 
+  // ── Actualizar badge de estado ──
   if (r.excepcion || r.excTipo) {
     badge.innerHTML = '<span class="badge badge-orange">⚠️ Excepción de entrega</span>';
-    if (btnDone)   btnDone.style.display = 'none';
-    if (btnUndo)   btnUndo.style.display = 'none';
-    if (btnCamino) btnCamino.style.display = 'none';
+    if (btnUndo) btnUndo.style.display = 'none';
   } else if (esEntregado) {
-    // Mostrar hora exacta de entrega si está disponible
     let horaLabel = '';
     if (r.horaEntrega) {
       const d = new Date(r.horaEntrega);
@@ -3218,20 +3227,14 @@ window.openClient = function(id) {
       horaLabel = ` · ${hh}:${mm} ${ampm}`;
     }
     badge.innerHTML = `<span class="badge badge-green">✓ Entregado${horaLabel}</span>`;
-    if (btnDone)   btnDone.style.display = 'none';
-    if (btnUndo)   btnUndo.style.display = '';
-    if (btnCamino) btnCamino.style.display = 'none';
-  } else if (r.enCamino) {
-    badge.innerHTML = '<span class="badge badge-blue">🚗 En camino</span>';
-    if (btnDone)   btnDone.style.display = '';
-    if (btnUndo)   btnUndo.style.display = 'none';
-    if (btnCamino) { btnCamino.style.display = ''; btnCamino.textContent = '✕ Cancelar en camino'; btnCamino.style.background = 'rgba(255,145,0,.15)'; btnCamino.style.color = 'var(--orange)'; btnCamino.style.borderColor = 'var(--orange)'; }
+    if (btnUndo) btnUndo.style.display = 'flex';
   } else {
     badge.innerHTML = '<span class="badge badge-orange">Pendiente</span>';
-    if (btnDone)   btnDone.style.display = '';
-    if (btnUndo)   btnUndo.style.display = 'none';
-    if (btnCamino) { btnCamino.style.display = ''; btnCamino.textContent = '🚗 Marcar en camino'; btnCamino.style.background = 'rgba(0,200,255,.15)'; btnCamino.style.color = 'var(--accent)'; btnCamino.style.borderColor = 'var(--accent)'; }
+    if (btnUndo) btnUndo.style.display = 'none';
   }
+  // Botones de acción siempre ocultos (el flujo pasa por scan-entrega)
+  if (btnDone)   btnDone.style.display   = 'none';
+  if (btnCamino) btnCamino.style.display  = 'none';
 
   // ── PLUS CODES ──
   const plusCodes = Array.isArray(r.plusCodes) ? r.plusCodes : [];
@@ -3492,7 +3495,7 @@ window.deshacerEntrega = async function() {
   const btnDone = document.getElementById('btn-mark-done');
   const btnUndo = document.getElementById('btn-undo-done');
   const btnCamino = document.getElementById('btn-en-camino');
-  if (btnDone)   btnDone.style.display = '';
+  if (btnDone)   btnDone.style.display = 'none';
   if (btnUndo)   btnUndo.style.display = 'none';
   if (btnCamino) { btnCamino.style.display = ''; btnCamino.textContent = '🚗 Marcar en camino'; btnCamino.style.background = 'rgba(0,200,255,.15)'; btnCamino.style.color = 'var(--accent)'; btnCamino.style.borderColor = 'var(--accent)'; }
   showToast('↩ Entrega deshecha');
@@ -4705,6 +4708,12 @@ document.addEventListener('visibilitychange', async function() {
     await loadNavParadas();
     if (currentScreen === 'navegacion') renderNavStops();
     if (currentScreen === 'nav-guiada' && navParadas.length > 0) renderNavGuiada();
+    // Restaurar widget si hay ruta activa
+    if (navParadas.length > 0 && currentScreen !== 'nav-guiada') {
+      if (typeof crearWidgetNav === 'function') crearWidgetNav();
+      const w = document.getElementById('nav-widget');
+      if (w) { w.style.display = 'flex'; if (typeof actualizarWidgetNav === 'function') actualizarWidgetNav(); }
+    }
   }
 });
 
@@ -7856,6 +7865,7 @@ window.irAClienteDesdeNav = function() {
 
 window.reanudarNavegacion = function() {
   showScreen('nav-guiada');
+  renderNavGuiada();
 }
 
 window.salirNavegacion = function() {
@@ -8694,6 +8704,14 @@ updateRutaActivaBar();
 // - La segunda es la actual (home)
 history.replaceState({ app: true, screen: 'home' }, '');
 history.pushState({ app: true, screen: 'home' }, '');
+// Mostrar widget si hay ruta guardada al arrancar
+setTimeout(function() {
+  if (typeof navParadas !== 'undefined' && navParadas.length > 0 && currentScreen !== 'nav-guiada') {
+    if (typeof crearWidgetNav === 'function') crearWidgetNav();
+    const w = document.getElementById('nav-widget');
+    if (w) { w.style.display = 'flex'; if (typeof actualizarWidgetNav === 'function') actualizarWidgetNav(); }
+  }
+}, 1500);
 
 // ── Registrar Service Worker para modo PWA standalone ────────────────
 // En modo standalone Android ya no captura el gesto de atrás
