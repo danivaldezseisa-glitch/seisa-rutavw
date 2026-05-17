@@ -7,6 +7,12 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-title" content="SEISA">
 <title>SEISA Rutas</title>
+<!-- Google Maps API (reemplaza AIzaSyAGsOfVDl73CXEVPSb1UUXbreVJC-GmBcY con tu clave) -->
+<script>
+window.GOOGLE_API_KEY = "AIzaSyAGsOfVDl73CXEVPSb1UUXbreVJC-GmBcY"; // ← PON TU API KEY AQUÍ
+</script>
+<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAGsOfVDl73CXEVPSb1UUXbreVJC-GmBcY&libraries=places,geometry,directions&language=es&region=MX&callback=initGoogleMaps" async defer></script>
+<!-- Leaflet como fallback para pantallas sin conducción -->
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <style>
@@ -104,6 +110,12 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
 .nav-metric-val { font-size: 22px; font-weight: 800; font-family: var(--mono); line-height: 1; }
 .nav-metric-lbl { font-size: 9px; color: var(--text3); text-transform: uppercase; letter-spacing: .06em; margin-top: 2px; }
 .nav-divider { width: 1px; height: 36px; background: var(--border); }
+
+/* Google Maps container */
+#gmap-container { position:absolute;inset:0;z-index:1; }
+#nav-map-leaflet { position:absolute;inset:0;z-index:1;display:none; }
+.gm-style .gm-style-iw-c { background:var(--bg2) !important; color:var(--text) !important; }
+.gmnoprint, .gm-style-cc { display:none !important; }
 
 /* ── LISTA OVERLAY ── */
 #nav-lista-overlay { position: absolute; inset: 0; z-index: 200; background: var(--bg); display: flex; flex-direction: column; }
@@ -338,8 +350,10 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
 ════════════════════════════════ -->
 <div class="screen hidden" id="screen-nav" style="background:#0a1628;overflow:hidden;">
 
-  <!-- MAPA FULL SCREEN -->
-  <div id="nav-map" style="position:absolute;inset:0;z-index:1;"></div>
+  <!-- MAPA: Google Maps -->
+  <div id="gmap-container" style="position:absolute;inset:0;z-index:1;"></div>
+  <!-- MAPA: Leaflet (paradas) -->
+  <div id="nav-map" style="position:absolute;inset:0;z-index:1;display:none;"></div>
 
   <!-- INSTRUCCIÓN SUPERIOR (siguiente giro) -->
   <div id="nav-instruccion" style="
@@ -1377,25 +1391,68 @@ function iniciarRuta() {
 //  MAPA NAVEGACIÓN
 // ══════════════════════════════════════════════════════════════════
 function initMapaNav() {
-  if (mapNav) { mapNav.invalidateSize(); return; }
-  mapNav = L.map('nav-map', {
-    zoomControl: false,
-    attributionControl: false,
-    zoomAnimation: true,
-    markerZoomAnimation: true
-  }).setView([19.4326, -99.1332], 17);
+  if (gmap) return; // ya inicializado
 
-  // Mapa oscuro detallado para conducción
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    maxZoom: 20, subdomains: 'abcd'
-  }).addTo(mapNav);
+  if (googleMapsReady) {
+    // ── Google Maps ──────────────────────────────────────────────
+    document.getElementById('gmap-container').style.display = 'block';
+    document.getElementById('nav-map').style.display = 'none';
 
-  // Al tocar el mapa, desactivar modo centrado
-  mapNav.on('dragstart', () => {
-    modoCentrado = false;
-    const btn = document.getElementById('btn-centrar');
-    if (btn) btn.style.color = 'var(--text2)';
-  });
+    gmap = new google.maps.Map(document.getElementById('gmap-container'), {
+      center: { lat: 19.4326, lng: -99.1332 },
+      zoom: 17,
+      mapTypeId: google.maps.MapTypeId.ROADMAP,
+      disableDefaultUI: true,
+      gestureHandling: 'greedy',
+      backgroundColor: '#0a1628',
+      styles: [
+        { elementType:'geometry', stylers:[{color:'#1a2744'}] },
+        { featureType:'road', elementType:'geometry', stylers:[{color:'#2d4a70'}] },
+        { featureType:'road.highway', elementType:'geometry', stylers:[{color:'#1e6091'}] },
+        { featureType:'road', elementType:'labels.text.fill', stylers:[{color:'#8ab4cc'}] },
+        { featureType:'water', elementType:'geometry', stylers:[{color:'#0a1628'}] },
+        { featureType:'poi', stylers:[{visibility:'off'}] },
+        { featureType:'transit', stylers:[{visibility:'off'}] },
+        { elementType:'labels.text.fill', stylers:[{color:'#7a9fc0'}] },
+        { elementType:'labels.icon', stylers:[{visibility:'off'}] },
+      ]
+    });
+
+    // Renderer de direcciones (línea de ruta)
+    gmRenderer = new google.maps.DirectionsRenderer({
+      map: gmap,
+      suppressMarkers: true,
+      polylineOptions: {
+        strokeColor: '#00d4ff',
+        strokeWeight: 7,
+        strokeOpacity: 0.9,
+      }
+    });
+
+    // Click en mapa desactiva centrado
+    gmap.addListener('drag', () => {
+      modoCentrado = false;
+      const btn = document.getElementById('btn-centrar');
+      if (btn) btn.style.color = 'var(--text2)';
+    });
+
+  } else {
+    // ── Fallback Leaflet ─────────────────────────────────────────
+    document.getElementById('gmap-container').style.display = 'none';
+    document.getElementById('nav-map').style.display = 'block';
+
+    if (mapNav) { mapNav.invalidateSize(); return; }
+    mapNav = L.map('nav-map', { zoomControl:false, attributionControl:false })
+      .setView([19.4326, -99.1332], 17);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      maxZoom:20, subdomains:'abcd'
+    }).addTo(mapNav);
+    mapNav.on('dragstart', () => {
+      modoCentrado = false;
+      const btn = document.getElementById('btn-centrar');
+      if (btn) btn.style.color = 'var(--text2)';
+    });
+  }
 }
 
 function trazarRutaCompleta() {
@@ -1435,7 +1492,143 @@ function trazarRutaCompleta() {
 }
 
 // ══════════════════════════════════════════════════════════════════
-//  NAVEGADOR GPS — MODO CONDUCCIÓN
+//  GOOGLE MAPS — SISTEMA PRINCIPAL
+// ══════════════════════════════════════════════════════════════════
+let gmap            = null;   // google.maps.Map
+let gmDirections    = null;   // DirectionsService
+let gmRenderer      = null;   // DirectionsRenderer
+let gmGeocoder      = null;   // Geocoder
+let gmPlaces        = null;   // PlacesService
+let gmNavMarker     = null;   // Marcador posición actual
+let gmAutocomplete  = {};     // { inicio, final, parada, edicion }
+let googleMapsReady = false;
+
+// Callback cuando Google Maps carga
+window.initGoogleMaps = function() {
+  googleMapsReady = true;
+  gmDirections = new google.maps.DirectionsService();
+  gmGeocoder   = new google.maps.Geocoder();
+
+  // Inicializar Autocomplete en los inputs de búsqueda
+  const inputIds = {
+    'cr-inicio':           'inicio',
+    'cr-final':            'final',
+    'paradas-search':      'parada',
+    'edit-ub-input':       'edicion',
+    'editar-parada-input': 'editarParada',
+  };
+  const mxBounds = new google.maps.LatLngBounds(
+    new google.maps.LatLng(14.5, -118.5),
+    new google.maps.LatLng(32.7, -86.7)
+  );
+  Object.entries(inputIds).forEach(([id, tipo]) => {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const ac = new google.maps.places.Autocomplete(el, {
+      bounds: mxBounds, strictBounds: false,
+      componentRestrictions: { country: 'mx' },
+      fields: ['geometry','name','formatted_address'],
+      types: ['geocode','establishment']
+    });
+    ac.addListener('place_changed', () => {
+      const place = ac.getPlace();
+      if (!place.geometry?.location) return;
+      const lat = place.geometry.location.lat();
+      const lng = place.geometry.location.lng();
+      const nombre = place.formatted_address || place.name || el.value;
+      onGooglePlaceSelected(tipo, lat, lng, nombre);
+    });
+    gmAutocomplete[tipo] = ac;
+  });
+
+  console.log('✅ Google Maps listo');
+};
+
+function onGooglePlaceSelected(tipo, lat, lng, nombre) {
+  switch(tipo) {
+    case 'inicio':
+      rutaBuild.inicio = { lat, lng, nombre };
+      const liEl = document.getElementById('cr-inicio-label');
+      if (liEl) { liEl.textContent = '✓ ' + nombre; liEl.style.display = 'block'; }
+      break;
+    case 'final':
+      rutaBuild.final = { lat, lng, nombre };
+      const lfEl = document.getElementById('cr-final-label');
+      if (lfEl) { lfEl.textContent = '✓ ' + nombre; lfEl.style.display = 'block'; }
+      break;
+    case 'parada':
+      agregarParada(lat, lng, nombre);
+      const ps = document.getElementById('paradas-search');
+      if (ps) ps.value = '';
+      break;
+    case 'edicion':
+      editUbData = { lat, lng, nombre };
+      const ep = document.getElementById('edit-ub-preview');
+      if (ep) { ep.textContent = '📍 ' + nombre; ep.style.display = 'block'; }
+      break;
+    case 'editarParada':
+      editParadaData = { lat, lng, nombre };
+      const pp = document.getElementById('editar-parada-preview');
+      if (pp) { pp.textContent = '📍 ' + nombre; pp.style.display = 'block'; }
+      break;
+  }
+}
+
+// ── Geocoding con Google ────────────────────────────────────────
+async function geocodeGoogle(q) {
+  return new Promise(resolve => {
+    if (!gmGeocoder) { resolve(null); return; }
+    gmGeocoder.geocode({ address: q, region: 'MX' }, (results, status) => {
+      if (status === 'OK' && results[0]) {
+        resolve({
+          lat: results[0].geometry.location.lat(),
+          lng: results[0].geometry.location.lng(),
+          nombre: results[0].formatted_address
+        });
+      } else resolve(null);
+    });
+  });
+}
+
+// ── Resolver Plus Code con Google Geocoding ─────────────────────
+async function resolverPlusCodeGoogle(input) {
+  const parsed = parsearLineaPlusCode(input.trim());
+  if (!parsed) return null;
+  const { plusCode, ciudad, nombre } = parsed;
+  const pi = plusCode.indexOf('+');
+  const prefix = plusCode.slice(0, pi).replace(/0/g,'');
+
+  // Código completo: decodificar localmente (preciso)
+  if (prefix.length >= 8) {
+    const digits = prefix + plusCode.slice(pi+1).replace(/0/g,'');
+    const coords = olcDecodeCompleto(digits);
+    return { lat: coords.lat, lng: coords.lng, nombre };
+  }
+
+  // Código corto: usar Google Geocoding con el texto completo
+  if (googleMapsReady && gmGeocoder) {
+    const query = plusCode + ' ' + ciudad;
+    const result = await geocodeGoogle(query);
+    if (result) return { lat: result.lat, lng: result.lng, nombre };
+  }
+
+  // Fallback: OLC con referencia de Nominatim
+  return await resolverPlusCode_nominatim(input);
+}
+
+// Guardar la función original de Nominatim
+const resolverPlusCode_nominatim = resolverPlusCode;
+
+// Override resolverPlusCode para usar Google primero
+window.resolverPlusCode = async function(input) {
+  if (googleMapsReady) return resolverPlusCodeGoogle(input);
+  return resolverPlusCode_nominatim(input);
+};
+
+// ══════════════════════════════════════════════════════════════════
+//  NAVEGADOR GPS CON GOOGLE MAPS — MODO CONDUCCIÓN
+// ══════════════════════════════════════════════════════════════════
+
 // ══════════════════════════════════════════════════════════════════
 let navRuta      = null;  // pasos OSRM de la ruta actual
 let navPasoActual = 0;    // índice del paso actual en navRuta.steps
@@ -1539,6 +1732,20 @@ function crearIconoGPS(heading) {
   });
 }
 
+function crearIconoGPSGoogle(heading) {
+  const h = heading != null ? heading : 0;
+  return {
+    path: google.maps.SymbolPath.FORWARD_CLOSED_ARROW,
+    fillColor: '#00d4ff',
+    fillOpacity: 1,
+    strokeColor: '#fff',
+    strokeWeight: 2,
+    scale: 7,
+    rotation: h,
+    anchor: new google.maps.Point(0, 2.5),
+  };
+}
+
 // ── Calcular y trazar ruta OSRM ───────────────────────────────────
 async function calcularRutaOSRM(lat1, lng1, lat2, lng2) {
   const url = `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?overview=full&geometries=geojson&steps=true&annotations=true`;
@@ -1554,49 +1761,165 @@ async function recalcularRuta(fromLat, fromLng) {
   const p = ruta.paradas[state.paradaActual];
   if (!p) return;
 
-  // Posición actual o GPS
+  // Posición actual
   let lat = fromLat, lng = fromLng;
-  if (!lat && navGPSMarker) {
-    const pos = navGPSMarker.getLatLng();
-    lat = pos.lat; lng = pos.lng;
+  if (lat == null) {
+    if (gmap && gmNavMarker) {
+      const pos = gmNavMarker.getPosition();
+      lat = pos.lat(); lng = pos.lng();
+    } else if (navGPSMarker) {
+      const pos = navGPSMarker.getLatLng();
+      lat = pos.lat; lng = pos.lng;
+    }
   }
-  if (!lat) return;
+  if (lat == null) {
+    // Sin GPS aún: centrar mapa en destino
+    if (gmap) gmap.panTo({ lat: p.lat, lng: p.lng });
+    return;
+  }
 
+  if (googleMapsReady && gmDirections && gmRenderer) {
+    // ── Google Directions API ─────────────────────────────────────
+    const request = {
+      origin: new google.maps.LatLng(lat, lng),
+      destination: new google.maps.LatLng(p.lat, p.lng),
+      travelMode: google.maps.TravelMode.DRIVING,
+      drivingOptions: {
+        departureTime: new Date(),
+        trafficModel: google.maps.TrafficModel.BEST_GUESS,
+      },
+      region: 'MX',
+      language: 'es',
+      avoidTolls: rutaBuild.peajes,
+    };
+
+    gmDirections.route(request, (result, status) => {
+      if (status !== 'OK') {
+        showToast('⚠️ Google Directions: ' + status);
+        recalcularRutaOSRM(lat, lng, p);
+        return;
+      }
+
+      gmRenderer.setDirections(result);
+
+      const leg = result.routes[0].legs[0];
+      const km  = (leg.distance.value / 1000).toFixed(1);
+      const min = Math.round(leg.duration.value / 60);
+
+      document.getElementById('nav-dist-total').textContent = leg.distance.text;
+      document.getElementById('nav-tiempo-restante').textContent = leg.duration.text;
+      document.getElementById('nav-km').textContent = km + ' km';
+
+      // Guardar pasos para instrucciones de voz
+      navRuta = { steps: leg.steps.map(s => ({
+        maneuver: { type: s.maneuver || 'straight', modifier: '' },
+        name: s.instructions?.replace(/<[^>]+>/g,'') || '',
+        distance: s.distance.value,
+        duration: s.duration.value,
+        intersections: [{ location: [s.end_location.lng(), s.end_location.lat()] }],
+        html_instructions: s.instructions,
+        end_location: s.end_location,
+        start_location: s.start_location,
+      }))};
+      navPasoActual = 0;
+
+      // Marcadores de destino
+      dibujarMarcadoresNav(result.routes[0].legs[0]);
+      mostrarPasoActualGoogle();
+
+      // Mostrar panel
+      document.getElementById('nav-instruccion').style.display = 'block';
+      document.getElementById('nav-topbar-simple').style.display = 'none';
+      document.getElementById('nav-velocimetro').style.display = 'block';
+    });
+
+  } else {
+    // ── Fallback OSRM ─────────────────────────────────────────────
+    await recalcularRutaOSRM(lat, lng, p);
+  }
+}
+
+function dibujarMarcadoresNav(leg) {
+  if (!gmap) return;
+  // Marcador de destino
+  if (window._gmDestMarker) window._gmDestMarker.setMap(null);
+  const ruta = state.rutaActual;
+  const p    = ruta?.paradas[state.paradaActual];
+  if (!p) return;
+  window._gmDestMarker = new google.maps.Marker({
+    position: { lat: p.lat, lng: p.lng },
+    map: gmap,
+    icon: {
+      path: google.maps.SymbolPath.CIRCLE,
+      scale: 12,
+      fillColor: '#00e676',
+      fillOpacity: 1,
+      strokeColor: '#fff',
+      strokeWeight: 2,
+    },
+    title: p.nombre,
+  });
+  // Marcadores de todas las paradas (pequeños)
+  if (!window._gmParadaMarkers) window._gmParadaMarkers = [];
+  window._gmParadaMarkers.forEach(m => m.setMap(null));
+  window._gmParadaMarkers = (ruta?.paradas || []).map((pa, i) => {
+    const color = pa.hecha ? '#00e676' : pa.fallida ? '#ff5252' : '#00d4ff';
+    return new google.maps.Marker({
+      position: { lat: pa.lat, lng: pa.lng },
+      map: gmap,
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: i === state.paradaActual ? 10 : 6,
+        fillColor: color, fillOpacity: 1,
+        strokeColor: '#fff', strokeWeight: 1.5,
+      },
+      label: { text: pa.hecha ? '✓' : pa.fallida ? '✗' : String(i+1), color:'#000', fontSize:'10px', fontWeight:'800' },
+    });
+  });
+}
+
+// Instrucciones de voz con Google
+function mostrarPasoActualGoogle() {
+  if (!navRuta?.steps?.[navPasoActual]) return;
+  const step = navRuta.steps[navPasoActual];
+
+  // Texto limpio de HTML
+  const texto = (step.html_instructions || step.name || '').replace(/<[^>]+>/g,' ').replace(/\s+/g,' ').trim();
+
+  const flechaEl = document.getElementById('nav-flecha');
+  const calleEl  = document.getElementById('nav-calle');
+  const distEl   = document.getElementById('nav-dist-prox');
+  const destEl   = document.getElementById('nav-destino-nombre');
+
+  if (flechaEl) flechaEl.textContent = flechaParaManeuver({ type: step.maneuver?.type || 'straight' });
+  if (calleEl)  calleEl.textContent  = texto || step.name || '—';
+  if (distEl)   distEl.textContent   = step.distance < 1000
+    ? 'En ' + Math.round(step.distance) + ' m'
+    : 'En ' + (step.distance/1000).toFixed(1) + ' km';
+  const p = state.rutaActual?.paradas[state.paradaActual];
+  if (destEl && p) destEl.textContent = p.nombre;
+
+  if (navPasoActual > 0 && vozActiva) hablar(texto);
+}
+
+async function recalcularRutaOSRM(lat, lng, p) {
   try {
     const route = await calcularRutaOSRM(lat, lng, p.lat, p.lng);
-    if (!route) { showToast('Sin ruta disponible'); return; }
-
-    // Dibujar línea de ruta
+    if (!route) return;
     if (navRouteLayer) { navRouteLayer.remove(); navRouteLayer = null; }
-    if (navRouteRecorrida) { navRouteRecorrida.remove(); navRouteRecorrida = null; }
-
     const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
     navRouteLayer = L.polyline(coords, { color:'#00d4ff', weight:6, opacity:.9 }).addTo(mapNav);
-    navRouteRecorrida = L.polyline([], { color:'#ffffff', weight:6, opacity:.3 }).addTo(mapNav);
-
-    // Guardar pasos
     navRuta = route.legs[0];
     navPasoActual = 0;
-
-    // Métricas
-    const km  = (route.distance / 1000).toFixed(1);
-    const min = Math.round(route.duration / 60);
+    const km  = (route.distance/1000).toFixed(1);
+    const min = Math.round(route.duration/60);
     document.getElementById('nav-dist-total').textContent = km + ' km';
     document.getElementById('nav-tiempo-restante').textContent = '~' + min + ' min';
-    document.getElementById('nav-km').textContent = (ruta.kmTotal || km) + ' km';
-
-    // Mostrar primera instrucción
+    document.getElementById('nav-km').textContent = km + ' km';
     mostrarPasoActual();
-
-    // Mostrar panel de instrucción
     document.getElementById('nav-instruccion').style.display = 'block';
     document.getElementById('nav-topbar-simple').style.display = 'none';
-    document.getElementById('nav-velocimetro').style.display = 'block';
-
-  } catch(e) {
-    console.warn('OSRM error:', e);
-    showToast('⚠️ Sin conexión — navegando sin indicaciones');
-  }
+  } catch(e) { showToast('⚠️ Sin ruta disponible'); }
 }
 
 // ── Actualizar paso actual según posición GPS ─────────────────────
@@ -1721,8 +2044,12 @@ function centrarGPS() {
   modoCentrado = !modoCentrado;
   const btn = document.getElementById('btn-centrar');
   if (btn) btn.style.color = modoCentrado ? 'var(--accent)' : 'var(--text2)';
-  if (modoCentrado && navGPSMarker) {
-    mapNav.setView(navGPSMarker.getLatLng(), 17, { animate: true });
+  if (!modoCentrado) return;
+  if (gmap && gmNavMarker) {
+    gmap.panTo(gmNavMarker.getPosition());
+    gmap.setZoom(17);
+  } else if (mapNav && navGPSMarker) {
+    mapNav.setView(navGPSMarker.getLatLng(), 17, { animate:true });
   }
 }
 
@@ -1731,9 +2058,15 @@ function vistaGeneral() {
   const btn = document.getElementById('btn-centrar');
   if (btn) btn.style.color = 'var(--text2)';
   if (!state.rutaActual?.paradas.length) return;
-  const pts = state.rutaActual.paradas.map(p => [p.lat, p.lng]);
-  if (navGPSMarker) pts.push([navGPSMarker.getLatLng().lat, navGPSMarker.getLatLng().lng]);
-  mapNav.fitBounds(L.latLngBounds(pts), { padding: [60, 80] });
+  if (gmap) {
+    const bounds = new google.maps.LatLngBounds();
+    state.rutaActual.paradas.forEach(p => bounds.extend({ lat: p.lat, lng: p.lng }));
+    if (gmNavMarker) bounds.extend(gmNavMarker.getPosition());
+    gmap.fitBounds(bounds, 60);
+  } else if (mapNav) {
+    const pts = state.rutaActual.paradas.map(p => [p.lat, p.lng]);
+    mapNav.fitBounds(L.latLngBounds(pts), { padding:[60,80] });
+  }
 }
 
 // ── Panel inferior ────────────────────────────────────────────────
