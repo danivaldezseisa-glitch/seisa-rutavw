@@ -1303,43 +1303,37 @@ async function resolverPlusCodeUI() {
   try {
     let result = null;
 
-    // ── Google Geocoding: más preciso para Plus Codes ────────────────
+    // ── Google Geocoding: resolver Plus Code ─────────────────────────
     if (googleMapsReady && gmGeocoder) {
       const parsed = parsearLineaPlusCode(raw);
-      // Enviar el plus code + ciudad a Google
+      // Google entiende Plus Codes directamente: 'GP7F+JX5 Naucalpan de Juárez'
       const query = parsed
         ? parsed.plusCode + ' ' + parsed.ciudad
         : raw;
       result = await new Promise(resolve => {
         gmGeocoder.geocode(
           { address: query, region: 'MX', language: 'es' },
-          (res, status) => {
-            if (status === 'OK' && res[0]) {
-              // Nombre de la dirección desde Google
-              const addr    = res[0].address_components || [];
-              const street  = addr.find(c => c.types.includes('route'))?.long_name || '';
-              const number  = addr.find(c => c.types.includes('street_number'))?.long_name || '';
-              const colonia = addr.find(c => c.types.includes('sublocality_level_1') ||
-                                             c.types.includes('neighborhood'))?.long_name || '';
-              // Nombre a mostrar: si hay calle, usarla; si no, el nombre del plus code
-              const nombreGoogle = [street, number].filter(Boolean).join(' ')
-                || parsed?.nombre || res[0].formatted_address.split(',')[0];
-              resolve({
-                lat:    res[0].geometry.location.lat(),
-                lng:    res[0].geometry.location.lng(),
-                nombre: nombreGoogle,
-                colonia,
-              });
-            } else {
-              console.warn('Google Geocoding status:', status);
-              resolve(null);
+          async (res, status) => {
+            if (status !== 'OK' || !res[0]) {
+              console.warn('Google Geocoding:', status, query);
+              resolve(null); return;
             }
+            const addr   = res[0].address_components || [];
+            const street = addr.find(c => c.types.includes('route'))?.long_name || '';
+            const num    = addr.find(c => c.types.includes('street_number'))?.long_name || '';
+            const lat    = res[0].geometry.location.lat();
+            const lng    = res[0].geometry.location.lng();
+            // Nombre: lo que escribió el usuario > calle Google > formatted_address
+            const nombreFinal = (parsed?.nombre && parsed.nombre !== parsed.plusCode)
+              ? parsed.nombre
+              : ([street, num].filter(Boolean).join(' ') || res[0].formatted_address.split(',')[0]);
+            resolve({ lat, lng, nombre: nombreFinal });
           }
         );
       });
     }
 
-    // ── Fallback: OLC local + Nominatim ───────────────────────────────
+    // ── Fallback: OLC + Nominatim ─────────────────────────────────────
     if (!result) {
       result = await resolverPlusCode(raw);
     }
@@ -2275,8 +2269,12 @@ function renderListaNav() {
         <div class="parada-name"></div>
         ${p.horaAccion ? `<div class="parada-sub">${p.hecha&&!p.fallida?'✓ Entregada':'✗ Fallida'} · ${p.horaAccion}</div>` : ''}
       </div>
-      ${esActual ? '<div style="font-size:10px;color:var(--accent);font-weight:700;">▶ Actual</div>' : ''}`;
+      <div style="display:flex;align-items:center;gap:4px;">
+        ${esActual ? '<div style="font-size:10px;color:var(--accent);font-weight:700;">▶</div>' : ''}
+        <button style="background:none;border:none;color:var(--text3);font-size:15px;cursor:pointer;padding:4px;" title="Editar ubicación">✏️</button>
+      </div>`;
     div.querySelector('.parada-name').textContent = p.nombre;
+    div.querySelector('button').onclick = (e) => { e.stopPropagation(); abrirEditarParada(p.id); toggleListaNav(); };
     div.onclick = () => { irAParada(i); toggleListaNav(); };
     container.appendChild(div);
   });
@@ -2460,7 +2458,7 @@ function usarGPS(tipo) {
 // ══════════════════════════════════════════════════════════════════
 let editParadaData = null;
 
-function abrirEditarParada(id) {
+window.abrirEditarParada = function(id) {
   editParadaData = null;
   document.getElementById('editar-parada-id').value = id;
   document.getElementById('editar-parada-input').value = '';
@@ -2468,21 +2466,22 @@ function abrirEditarParada(id) {
   const box = document.getElementById('search-results-editar-parada');
   if (box) { box.style.display = 'none'; box.innerHTML = ''; }
 
-  // Mostrar nombre y coords actuales
-  const p = rutaBuild.paradas.find(x => x.id === id);
+  // Buscar parada en rutaBuild O en rutaActual
+  const p = rutaBuild.paradas.find(x => x.id === id)
+         || state.rutaActual?.paradas.find(x => x.id === id);
+
   const actualEl = document.getElementById('editar-parada-actual');
   if (actualEl && p) {
     actualEl.textContent = '📍 ' + p.nombre + ' · ' + p.lat.toFixed(5) + ', ' + p.lng.toFixed(5);
   }
   const nombreEl = document.getElementById('editar-parada-nombre');
-  if (nombreEl && p) nombreEl.value = p.nombre;
+  if (nombreEl) nombreEl.value = p ? p.nombre : '';
 
-  // Limpiar plus code
   const pcEl = document.getElementById('editar-pluscode-input');
   if (pcEl) pcEl.value = '';
 
   document.getElementById('modal-editar-parada').classList.remove('hidden');
-}
+};
 
 function buscarEdicionParada(q) {
   clearTimeout(searchTimers['editar-parada']);
@@ -2535,27 +2534,42 @@ async function resolverPlusCodeEditar() {
 function confirmarEditarParada() {
   if (!editParadaData) { showToast('Selecciona una nueva ubicación primero'); return; }
   const id = document.getElementById('editar-parada-id').value;
-  const p  = rutaBuild.paradas.find(x => x.id === id);
-  if (!p) return;
-
-  // Usar nombre personalizado si se escribió, si no el de la búsqueda
   const nombreCustom = document.getElementById('editar-parada-nombre')?.value.trim();
-  p.lat    = editParadaData.lat;
-  p.lng    = editParadaData.lng;
-  p.nombre = nombreCustom || editParadaData.nombre;
 
-  actualizarMapaParadas();
-  renderParadasList();
+  // Actualizar en rutaBuild
+  const pb = rutaBuild.paradas.find(x => x.id === id);
+  if (pb) {
+    pb.lat = editParadaData.lat; pb.lng = editParadaData.lng;
+    pb.nombre = nombreCustom || editParadaData.nombre;
+  }
+
+  // Actualizar también en rutaActual si existe
+  const pa = state.rutaActual?.paradas.find(x => x.id === id);
+  if (pa) {
+    pa.lat = editParadaData.lat; pa.lng = editParadaData.lng;
+    pa.nombre = nombreCustom || editParadaData.nombre;
+    saveState();
+  }
+
   closeModal('modal-editar-parada');
 
-  // Re-optimizar automáticamente si hay más de 1 parada
-  if (rutaBuild.paradas.length > 1) {
-    showToast('✅ Parada actualizada — re-optimizando...');
-    setTimeout(() => {
-      optimizarRuta();
-    }, 400);
-  } else {
-    showToast('✅ Parada actualizada');
+  if (pb) {
+    // Estamos en pantalla de paradas → re-optimizar
+    actualizarMapaParadas();
+    renderParadasList();
+    if (rutaBuild.paradas.length > 1) {
+      showToast('✅ Parada actualizada — re-optimizando...');
+      setTimeout(() => optimizarRuta(), 400);
+    } else {
+      showToast('✅ Parada actualizada');
+    }
+  } else if (pa) {
+    // Estamos en navegación → actualizar mapa y ruta
+    actualizarNavPanel();
+    trazarRutaCompleta();
+    renderListaNav();
+    showToast('✅ Ubicación actualizada');
+    setTimeout(() => recalcularRuta(), 400);
   }
 }
 
