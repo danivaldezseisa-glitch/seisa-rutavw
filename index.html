@@ -716,190 +716,11 @@ select option { background: var(--surface2); }
 <body>
 
 <!-- ══════════════════════════════════════════
-     SCREEN: LOGIN
-══════════════════════════════════════════ -->
-<div id="screen-login">
-
-  <!-- Logo SEISA con camión -->
-  <div style="display:flex;flex-direction:column;align-items:center;margin-bottom:28px;">
-    <svg width="220" height="110" viewBox="0 0 220 110" xmlns="http://www.w3.org/2000/svg">
-      <!-- Cabina del camión -->
-      <rect x="4" y="42" width="52" height="46" rx="6" fill="#1a3a6b" stroke="#00d4ff" stroke-width="1.5"/>
-      <!-- Parabrisas -->
-      <rect x="10" y="48" width="30" height="18" rx="3" fill="#00d4ff" opacity="0.85"/>
-      <!-- Puerta cabina -->
-      <rect x="10" y="70" width="18" height="14" rx="2" fill="#0f2850" stroke="#1e3560" stroke-width="1"/>
-      <!-- Manija -->
-      <rect x="25" y="76" width="5" height="2" rx="1" fill="#00d4ff"/>
-      <!-- Espejo -->
-      <rect x="1" y="52" width="5" height="8" rx="2" fill="#1a3a6b" stroke="#00d4ff" stroke-width="1"/>
-      <!-- Cuerpo de la caja seca -->
-      <rect x="56" y="28" width="158" height="60" rx="4" fill="#152240" stroke="#1e3560" stroke-width="1.5"/>
-      <!-- Líneas de la caja (estructura) -->
-      <line x1="56" y1="48" x2="214" y2="48" stroke="#1e3560" stroke-width="1"/>
-      <line x1="100" y1="28" x2="100" y2="88" stroke="#1e3560" stroke-width="1"/>
-      <line x1="157" y1="28" x2="157" y2="88" stroke="#1e3560" stroke-width="1"/>
-      <!-- Logo Walmart en la caja (estrella de 6 puntas spark) -->
-      <g transform="translate(128,58)">
-        <!-- Spark Walmart -->
-        <ellipse cx="0" cy="-13" rx="3.5" ry="6" fill="#FFC220" transform="rotate(0)"/>
-        <ellipse cx="0" cy="-13" rx="3.5" ry="6" fill="#FFC220" transform="rotate(60)"/>
-        <ellipse cx="0" cy="-13" rx="3.5" ry="6" fill="#FFC220" transform="rotate(120)"/>
-        <ellipse cx="0" cy="-13" rx="3.5" ry="6" fill="#FFC220" transform="rotate(180)"/>
-        <ellipse cx="0" cy="-13" rx="3.5" ry="6" fill="#FFC220" transform="rotate(240)"/>
-        <ellipse cx="0" cy="-13" rx="3.5" ry="6" fill="#FFC220" transform="rotate(300)"/>
-        <circle cx="0" cy="0" r="4" fill="#FFC220"/>
-        <!-- Texto Walmart -->
-        <text x="0" y="18" text-anchor="middle" font-family="Arial Black,sans-serif" font-size="11" font-weight="900" fill="#FFC220" letter-spacing="-0.5">Walmart</text>
-      </g>
-      <!-- Puerta trasera de la caja -->
-      <rect x="196" y="32" width="16" height="52" rx="2" fill="#0f2850" stroke="#1e3560" stroke-width="1"/>
-      <line x1="204" y1="32" x2="204" y2="84" stroke="#1e3560" stroke-width="1"/>
-      <circle cx="204" cy="58" r="2.5" fill="#00d4ff" opacity="0.7"/>
-      <!-- Chasis / bastidor -->
-      <rect x="4" y="88" width="210" height="6" rx="2" fill="#0f2850" stroke="#1e3560" stroke-width="1"/>
-      <!-- Rueda trasera doble (eje trasero) -->
-      <circle cx="168" cy="97" r="11" fill="#0a1628" stroke="#00d4ff" stroke-width="1.5"/>
-      <circle cx="168" cy="97" r="6" fill="#152240" stroke="#1e3560" stroke-width="1"/>
-      <circle cx="168" cy="97" r="2.5" fill="#00d4ff" opacity="0.7"/>
-      <circle cx="183" cy="97" r="11" fill="#0a1628" stroke="#00d4ff" stroke-width="1.5"/>
-      <circle cx="183" cy="97" r="6" fill="#152240" stroke="#1e3560" stroke-width="1"/>
-      <circle cx="183" cy="97" r="2.5" fill="#00d4ff" opacity="0.7"/>
-      <!-- Rueda delantera -->
-      <circle cx="30" cy="97" r="11" fill="#0a1628" stroke="#00d4ff" stroke-width="1.5"/>
-      <circle cx="30" cy="97" r="6" fill="#152240" stroke="#1e3560" stroke-width="1"/>
-      <circle cx="30" cy="97" r="2.5" fill="#00d4ff" opacity="0.7"/>
-      <!-- Luces delantera -->
-      <rect x="4" y="70" width="6" height="4" rx="1" fill="#ffd740" opacity="0.9"/>
-      <!-- Luces traseras -->
-      <rect x="210" y="70" width="4" height="8" rx="1" fill="#ff5252" opacity="0.9"/>
-      <!-- Escape / humo estilizado -->
-      <circle cx="60" cy="24" r="3" fill="#1e3560" opacity="0.6"/>
-      <circle cx="64" cy="18" r="2.5" fill="#1e3560" opacity="0.4"/>
-      <circle cx="67" cy="13" r="2" fill="#1e3560" opacity="0.2"/>
-    </svg>
-
-    <!-- Nombre SEISA -->
-    <div style="font-size:34px;font-weight:900;color:var(--accent);letter-spacing:.12em;line-height:1;margin-top:4px;font-family:var(--sans);">SEISA</div>
-    <div style="font-size:11px;color:var(--text3);letter-spacing:.18em;text-transform:uppercase;margin-top:4px;">Soluciones Logísticas Seisa</div>
-  </div>
-
-  <div class="login-card">
-    <div class="login-field">
-      <label>Correo electrónico</label>
-      <input type="email" id="login-email" placeholder="usuario@seisa.com" autocomplete="email"
-        onkeydown="if(event.key==='Enter')document.getElementById('login-pass').focus()">
-    </div>
-    <div class="login-field">
-      <label>Contraseña</label>
-      <input type="password" id="login-pass" placeholder="••••••••" autocomplete="current-password"
-        onkeydown="if(event.key==='Enter')doLogin()">
-    </div>
-    <div class="login-error" id="login-error"></div>
-    <button class="login-btn" id="login-btn" onclick="doLogin()">Iniciar sesión</button>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════
-     SCREEN: ADMIN (solo admin)
-══════════════════════════════════════════ -->
-<div class="screen hidden" id="screen-admin">
-  <div class="topbar">
-    <button class="topbar-back" onclick="showScreen('home')">←</button>
-    <h2>⚙️ Panel de Admin</h2>
-  </div>
-  <div class="scroll" style="padding:16px;display:flex;flex-direction:column;gap:16px;">
-
-    <!-- Crear usuario -->
-    <div class="card">
-      <div style="font-size:13px;font-weight:700;margin-bottom:12px;color:var(--accent);">➕ Crear usuario</div>
-      <div style="display:flex;flex-direction:column;gap:10px;">
-        <div class="field"><label>Nombre</label><input type="text" id="nu-nombre" placeholder="Juan Pérez"></div>
-        <div class="field"><label>Correo</label><input type="email" id="nu-email" placeholder="juan@seisa.com"></div>
-        <div class="field"><label>Contraseña</label><input type="password" id="nu-pass" placeholder="mínimo 6 caracteres"></div>
-        <div class="field">
-          <label>Rol</label>
-          <select id="nu-rol" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--text);font-family:var(--sans);font-size:14px;">
-            <option value="operador">🚚 Operador</option>
-            <option value="admin">⚙️ Administrador</option>
-          </select>
-        </div>
-        <div id="nu-error" style="font-size:12px;color:var(--red);min-height:14px;"></div>
-        <button class="btn btn-accent" id="btn-crear-usuario" onclick="crearUsuario()">Crear usuario</button>
-      </div>
-    </div>
-
-    <!-- Lista de usuarios -->
-    <div class="card">
-      <div style="font-size:13px;font-weight:700;margin-bottom:12px;color:var(--accent);">👥 Usuarios registrados</div>
-      <div id="admin-users-list" style="display:flex;flex-direction:column;gap:10px;">
-        <div style="color:var(--text3);font-size:13px;">Cargando...</div>
-      </div>
-    </div>
-
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════
-     SCREEN: HOME / RUTA
-══════════════════════════════════════════ -->
-<div class="screen" id="screen-home">
-  <div class="home-header">
-    <div style="display:flex;align-items:center;justify-content:space-between;">
-      <div>
-        <div class="home-greeting">Bienvenido,</div>
-        <div class="home-name" id="home-user-name">—</div>
-      </div>
-      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
-        <div class="user-badge" onclick="doLogout()">
-          <div class="user-badge-dot"></div>
-          <span id="home-user-rol">operador</span>
-          <span style="font-size:10px;color:var(--text3);">· Salir</span>
-        </div>
-        <div id="admin-btn-wrap" style="display:none;">
-          <button class="btn btn-ghost btn-sm" onclick="abrirAdmin()" style="font-size:11px;padding:4px 10px;">⚙️ Admin</button>
-        </div>
-      </div>
-    </div>
-  </div>
-  <div class="stats-row">
-    <div class="stat-card"><div class="stat-n" id="stat-total">0</div><div class="stat-l">Total</div></div>
-    <div class="stat-card"><div class="stat-n" id="stat-done" style="color:var(--green)">0</div><div class="stat-l">Entregados</div></div>
-    <div class="stat-card"><div class="stat-n" id="stat-pending" style="color:var(--orange)">0</div><div class="stat-l">Pendientes</div></div>
-  </div>
-  <div style="padding:0 16px 10px; display:flex; gap:8px;">
-    <button class="btn btn-accent" onclick="showScreen('nueva-ruta')" style="flex:1;">
-      🗺️ Nueva Ruta
-    </button>
-    <button class="btn btn-green" onclick="enviarMasivo()" style="flex:1;">
-      💬 Enviar a pendientes
-    </button>
-  </div>
-  <div style="padding:0 16px 10px;">
-    <button class="btn" onclick="abrirFinDeRuta()" style="background:linear-gradient(135deg,#ff5252,#cc0000);color:#fff;font-size:14px;font-weight:700;border:none;gap:8px;">
-      🏁 Fin de Ruta
-    </button>
-  </div>
-  <div id="ruta-activa-bar" style="display:none;" class="ruta-active-bar" onclick="showScreen('nueva-ruta')">
-    <div class="ruta-active-dot"></div>
-    <div class="ruta-active-name" id="ruta-activa-nombre">—</div>
-    <div class="ruta-active-label">Ruta activa ›</div>
-  </div>
-  <div class="scroll" id="route-list-wrap">
-    <div class="empty-list" id="route-empty">
-      <div class="ei">📦</div>
-      <p>No hay paquetes en ruta.<br>Ve a <strong>Escanear</strong> para cargar etiquetas.</p>
-    </div>
-    <div id="route-list"></div>
-  </div>
-  </div>
-
-<!-- ══════════════════════════════════════════
      SCREEN: NAVEGACIÓN — CONFIGURAR PARADAS
 ══════════════════════════════════════════ -->
 <div class="screen hidden" id="screen-navegacion">
   <div class="topbar">
-    <button class="topbar-back" onclick="showScreen('home')">←</button>
+    <button class="topbar-back" onclick="showScreen('navegacion')">←</button>
     <h2>🗺️ Planear ruta</h2>
     <span class="topbar-sub" id="nav-stop-count">0 paradas</span>
   </div>
@@ -1170,7 +991,7 @@ select option { background: var(--surface2); }
       </div>
 
       <!-- Fila acción: Google Maps | Deshacer | Redibujar -->
-      <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px;">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
         <button onclick="abrirRutaEnGoogleMaps()" style="
           padding:10px 4px;border-radius:11px;
           border:1.5px solid rgba(52,168,83,.45);
@@ -1185,13 +1006,7 @@ select option { background: var(--surface2); }
           font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);
           display:flex;align-items:center;justify-content:center;gap:4px;
         ">↩ Deshacer</button>
-        <button onclick="recalcularVistaGeneral()" style="
-          padding:10px 4px;border-radius:11px;
-          border:1.5px solid rgba(0,212,255,.3);
-          background:rgba(0,212,255,.08);color:var(--accent);
-          font-size:11px;font-weight:700;cursor:pointer;font-family:var(--sans);
-          display:flex;align-items:center;justify-content:center;gap:4px;
-        ">🔄 Redibujar</button>
+
       </div>
 
     </div>
@@ -1408,523 +1223,6 @@ Casa verde, 8Q4F+HP México" style="
     <!-- Zonas detectadas -->
     <div id="zona-chips" style="display:flex;flex-wrap:wrap;gap:6px;min-height:28px;margin-bottom:8px;"></div>
   </div>
-</div>
-
-<div class="screen hidden" id="screen-nueva-ruta">
-  <div class="topbar">
-    <button class="topbar-back" onclick="showScreen('home')">←</button>
-    <h2>Nueva Ruta</h2>
-    <span class="topbar-sub" id="nr-fecha-label"></span>
-  </div>
-  <div class="scroll">
-    <div class="nueva-ruta-hero">
-      <div class="nueva-ruta-icon">🗺️</div>
-      <div class="nueva-ruta-title">¿Cómo se llama esta ruta?</div>
-      <div class="nueva-ruta-sub">Dale un nombre para identificarla<br>en la lista de paquetes</div>
-    </div>
-
-    <div style="padding: 0 16px 12px;">
-      <div class="field">
-        <label>Nombre de la ruta</label>
-        <input type="text" id="nr-nombre" class="ruta-name-input" placeholder="Ej. Ruta Norte Mañana"
-          oninput="updateNRPreview()" autocomplete="off" maxlength="40">
-      </div>
-      <div class="field">
-        <label>📅 Fecha de la ruta</label>
-        <input type="date" id="nr-fecha-input" oninput="updateNRPreview()"
-          style="font-size:15px;font-weight:600;text-align:center;letter-spacing:.02em;">
-      </div>
-    </div>
-
-    <div class="sec-header">Sugerencias rápidas</div>
-    <div class="ruta-suggestions">
-      <div class="ruta-chip" onclick="setRutaName('Ruta Norte')">🧭 Ruta Norte</div>
-      <div class="ruta-chip" onclick="setRutaName('Ruta Sur')">🧭 Ruta Sur</div>
-      <div class="ruta-chip" onclick="setRutaName('Ruta Centro')">🧭 Ruta Centro</div>
-      <div class="ruta-chip" onclick="setRutaName('Ruta Oriente')">🧭 Ruta Oriente</div>
-      <div class="ruta-chip" onclick="setRutaName('Ruta Poniente')">🧭 Ruta Poniente</div>
-      <div class="ruta-chip" onclick="setRutaName('Ruta Mañana')">🌅 Ruta Mañana</div>
-      <div class="ruta-chip" onclick="setRutaName('Ruta Tarde')">🌇 Ruta Tarde</div>
-      <div class="ruta-chip" onclick="setRutaName('Ruta Extra')">⭐ Ruta Extra</div>
-    </div>
-
-    <div style="padding: 0 16px 8px;">
-      <div id="nr-preview" style="
-        background: var(--surface); border: 1px solid var(--border);
-        border-radius: 12px; padding: 14px 16px; margin-bottom: 14px;
-        display: flex; align-items: center; gap: 12px; opacity: .5;
-        transition: opacity .2s;
-      ">
-        <span style="font-size: 24px;">🗺️</span>
-        <div>
-          <div id="nr-preview-nombre" style="font-size:15px;font-weight:700;">—</div>
-          <div id="nr-preview-fecha" style="font-size:11px;color:var(--text3);margin-top:2px;font-family:var(--mono);"></div>
-        </div>
-      </div>
-
-      <button class="btn btn-accent" id="btn-iniciar-escaneo" onclick="iniciarNuevaRuta()" disabled>
-        📷 Iniciar escaneo de etiquetas
-      </button>
-      <div style="height:10px;"></div>
-      <button class="btn btn-ghost" onclick="showScreen('home')">Cancelar</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════
-     SCREEN: SCAN MASIVO
-══════════════════════════════════════════ -->
-<div class="screen hidden" id="screen-scan">
-  <div class="topbar">
-    <button class="topbar-back" onclick="detenerEscaner();showScreen('home')">←</button>
-    <h2 id="scan-ruta-title">Escanear guías</h2>
-    <span class="topbar-sub" id="scan-count"></span>
-  </div>
-  <div class="scroll">
-
-    <!-- PASO 1: Escáner de código de barras -->
-    <div style="padding:14px 16px 8px;">
-      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-        <div style="width:28px;height:28px;border-radius:50%;background:var(--accent);color:var(--bg);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0;">1</div>
-        <div>
-          <div style="font-size:14px;font-weight:700;">Escanear código QR o de barras</div>
-          <div style="font-size:11px;color:var(--text3);">Apunta la cámara al código QR o código de barras del Tracking</div>
-        </div>
-      </div>
-
-      <!-- Visor de cámara -->
-      <div id="scanner-wrap" style="position:relative;border-radius:14px;overflow:hidden;background:#000;aspect-ratio:4/3;margin-bottom:10px;display:none;">
-        <div id="scanner-video" style="width:100%;height:100%;"></div>
-        <!-- Línea de escaneo animada -->
-        <div style="position:absolute;inset:0;pointer-events:none;">
-          <div style="position:absolute;left:5%;right:5%;top:50%;transform:translateY(-50%);height:80px;border:2px solid var(--accent);border-radius:8px;box-shadow:0 0 0 2000px rgba(0,0,0,.45);">
-            <div id="scan-line" style="position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent);box-shadow:0 0 8px var(--accent);animation:scanLine 1.2s ease-in-out infinite;"></div>
-          </div>
-        </div>
-        <!-- Último tracking detectado -->
-        <div id="scanner-last" style="position:absolute;bottom:0;left:0;right:0;padding:10px 14px;background:rgba(0,0,0,.75);font-size:13px;font-weight:700;color:var(--green);font-family:var(--mono);text-align:center;display:none;"></div>
-        <!-- Debug: modo activo y último código visto -->
-        <div id="scanner-debug" style="position:absolute;top:8px;left:8px;right:8px;padding:6px 10px;background:rgba(0,0,0,.65);border-radius:8px;font-size:11px;color:#fff;font-family:monospace;display:none;word-break:break-all;"></div>
-        <!-- Canvas oculto para lectura de QR con jsQR -->
-        <canvas id="qr-canvas" style="display:none;"></canvas>
-      </div>
-
-      <div id="scanner-btns" style="display:flex;gap:8px;margin-bottom:10px;">
-        <button class="btn btn-accent" id="btn-iniciar-scanner" onclick="iniciarEscaner()" style="flex:1;">
-          📷 Iniciar escáner
-        </button>
-        <button class="btn btn-ghost btn-sm" id="btn-detener-scanner" onclick="detenerEscaner()" style="display:none;white-space:nowrap;">
-          ⏹ Detener
-        </button>
-      </div>
-
-      <!-- Ingreso manual como fallback -->
-      <div style="display:flex;gap:8px;align-items:center;">
-        <input type="text" id="tracking-manual-input" placeholder="O escribe el tracking manualmente..."
-          style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--text);font-size:13px;font-family:var(--mono);outline:none;"
-          onkeydown="if(event.key==='Enter')agregarTrackingManual()">
-        <button class="btn btn-ghost btn-sm" onclick="agregarTrackingManual()" style="white-space:nowrap;flex-shrink:0;">＋ Agregar</button>
-      </div>
-    </div>
-
-    <!-- Guías escaneadas -->
-    <div id="trackings-detectados-wrap" style="display:none;padding:0 16px 16px;">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;font-weight:600;">Guías escaneadas</div>
-        <button onclick="limpiarTrackings()" style="background:none;border:none;color:var(--text3);font-size:11px;cursor:pointer;padding:2px 6px;border-radius:6px;">🗑 Limpiar</button>
-      </div>
-      <div id="trackings-detectados-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;"></div>
-      <button id="btn-cargar-etiquetas" onclick="cargarEtiquetasEnLista()" class="btn btn-green" style="width:100%;font-size:15px;font-weight:700;">
-        📋 Cargar etiquetas en lista
-      </button>
-      <div id="cargar-etiquetas-resultado" style="display:none;margin-top:10px;font-size:13px;color:var(--text2);padding:10px 14px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);"></div>
-    </div>
-
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════
-     SCREEN: DETALLE CLIENTE
-══════════════════════════════════════════ -->
-<div class="screen hidden" id="screen-client">
-  <div class="topbar">
-    <button class="topbar-back" onclick="showScreen('home')">←</button>
-    <h2 id="client-topbar-name">Cliente</h2>
-    <span id="client-status-badge"></span>
-  </div>
-  <div class="scroll">
-
-    <!-- ── HERO ── -->
-    <div class="client-hero">
-      <div class="client-name" id="c-nombre">—</div>
-      <!-- Teléfono inline con ícono y tap-to-call -->
-      <div id="c-tel-hero" style="display:flex;align-items:center;gap:6px;margin-top:5px;">
-        <span style="font-size:14px;">📞</span>
-        <a id="c-tel-link" href="#" style="font-size:14px;color:var(--accent);font-weight:600;text-decoration:none;">—</a>
-      </div>
-    </div>
-
-    <!-- ── TARJETA DOMICILIO ── -->
-    <div style="padding:14px 16px 0;">
-      <div style="
-        background:linear-gradient(135deg,var(--surface) 0%,var(--surface2) 100%);
-        border:1px solid var(--border);border-radius:16px;overflow:hidden;
-      ">
-        <!-- Encabezado -->
-        <div style="
-          display:flex;align-items:center;gap:10px;
-          padding:12px 14px 10px;
-          border-bottom:1px solid var(--border);
-          background:rgba(0,212,255,.05);
-        ">
-          <div style="width:32px;height:32px;border-radius:10px;background:rgba(0,212,255,.15);border:1px solid rgba(0,212,255,.25);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">🏠</div>
-          <div>
-            <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.09em;">Domicilio de entrega</div>
-            <div id="c-municipio-label" style="font-size:11px;color:var(--text3);margin-top:1px;"></div>
-          </div>
-          <button onclick="copiarDireccion()" style="margin-left:auto;background:transparent;border:none;color:var(--text3);font-size:18px;cursor:pointer;padding:4px;" title="Copiar dirección">⎘</button>
-        </div>
-
-        <!-- Campos de dirección -->
-        <div style="padding:12px 14px;display:flex;flex-direction:column;gap:8px;">
-
-          <!-- Calle + Número -->
-          <div style="display:flex;align-items:baseline;gap:10px;">
-            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;font-weight:600;width:52px;flex-shrink:0;">Calle</div>
-            <div id="c-calle-num" style="font-size:15px;font-weight:700;color:var(--text);flex:1;"></div>
-          </div>
-
-          <div style="height:1px;background:var(--border);opacity:.5;"></div>
-
-          <!-- Colonia -->
-          <div style="display:flex;align-items:baseline;gap:10px;">
-            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;font-weight:600;width:52px;flex-shrink:0;">Colonia</div>
-            <div id="c-colonia" style="font-size:14px;color:var(--text);flex:1;font-weight:500;"></div>
-          </div>
-
-          <div style="height:1px;background:var(--border);opacity:.5;"></div>
-
-          <!-- CP + Municipio en fila -->
-          <div style="display:flex;gap:16px;">
-            <div style="flex:1;">
-              <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-bottom:3px;">C.P.</div>
-              <div id="c-cp" style="font-size:14px;font-weight:600;font-family:var(--mono);color:var(--text);">—</div>
-            </div>
-            <div style="flex:2;">
-              <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-bottom:3px;">Municipio</div>
-              <div id="c-municipio" style="font-size:14px;font-weight:500;color:var(--text);">—</div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Botón Google Maps -->
-        <button onclick="abrirEnMaps()" style="
-          width:100%;display:flex;align-items:center;justify-content:center;gap:8px;
-          padding:11px 14px;border:none;cursor:pointer;
-          background:rgba(0,212,255,.08);border-top:1px solid var(--border);
-          color:var(--accent);font-size:13px;font-weight:600;font-family:var(--sans);
-          transition:background .15s;
-        " onmousedown="this.style.background='rgba(0,212,255,.16)'" onmouseup="this.style.background='rgba(0,212,255,.08)'">
-          <span style="font-size:16px;">🗺️</span> Abrir en Google Maps
-        </button>
-      </div>
-    </div>
-
-    <!-- ── PAQUETES ── -->
-    <div style="padding:14px 16px 0;">
-      <div style="
-        background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;
-      ">
-        <div style="
-          display:flex;align-items:center;gap:10px;padding:12px 14px 10px;
-          border-bottom:1px solid var(--border);background:rgba(0,230,118,.04);
-        ">
-          <div style="width:32px;height:32px;border-radius:10px;background:rgba(0,230,118,.12);border:1px solid rgba(0,230,118,.25);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">📦</div>
-          <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.09em;">Paquetes</div>
-          <div id="c-pdd-badge" style="margin-left:auto;display:none;">
-            <span style="font-size:11px;font-weight:600;color:var(--orange);background:rgba(255,145,0,.12);border:1px solid rgba(255,145,0,.25);padding:3px 9px;border-radius:99px;">📅 PDD: <span id="c-pdd"></span></span>
-          </div>
-        </div>
-        <div id="c-paquetes-lista" style="padding:10px 14px;display:flex;flex-direction:column;gap:6px;"></div>
-      </div>
-    </div>
-
-    <!-- ── FOTOS ESCANEO ── -->
-    <div id="c-foto-wrap" style="display:none;padding:14px 16px 0;">
-      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;">
-        <div style="padding:12px 14px 10px;border-bottom:1px solid var(--border);">
-          <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.09em;">📷 Fotos del escaneo</div>
-        </div>
-        <div id="c-fotos-paquetes" style="padding:12px 14px;"></div>
-      </div>
-    </div>
-
-    <div id="c-fotos-entrega-wrap">
-      <div class="sec-header" style="display:flex;align-items:center;justify-content:space-between;padding-right:16px;">
-        <span>📸 Fotos de producto entregado</span>
-        <label for="c-entrega-file-input" style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:99px;font-size:12px;font-weight:600;background:rgba(0,212,255,.12);border:1px solid rgba(0,212,255,.3);color:var(--accent);cursor:pointer;">
-          ＋ Agregar
-        </label>
-      </div>
-      <input type="file" id="c-entrega-file-input" accept="image/*" multiple style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">
-      <div id="c-fotos-entrega-grid" style="display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 16px;"></div>
-    </div>
-
-    <!-- FOTOS DEL ARTÍCULO -->
-    <div id="c-fotos-articulo-wrap">
-      <div class="sec-header" style="display:flex;align-items:center;justify-content:space-between;padding-right:16px;">
-        <span>📦 Fotos del artículo</span>
-        <label for="c-articulo-file-input" style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:99px;font-size:12px;font-weight:600;background:rgba(0,230,118,.12);border:1px solid rgba(0,230,118,.3);color:var(--green);cursor:pointer;">
-          ＋ Agregar
-        </label>
-      </div>
-      <input type="file" id="c-articulo-file-input" accept="image/*" multiple style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">
-      <div id="c-fotos-articulo-grid" style="display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 16px;"></div>
-    </div>
-
-    <div id="c-fotos-excepcion-wrap">
-      <div class="sec-header" style="display:flex;align-items:center;justify-content:space-between;padding-right:16px;">
-        <span>⚠️ Fotos de excepción de entrega</span>
-        <label for="c-excepcion-file-input" style="
-          display:inline-flex;align-items:center;gap:5px;
-          padding:5px 12px;border-radius:99px;font-size:12px;font-weight:600;
-          background:rgba(255,145,0,.12);border:1px solid rgba(255,145,0,.3);
-          color:var(--orange);cursor:pointer;">
-          ＋ Agregar
-        </label>
-      </div>
-      <input type="file" id="c-excepcion-file-input" accept="image/*" multiple style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">
-      <div id="c-fotos-excepcion-grid" style="display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 16px;"></div>
-    </div>
-
-    <div class="sec-header" style="display:flex;align-items:center;justify-content:space-between;padding-right:16px;">
-      <span>📍 Plus Code de entrega</span>
-    </div>
-    <div style="padding:0 16px 14px;display:flex;flex-direction:column;gap:8px;">
-      <div style="display:flex;gap:8px;">
-        <input type="text" id="c-pluscode-input" placeholder="Ej. 8Q3C+6P Cuautitlán" autocomplete="off"
-          style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--text);font-size:13px;font-family:var(--sans);outline:none;"
-          onkeydown="if(event.key==='Enter')agregarPlusCodeCliente()">
-        <button class="btn btn-accent btn-sm" onclick="agregarPlusCodeCliente()" style="white-space:nowrap;flex-shrink:0;">＋ Agregar</button>
-      </div>
-      <div id="c-pluscode-list" style="display:flex;flex-direction:column;gap:6px;"></div>
-      <button class="btn btn-ghost" id="btn-ir-ruta" onclick="agregarClienteARuta()" style="display:none;margin-top:4px;border-color:var(--accent);color:var(--accent);">
-        📍 Agregar paradas a ruta
-      </button>
-    </div>
-
-    <!-- botones ocultos — solo para compatibilidad con JS existente -->
-    <div id="hidden-action-btns" style="position:absolute;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;">
-      <button id="btn-whatsapp-intro"></button>
-      <button id="btn-whatsapp-camino"></button>
-      <button id="btn-open-camera"></button>
-      <button id="btn-edit-client"></button>
-      <div id="exc-btn-wrap">
-        <div id="exc-dropdown"></div>
-        <button class="exc-btn" onclick="toggleExcDropdown()">
-          <span id="exc-arrow"></span>
-        </button>
-      </div>
-      <button id="btn-mark-done"></button>
-      <button id="btn-en-camino"></button>
-    </div>
-    <!-- único botón visible: deshacer entrega -->
-    <div style="padding:0 16px 16px;">
-      <button class="btn btn-ghost" id="btn-undo-done" onclick="deshacerEntrega()" style="display:none;color:var(--orange);border-color:var(--orange);font-size:13px;">
-        ↩ Deshacer entrega
-      </button>
-    </div>
-  </div>
-</div>
-
-<!-- SCREEN: ESCANEAR GUÍA EN ENTREGA -->
-<div class="screen hidden" id="screen-scan-entrega">
-  <div class="topbar">
-    <button class="topbar-back" onclick="cerrarScanEntrega()">←</button>
-    <h2>📦 Confirmar entrega</h2>
-    <div id="scan-entrega-client-name" style="font-size:12px;color:var(--accent);font-weight:600;"></div>
-  </div>
-  <div class="scroll" style="padding:16px;display:flex;flex-direction:column;gap:14px;">
-
-    <!-- Visor escáner -->
-    <div class="card" style="padding:14px;">
-      <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;font-weight:600;">📷 Escanear etiqueta de guía</div>
-      <div id="scan-entrega-wrap" style="position:relative;border-radius:12px;overflow:hidden;background:#000;aspect-ratio:4/3;margin-bottom:10px;">
-        <div id="scan-entrega-video" style="width:100%;height:100%;"></div>
-        <div style="position:absolute;inset:0;pointer-events:none;">
-          <div style="position:absolute;left:5%;right:5%;top:50%;transform:translateY(-50%);height:80px;border:2px solid var(--accent);border-radius:8px;box-shadow:0 0 0 2000px rgba(0,0,0,.45);">
-            <div style="position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent);box-shadow:0 0 8px var(--accent);animation:scanLine 1.2s ease-in-out infinite;"></div>
-          </div>
-        </div>
-        <canvas id="scan-entrega-canvas" style="display:none;"></canvas>
-      </div>
-      <!-- Guía detectada -->
-      <div id="scan-entrega-resultado" style="display:none;padding:12px 14px;background:rgba(0,230,118,.1);border:1px solid var(--green);border-radius:10px;margin-bottom:10px;">
-        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:4px;">✅ Guía detectada</div>
-        <div id="scan-entrega-guia-val" style="font-size:15px;font-weight:700;color:var(--green);font-family:var(--mono);word-break:break-all;"></div>
-      </div>
-      <!-- Ingreso manual -->
-      <div style="display:flex;gap:8px;align-items:center;margin-top:6px;">
-        <input type="text" id="scan-entrega-manual" placeholder="O escribe la guía manualmente..."
-          style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--text);font-size:13px;font-family:var(--mono);outline:none;"
-          onkeydown="if(event.key==='Enter')scanEntregaManual()">
-        <button class="btn btn-ghost btn-sm" onclick="scanEntregaManual()" style="white-space:nowrap;flex-shrink:0;">＋</button>
-      </div>
-    </div>
-
-    <!-- Método de entrega (se muestra tras escanear) -->
-    <div id="scan-entrega-metodos" style="display:none;" class="card">
-      <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;font-weight:600;">Método de entrega</div>
-      <div style="display:flex;gap:10px;margin-bottom:12px;">
-        <div id="se-opt-cliente" onclick="seSetReceptor('cliente')"
-          style="flex:1;padding:14px 8px;border-radius:10px;text-align:center;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--accent);background:rgba(0,212,255,.15);color:var(--accent);">
-          👤 Cliente</div>
-        <div id="se-opt-familiar" onclick="seSetReceptor('familiar')"
-          style="flex:1;padding:14px 8px;border-radius:10px;text-align:center;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--border);background:var(--surface2);color:var(--text2);">
-          👨‍👩‍👦 Familiar</div>
-      </div>
-      <div id="se-familiar-wrap" style="display:none;margin-bottom:10px;">
-        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">💬 Nombre del familiar</div>
-        <input type="text" id="se-familiar-nombre" placeholder="Ej. Esposa, hijo mayor..."
-          style="width:100%;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--text);font-size:14px;outline:none;">
-      </div>
-      <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;font-weight:600;">Verificación</div>
-      <div style="display:flex;flex-direction:column;gap:8px;">
-        <div id="se-opt-nopedido" onclick="seSetVerificacion('nopedido')"
-          style="padding:13px 14px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--accent);background:rgba(0,212,255,.15);color:var(--accent);">
-          🔢 Validación de No. de pedido</div>
-        <div id="se-opt-ine" onclick="seSetVerificacion('ine')"
-          style="padding:13px 14px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--border);background:var(--surface2);color:var(--text2);">
-          🪪 Validación por INE</div>
-        <div id="se-opt-wapedido" onclick="seSetVerificacion('wapedido')"
-          style="padding:13px 14px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--border);background:var(--surface2);color:var(--text2);">
-          📲 Envío de No. de pedido por WhatsApp</div>
-        <div id="se-opt-codigoentrega" onclick="seSetVerificacion('codigoentrega')"
-          style="padding:13px 14px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--border);background:var(--surface2);color:var(--text2);">
-          🔑 Validación por código de entrega</div>
-      </div>
-    </div>
-
-    <!-- Botón enviar WhatsApp -->
-    <button class="btn btn-green" id="btn-scan-entrega-wap" onclick="scanEntregaEnviarWap()" style="display:none;font-size:16px;padding:16px;">
-      📤 Enviar entrega por WhatsApp
-    </button>
-
-    <!-- Ubicación detectada -->
-    <div id="scan-entrega-ubicacion" style="display:none;padding:10px 14px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);font-size:12px;color:var(--text3);">
-      📍 <span id="scan-entrega-coords"></span>
-    </div>
-
-  </div>
-</div>
-
-<!-- SCREEN: ENTREGA / EXCEPCIÓN -->
-<div class="screen hidden" id="screen-camera">
-  <div class="topbar">
-    <button class="topbar-back" onclick="showScreen('client')">←</button>
-    <h2 id="cam-screen-title">📸 Registrar entrega</h2>
-    <div id="cam-client-name" style="font-size:12px;color:var(--accent);font-weight:600;"></div>
-  </div>
-  <div class="scroll">
-    <input type="file" id="cam-file-input" accept="image/*" multiple style="display:none;">
-    <div style="padding:16px;display:flex;flex-direction:column;gap:14px;">
-
-      <!-- Modo entrega -->
-      <div id="cam-entrega-cards">
-        <div style="display:flex;flex-direction:column;gap:14px;">
-          <div class="card">
-            <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Quién recibe</div>
-            <div style="display:flex;gap:10px;">
-              <div id="opt-cliente" onclick="setCamOpt('receptor','cliente')" style="flex:1;padding:14px 8px;border-radius:10px;text-align:center;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--accent);background:rgba(0,212,255,.15);color:var(--accent);">👤 Cliente</div>
-              <div id="opt-familiar" onclick="setCamOpt('receptor','familiar')" style="flex:1;padding:14px 8px;border-radius:10px;text-align:center;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--border);background:var(--surface2);color:var(--text2);">👨‍👩‍👦 Familiar</div>
-            </div>
-            <!-- Campo de comentario para familiar -->
-            <div id="familiar-comentario-wrap" style="display:none;margin-top:10px;">
-              <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">💬 Comentario (nombre del familiar)</div>
-              <textarea id="familiar-comentario" placeholder="Ej. Esposa, hijo mayor, vecino autorizado..."
-                style="width:100%;height:70px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--text);font-size:14px;font-family:var(--sans);outline:none;resize:none;"></textarea>
-            </div>
-          </div>
-          <div class="card">
-            <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Método de verificación</div>
-            <div style="display:flex;flex-direction:column;gap:8px;">
-              <div id="opt-nopedido" onclick="setCamOpt('verificacion','nopedido')" style="padding:13px 14px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--accent);background:rgba(0,212,255,.15);color:var(--accent);">🔢 Validación de No. de pedido</div>
-              <div id="opt-ine" onclick="setCamOpt('verificacion','ine')" style="padding:13px 14px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--border);background:var(--surface2);color:var(--text2);">🪪 Validación por INE</div>
-              <div id="opt-wapedido" onclick="setCamOpt('verificacion','wapedido')" style="padding:13px 14px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--border);background:var(--surface2);color:var(--text2);">📲 Envío de No. de pedido por WhatsApp</div>
-              <div id="opt-codigoentrega" onclick="setCamOpt('verificacion','codigoentrega')" style="padding:13px 14px;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer;border:2px solid var(--border);background:var(--surface2);color:var(--text2);">🔑 Validación por código de entrega</div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Modo excepción -->
-      <div id="cam-excepcion-card" style="display:none;" class="card">
-        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
-          <span id="cam-exc-icon" style="font-size:22px;">⚠️</span>
-          <span id="cam-exc-label" style="font-size:15px;font-weight:700;color:var(--orange);">—</span>
-        </div>
-        <!-- Guías de la ruta para seleccionar -->
-        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;font-weight:600;">🔖 Seleccionar guía</div>
-        <!-- Lista de guías de la ruta -->
-        <div id="cam-exc-guias-list" style="display:flex;flex-direction:column;gap:6px;max-height:180px;overflow-y:auto;margin-bottom:8px;"></div>
-        <!-- Guía seleccionada -->
-        <div id="cam-exc-guia-val" style="display:none;padding:10px 13px;background:rgba(255,145,0,.12);border:1px solid rgba(255,145,0,.4);border-radius:10px;margin-bottom:8px;">
-          <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:3px;">Guía seleccionada</div>
-          <div id="cam-exc-guia-val-text" style="font-size:14px;font-weight:700;color:var(--orange);font-family:var(--mono);word-break:break-all;"></div>
-        </div>
-        <!-- Campo manual + escáner -->
-        <div style="display:flex;gap:8px;margin-bottom:10px;">
-          <input type="text" id="cam-exc-guia" placeholder="O escribe/escanea la guía..."
-            style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:9px 13px;color:var(--text);font-size:13px;font-family:var(--mono);outline:none;"
-            onkeydown="if(event.key==='Enter')excGuiaManual()">
-          <button class="btn btn-ghost btn-sm" onclick="excAbrirEscaner()" style="flex-shrink:0;padding:8px 12px;" title="Escanear">📷</button>
-        </div>
-        <!-- Escáner inline -->
-        <div id="cam-exc-scanner-wrap" style="display:none;position:relative;border-radius:10px;overflow:hidden;background:#000;aspect-ratio:4/3;margin-bottom:10px;">
-          <video id="cam-exc-video" playsinline autoplay style="width:100%;height:100%;object-fit:cover;"></video>
-          <canvas id="cam-exc-canvas" style="display:none;"></canvas>
-          <div style="position:absolute;inset:0;pointer-events:none;">
-            <div style="position:absolute;left:5%;right:5%;top:50%;transform:translateY(-50%);height:60px;border:2px solid var(--orange);border-radius:8px;box-shadow:0 0 0 2000px rgba(0,0,0,.45);">
-              <div style="position:absolute;top:0;left:0;right:0;height:2px;background:var(--orange);animation:scanLine 1.2s ease-in-out infinite;"></div>
-            </div>
-          </div>
-          <button onclick="excDetenerEscaner()" style="position:absolute;top:8px;right:8px;background:rgba(0,0,0,.6);border:1px solid var(--border);color:#fff;border-radius:8px;padding:4px 10px;font-size:12px;cursor:pointer;">✕ Cerrar</button>
-        </div>
-        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">Comentarios</div>
-        <textarea id="cam-exc-comentario" placeholder="Describe la situación..."
-          style="width:100%;height:70px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--text);font-size:14px;font-family:var(--sans);outline:none;resize:none;"></textarea>
-      </div>
-
-      <div id="photos-preview" style="display:none;" class="card">
-        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;margin-bottom:10px;">Fotos capturadas</div>
-        <div id="photos-thumbs" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
-      </div>
-
-      <button class="btn btn-accent" onclick="openTimestamp()">📷 Abrir Timestamp Camera</button>
-      <button class="btn btn-ghost" onclick="openNativeCamera()" style="font-size:13px;">🖼️ Seleccionar de galería</button>
-      <button class="btn btn-green" id="btn-send-photos" onclick="sendPhotosToWhatsApp()" style="display:none;">📤 Enviar a WhatsApp</button>
-      <button class="btn btn-green" id="btn-mark-done-camera" onclick="marcarEntregadoDesdeCamera()" style="display:none;background:var(--green);color:var(--bg);font-size:16px;padding:16px;">✅ Marcar como entregado</button>
-    </div>
-  </div>
-</div>
-
-<!-- ══════════════════════════════════════════
-     SCREEN: BASE DE DATOS
-══════════════════════════════════════════ -->
-<div class="screen hidden" id="screen-db">
-  <div class="topbar">
-    <button class="topbar-back" onclick="showScreen('home')">←</button>
-    <h2>Base de datos</h2>
-    <span class="topbar-sub" id="db-count-label">0 reg.</span>
-  </div>
-  <div class="db-toolbar">
-    <div class="search-box">
-      <span style="color:var(--text3);">🔍</span>
-      <input type="text" id="db-search" placeholder="Buscar nombre, tracking...">
-    </div>
-    <button class="btn btn-ghost btn-sm" onclick="exportCSV()">↓ CSV</button>
-  </div>
-  <div class="scroll" id="db-list"></div>
 </div>
 
 <!-- ══════════════════════════════════════════
@@ -2385,8 +1683,55 @@ const COL_HIST = 'rutas_historial'; // Historial de rutas finalizadas
 let currentUser = null;  // { uid, email, nombre, rol } rol: 'admin' | 'operador'
 
 // ─── AUTH ──────────────────────────────────────────────────────────────
-function mostrarLogin() { document.getElementById('screen-login').classList.remove('hidden'); }
-function ocultarLogin() { document.getElementById('screen-login').classList.add('hidden'); }
+// Login overlay inline (screen-login fue eliminado)
+function mostrarLogin() {
+  let ov = document.getElementById('login-overlay');
+  if (!ov) {
+    ov = document.createElement('div');
+    ov.id = 'login-overlay';
+    ov.style.cssText = 'position:fixed;inset:0;z-index:99999;background:var(--bg,#0a1628);'
+      + 'display:flex;align-items:center;justify-content:center;padding:24px;';
+    ov.innerHTML = `
+      <div style='width:100%;max-width:340px;display:flex;flex-direction:column;gap:14px;'>
+        <div style='text-align:center;margin-bottom:8px;'>
+          <div style='font-size:32px;font-weight:900;color:var(--accent,#00d4ff);letter-spacing:2px;'>SEISA</div>
+          <div style='font-size:13px;color:var(--text3,#6a8caf);margin-top:4px;'>Sistema de Rutas</div>
+        </div>
+        <input id='login-email-ov' type='email' placeholder='Correo electrónico'
+          style='background:var(--surface2,#172540);border:1px solid var(--border,#1e3560);border-radius:10px;padding:13px 16px;color:var(--text,#dceeff);font-size:15px;outline:none;width:100%;box-sizing:border-box;'>
+        <input id='login-pass-ov' type='password' placeholder='Contraseña'
+          style='background:var(--surface2,#172540);border:1px solid var(--border,#1e3560);border-radius:10px;padding:13px 16px;color:var(--text,#dceeff);font-size:15px;outline:none;width:100%;box-sizing:border-box;'
+          onkeydown='if(event.key==="Enter")loginOverlay()'>
+        <button onclick='loginOverlay()' id='login-btn-ov'
+          style='background:var(--accent,#00d4ff);color:#000;font-size:16px;font-weight:700;border:none;border-radius:12px;padding:15px;cursor:pointer;width:100%;'>
+          Iniciar sesión
+        </button>
+        <div id='login-err-ov' style='color:var(--red,#ff5252);font-size:13px;text-align:center;display:none;'></div>
+      </div>`;
+    document.body.appendChild(ov);
+  }
+  ov.style.display = 'flex';
+}
+function ocultarLogin() {
+  const ov = document.getElementById('login-overlay');
+  if (ov) ov.style.display = 'none';
+}
+async function loginOverlay() {
+  const email = document.getElementById('login-email-ov').value.trim();
+  const pass  = document.getElementById('login-pass-ov').value;
+  const btn   = document.getElementById('login-btn-ov');
+  const err   = document.getElementById('login-err-ov');
+  if (!email || !pass) { err.textContent = 'Completa los campos'; err.style.display = 'block'; return; }
+  btn.textContent = 'Entrando…'; btn.disabled = true;
+  err.style.display = 'none';
+  try {
+    await signInWithEmailAndPassword(auth, email, pass);
+  } catch(e) {
+    err.textContent = 'Correo o contraseña incorrectos';
+    err.style.display = 'block';
+    btn.textContent = 'Iniciar sesión'; btn.disabled = false;
+  }
+}
 
 window._doLogin = async function() {
   const email = document.getElementById('login-email').value.trim();
@@ -2445,8 +1790,7 @@ onAuthStateChanged(auth, async (user) => {
   } else {
     currentUser = null;
     mostrarLogin();
-    document.getElementById('login-btn').textContent = 'Iniciar sesión';
-    document.getElementById('login-btn').disabled = false;
+    // login-btn era de screen-login (ya no existe)
   }
 });
 
@@ -3486,7 +2830,7 @@ document.getElementById('btn-mark-done').addEventListener('click', async () => {
       showToast('🎉 ¡Ruta completada!');
     }
   } else {
-    showScreen('home');
+    showScreen('navegacion');
   }
 });
 
@@ -4345,7 +3689,7 @@ window.cargarEtiquetasEnLista = async function() {
       trackingsDetectados = [];
       _saveTrackings();
       renderTrackingsDetectados();
-      showScreen('home');
+      showScreen('navegacion');
     }, 1800);
   }
 };
@@ -4528,7 +3872,7 @@ window.cruzarDatos = async function() {
   if (encontrados > 0) {
     await loadRecords();
     showToast(`✅ ${encontrados} clientes · 📍 ${geocodificados} ubicaciones`);
-    setTimeout(() => showScreen('home'), 1800);
+    setTimeout(() => showScreen('navegacion'), 1800);
   }
 };
 
@@ -6311,18 +5655,11 @@ window.widgetSiguiente = function() {
 }
 
 window.widgetEntregada = function() {
-  const p = navParadas[navParadaActual];
-  if (p && !p.esRetorno) {
-    // Abrir pantalla de escaneo de guía en entrega
-    abrirScanEntrega(p.clientId || p.id, p);
-  }
+  navAccionEntregada();
 }
 
 window.widgetFallida = function() {
-  const p = navParadas[navParadaActual];
-  if (!p || p.esRetorno) return;
-  // Abrir menú de excepciones → cámara → WhatsApp → siguiente parada
-  abrirExcepcionParada(navParadaActual);
+  navAccionFallida();
 }
 
 // ── Deshacer última entregada o fallida ──────────────────────────────
@@ -7504,8 +6841,25 @@ window.abrirEnGoogleMaps = function() {
 window.navAccionEntregada = function() {
   const p = navParadas[navParadaActual];
   if (!p || p.esRetorno) { showToast('Esta es la parada de retorno'); return; }
-  // Abrir pantalla de escaneo de guía en entrega
-  abrirScanEntrega(p.clientId || p.id, p);
+  const horaEntrega = new Date().toISOString();
+  p.hecha = true; p.fallida = false; p.horaEntrega = horaEntrega;
+  const clientId = p.clientId || p.id;
+  if (clientId && typeof updateRecord === 'function') {
+    updateRecord(clientId, { entregado: true, horaEntrega }).catch(()=>{});
+  }
+  if (typeof saveNavParadas === 'function') saveNavParadas();
+  navParadaActual = Math.min(navParadaActual + 1, navParadas.length - 1);
+  if (typeof saveNavParadas === 'function') saveNavParadas();
+  if (typeof renderListaParadas === 'function') renderListaParadas();
+  if (typeof renderNavGuiada    === 'function') renderNavGuiada();
+  if (typeof actualizarWidgetNav === 'function') actualizarWidgetNav();
+  const h = new Date(horaEntrega), hh = h.getHours()%12||12;
+  const mm = String(h.getMinutes()).padStart(2,'0'), ap = h.getHours()>=12?'PM':'AM';
+  showToast('✅ Entregada · ' + hh + ':' + mm + ' ' + ap);
+  const sig = navParadas[navParadaActual];
+  if (sig) setTimeout(function() {
+    window.open('https://www.google.com/maps/dir/?api=1&destination=' + sig.lat + ',' + sig.lng + '&travelmode=driving', '_blank');
+  }, 600);
 };
 
 // ── Abrir menú de excepciones desde parada (nav-guiada o lista) ──────────
@@ -7571,8 +6925,23 @@ window.abrirExcepcionParada = function(idx) {
 window.navAccionFallida = function() {
   const p = navParadas[navParadaActual];
   if (!p || p.esRetorno) { showToast('Esta es la parada de retorno'); return; }
-  // Abrir menú de excepciones → cámara → WhatsApp → siguiente parada
-  abrirExcepcionParada(navParadaActual);
+  const horaFallida = new Date().toISOString();
+  p.hecha = true; p.fallida = true; p.horaFallida = horaFallida;
+  const clientId = p.clientId || p.id;
+  if (clientId && typeof updateRecord === 'function') {
+    updateRecord(clientId, { excepcion: true, horaFallida }).catch(()=>{});
+  }
+  if (typeof saveNavParadas === 'function') saveNavParadas();
+  navParadaActual = Math.min(navParadaActual + 1, navParadas.length - 1);
+  if (typeof saveNavParadas === 'function') saveNavParadas();
+  if (typeof renderListaParadas === 'function') renderListaParadas();
+  if (typeof renderNavGuiada    === 'function') renderNavGuiada();
+  if (typeof actualizarWidgetNav === 'function') actualizarWidgetNav();
+  showToast('⚠️ Fallida registrada');
+  const sig = navParadas[navParadaActual];
+  if (sig) setTimeout(function() {
+    window.open('https://www.google.com/maps/dir/?api=1&destination=' + sig.lat + ',' + sig.lng + '&travelmode=driving', '_blank');
+  }, 600);
 };
 
 window.navAccionDeshacer = function() {
@@ -8910,270 +8279,6 @@ if (window._isPWA) {
 }
 </script>
 
-<!-- ─── MÓDULO: ESCANEO DE GUÍA EN ENTREGA ──────────────────────────────── -->
-<script>
-// Variables de estado del scan de entrega
-let _seClientId   = null;   // id del cliente actual
-let _seParada     = null;   // objeto parada de navParadas
-let _seGuia       = '';     // guía escaneada
-let _seReceptor   = 'cliente';
-let _seVerificacion = 'nopedido';
-let _seStream     = null;   // MediaStream del escáner
-let _seAnimFrame  = null;   // requestAnimationFrame id
-let _seLat        = null;
-let _seLng        = null;
-
-// ── Abrir pantalla de scan en entrega ────────────────────────────────────────
-window.abrirScanEntrega = function(clientId, parada) {
-  _seClientId    = clientId;
-  _seParada      = parada;
-  _seGuia        = '';
-  _seReceptor    = 'cliente';
-  _seVerificacion = 'nopedido';
-  _seLat         = null;
-  _seLng         = null;
-
-  // Nombre cliente en topbar
-  const r = (typeof allRecords !== 'undefined' ? allRecords : []).find(x => x.id === clientId);
-  const nombre = r?.nombre?.split(' ')[0] || parada?.nombre?.split(' ')[0] || '';
-  document.getElementById('scan-entrega-client-name').textContent = nombre;
-
-  // Reset UI
-  document.getElementById('scan-entrega-resultado').style.display = 'none';
-  document.getElementById('scan-entrega-guia-val').textContent = '';
-  document.getElementById('scan-entrega-metodos').style.display = 'none';
-  document.getElementById('btn-scan-entrega-wap').style.display = 'none';
-  document.getElementById('scan-entrega-ubicacion').style.display = 'none';
-  document.getElementById('scan-entrega-manual').value = '';
-  _seApplyReceptor('cliente');
-  _seApplyVerificacion('nopedido');
-
-  showScreen('scan-entrega');
-
-  // Obtener GPS en paralelo
-  if (navigator.geolocation) {
-    navigator.geolocation.getCurrentPosition(function(pos) {
-      _seLat = pos.coords.latitude.toFixed(6);
-      _seLng = pos.coords.longitude.toFixed(6);
-      const el = document.getElementById('scan-entrega-coords');
-      const ub = document.getElementById('scan-entrega-ubicacion');
-      if (el) el.textContent = _seLat + ', ' + _seLng;
-      if (ub) ub.style.display = 'block';
-    }, null, { timeout: 8000, enableHighAccuracy: true });
-  }
-
-  // Iniciar escáner automáticamente
-  _seIniciarEscaner();
-};
-
-// ── Cerrar y detener escáner ──────────────────────────────────────────────────
-window.cerrarScanEntrega = function() {
-  _seDetenerEscaner();
-  showScreen('nav-guiada');
-};
-
-// ── Iniciar escáner de cámara ─────────────────────────────────────────────────
-function _seIniciarEscaner() {
-  const videoWrap = document.getElementById('scan-entrega-video');
-  if (!videoWrap) return;
-  videoWrap.innerHTML = '';
-  const video = document.createElement('video');
-  video.setAttribute('playsinline', '');
-  video.setAttribute('autoplay', '');
-  video.style.cssText = 'width:100%;height:100%;object-fit:cover;';
-  videoWrap.appendChild(video);
-
-  navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } })
-    .then(function(stream) {
-      _seStream = stream;
-      video.srcObject = stream;
-      video.play();
-      _seLeerFrames(video);
-    })
-    .catch(function(e) {
-      videoWrap.innerHTML = '<div style="color:#fff;padding:20px;text-align:center;font-size:13px;">No se pudo acceder a la cámara.<br>Usa el campo manual.</div>';
-      console.warn('scan-entrega cámara:', e);
-    });
-}
-
-function _seDetenerEscaner() {
-  if (_seAnimFrame) { cancelAnimationFrame(_seAnimFrame); _seAnimFrame = null; }
-  if (_seStream) { _seStream.getTracks().forEach(t => t.stop()); _seStream = null; }
-}
-
-// ── Leer frames con jsQR ──────────────────────────────────────────────────────
-function _seLeerFrames(video) {
-  const canvas = document.getElementById('scan-entrega-canvas');
-  if (!canvas) return;
-  const ctx = canvas.getContext('2d');
-
-  function frame() {
-    if (!_seStream) return;
-    if (video.readyState === video.HAVE_ENOUGH_DATA) {
-      canvas.width  = video.videoWidth;
-      canvas.height = video.videoHeight;
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-      const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-      // jsQR
-      if (typeof jsQR === 'function') {
-        const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: 'dontInvert' });
-        if (code && code.data && code.data.length > 3) {
-          _seGuiaDetectada(code.data.trim());
-          return; // detener loop al detectar
-        }
-      }
-      // ZXing / BarcodeDetector API
-      if ('BarcodeDetector' in window) {
-        const bd = new BarcodeDetector({ formats: ['code_128','code_39','ean_13','qr_code','data_matrix','pdf417'] });
-        bd.detect(canvas).then(function(codes) {
-          if (codes.length > 0 && codes[0].rawValue) {
-            _seGuiaDetectada(codes[0].rawValue.trim());
-          }
-        }).catch(()=>{});
-      }
-    }
-    _seAnimFrame = requestAnimationFrame(frame);
-  }
-  _seAnimFrame = requestAnimationFrame(frame);
-}
-
-// ── Guía detectada (cámara o manual) ─────────────────────────────────────────
-function _seGuiaDetectada(guia) {
-  if (_seGuia) return; // ya detectada, ignorar
-  _seGuia = guia;
-  _seDetenerEscaner();
-
-  // Mostrar resultado
-  document.getElementById('scan-entrega-guia-val').textContent = guia;
-  document.getElementById('scan-entrega-resultado').style.display = 'block';
-
-  // Mostrar métodos de entrega y botón WhatsApp
-  document.getElementById('scan-entrega-metodos').style.display = 'block';
-  document.getElementById('btn-scan-entrega-wap').style.display = 'flex';
-
-  if (typeof showToast === 'function') showToast('✅ Guía: ' + guia.slice(0, 20));
-}
-
-// ── Ingreso manual ────────────────────────────────────────────────────────────
-window.scanEntregaManual = function() {
-  const val = document.getElementById('scan-entrega-manual').value.trim();
-  if (!val) return;
-  _seGuiaDetectada(val);
-};
-
-// ── Opciones receptor / verificación ─────────────────────────────────────────
-window.seSetReceptor = function(val) {
-  _seReceptor = val;
-  _seApplyReceptor(val);
-};
-window.seSetVerificacion = function(val) {
-  _seVerificacion = val;
-  _seApplyVerificacion(val);
-};
-
-function _seApplyReceptor(val) {
-  ['cliente','familiar'].forEach(function(v) {
-    const el = document.getElementById('se-opt-' + v);
-    if (!el) return;
-    const active = v === val;
-    el.style.borderColor  = active ? 'var(--accent)' : 'var(--border)';
-    el.style.background   = active ? 'rgba(0,212,255,.15)' : 'var(--surface2)';
-    el.style.color        = active ? 'var(--accent)' : 'var(--text2)';
-  });
-  const fw = document.getElementById('se-familiar-wrap');
-  if (fw) fw.style.display = val === 'familiar' ? 'block' : 'none';
-}
-
-function _seApplyVerificacion(val) {
-  ['nopedido','ine','wapedido','codigoentrega'].forEach(function(v) {
-    const el = document.getElementById('se-opt-' + v);
-    if (!el) return;
-    const active = v === val;
-    el.style.borderColor  = active ? 'var(--accent)' : 'var(--border)';
-    el.style.background   = active ? 'rgba(0,212,255,.15)' : 'var(--surface2)';
-    el.style.color        = active ? 'var(--accent)' : 'var(--text2)';
-  });
-}
-
-// ── Enviar entrega por WhatsApp y marcar como entregada ───────────────────────
-window.scanEntregaEnviarWap = function() {
-  if (!_seGuias || _seGuias.length === 0) {
-    if (typeof showToast === 'function') showToast('Escanea o ingresa al menos una guía');
-    return;
-  }
-
-  // Detener escáner
-  _seDetenerEscaner();
-
-  // Guardar override para que sendPhotosToWhatsApp use las guías escaneadas
-  window._seGuiasOverride = _seGuias.slice();
-  window._seClientId = _seClientId;
-
-  // Asegurar currentClientId para que la cámara guarde en el registro correcto
-  if (_seClientId) currentClientId = _seClientId;
-
-  // Configurar screen-camera en modo entrega con los datos ya elegidos
-  const r = (typeof allRecords !== 'undefined' ? allRecords : []).find(x => x.id === _seClientId);
-  const elCamName = document.getElementById('cam-client-name');
-  if (elCamName) elCamName.textContent = r?.nombre?.split(' ')[0] || '';
-
-  camModo        = 'entrega';
-  camReceptor    = _seReceptor;
-  camVerificacion = _seVerificacion;
-  capturedPhotos  = [];
-
-  const elThumbs  = document.getElementById('photos-thumbs');
-  const elPreview = document.getElementById('photos-preview');
-  const elSend    = document.getElementById('btn-send-photos');
-  const elDone    = document.getElementById('btn-mark-done-camera');
-  const elTitle   = document.getElementById('cam-screen-title');
-  const elEntCards = document.getElementById('cam-entrega-cards');
-  const elExcCard  = document.getElementById('cam-excepcion-card');
-
-  if (elThumbs)   elThumbs.innerHTML = '';
-  if (elPreview)  elPreview.style.display = 'none';
-  if (elSend)     elSend.style.display = 'none';
-  if (elDone)     elDone.style.display = 'none';
-  if (elTitle)    elTitle.textContent = '📸 Foto de entrega';
-  if (elEntCards) elEntCards.style.display = 'none';
-  if (elExcCard)  elExcCard.style.display  = 'none';
-
-  // Aplicar selección de receptor y verificación en la pantalla de cámara
-  if (typeof setCamOpt === 'function') {
-    setCamOpt('receptor', _seReceptor);
-    setCamOpt('verificacion', _seVerificacion);
-  }
-
-  showScreen('camera');
-};
-
-
-</script>
-<!-- ══════════════════════════════════════════
-     SCREEN: HISTORIAL DE RUTAS
-══════════════════════════════════════════ -->
-<div class="screen hidden" id="screen-historial">
-  <div class="topbar">
-    <button class="topbar-back" onclick="showScreen('home')">←</button>
-    <h2>🗂️ Historial de Rutas</h2>
-    <span class="topbar-sub" id="hist-count-label">—</span>
-  </div>
-
-  <!-- Barra de búsqueda -->
-  <div style="padding:10px 16px 6px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;">
-    <div class="search-box">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      <input type="text" id="hist-search" placeholder="Buscar por nombre de ruta…" oninput="renderHistorial()">
-    </div>
-  </div>
-
-  <div class="scroll" id="hist-list">
-    <div class="empty-list" style="padding:60px 20px;text-align:center;color:var(--text3);">
-      <div style="font-size:48px;margin-bottom:12px;">🗂️</div>
-      <p style="font-size:14px;">Cargando historial...</p>
-    </div>
-  </div>
-</div>
 
 <!-- ══════════════════════════════════════════
      MODAL: DETALLE DE RUTA HISTÓRICA
@@ -9191,38 +8296,6 @@ window.scanEntregaEnviarWap = function() {
     <button class="btn btn-ghost" onclick="closeModal('modal-hist-detalle');if(window._histMap){window._histMap.remove();window._histMap=null;}" style="margin-top:12px;">Cerrar</button>
   </div>
 </div>
-
-<!-- ══════════════════════════════════════════
-     SCREEN: IR A RUTA (mapa completo)
-══════════════════════════════════════════ -->
-<div class="screen hidden" id="screen-ir-ruta">
-  <div class="topbar" style="background:var(--bg);">
-    <button class="topbar-back" onclick="showScreen('client')">←</button>
-    <h2 id="ir-ruta-title">🗺️ Ir a Ruta</h2>
-    <span class="topbar-sub" id="ir-ruta-sub"></span>
-  </div>
-
-  <!-- Mapa Leaflet ocupa todo el espacio disponible -->
-  <div style="flex:1;position:relative;overflow:hidden;">
-    <div id="ir-ruta-map" style="width:100%;height:100%;"></div>
-
-    <!-- HUD inferior con lista de paradas -->
-    <div id="ir-ruta-hud" style="
-      position:absolute;bottom:0;left:0;right:0;
-      background:linear-gradient(0deg,var(--bg) 0%,rgba(10,22,40,.97) 80%,transparent 100%);
-      padding:14px 16px 20px;display:flex;flex-direction:column;gap:10px;
-    ">
-      <!-- Paradas ordenadas -->
-      <div id="ir-ruta-stops" style="display:flex;flex-direction:column;gap:6px;max-height:180px;overflow-y:auto;"></div>
-
-      <!-- Botón abrir en Google Maps nativo -->
-      <button class="btn btn-green" onclick="abrirGoogleMapsNativo()" style="font-size:14px;">
-        📱 Abrir en Google Maps
-      </button>
-    </div>
-  </div>
-</div>
-
 
 <script>
 // ── Bridge: expone funciones del módulo al HTML inline ──────────────
