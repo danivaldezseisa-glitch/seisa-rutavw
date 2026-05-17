@@ -149,7 +149,10 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
 <div class="screen" id="screen-home">
   <div class="topbar">
     <h2>🚛 SEISA Rutas</h2>
-    <button class="btn btn-ghost" onclick="showHistorial()" style="width:auto;padding:6px 12px;font-size:12px;">📋 Historial</button>
+    <div style="display:flex;gap:6px;">
+      <button id="btn-gh-status" onclick="mostrarConfigGH()" style="width:auto;padding:6px 10px;font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text3);cursor:pointer;">⬡ GitHub</button>
+      <button class="btn btn-ghost" onclick="showHistorial()" style="width:auto;padding:6px 12px;font-size:12px;">📋</button>
+    </div>
   </div>
   <div class="scroll" style="padding:16px;display:flex;flex-direction:column;gap:12px;">
     <!-- Ruta activa -->
@@ -426,6 +429,32 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
 <!-- TOAST -->
 <div id="toast"></div>
 
+<!-- MODAL: CONFIG GITHUB -->
+<div class="modal-overlay hidden" id="modal-github">
+  <div class="modal-sheet">
+    <div style="font-size:24px;text-align:center;margin-bottom:4px;">🔗</div>
+    <div class="modal-title">Conectar con GitHub</div>
+    <div style="font-size:12px;color:var(--text3);text-align:center;margin-bottom:8px;">Los datos se guardarán en tu repositorio GitHub</div>
+
+    <div class="field">
+      <div class="label">Usuario de GitHub</div>
+      <input class="input" id="gh-user" placeholder="tu-usuario">
+    </div>
+    <div class="field">
+      <div class="label">Nombre del repositorio</div>
+      <input class="input" id="gh-repo" placeholder="seisa-rutas-data">
+    </div>
+    <div class="field">
+      <div class="label">Token de acceso personal</div>
+      <input class="input" id="gh-token" type="password" placeholder="ghp_xxxxxxxxxxxx">
+      <div style="font-size:11px;color:var(--text3);margin-top:4px;">Necesita permisos: <b>repo</b>. <a href="https://github.com/settings/tokens/new" target="_blank" style="color:var(--accent);">Crear token →</a></div>
+    </div>
+
+    <button class="btn btn-accent" onclick="guardarConfigGH()">✓ Guardar y conectar</button>
+    <button class="btn btn-ghost" onclick="closeModal('modal-github')">Omitir (solo local)</button>
+  </div>
+</div>
+
 <style>
 .search-results-box { background: var(--surface); border: 1px solid var(--border); border-radius: 0 0 10px 10px; display: none; max-height: 200px; overflow-y: auto; }
 .search-results-box .res-item { padding: 11px 14px; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 13px; }
@@ -434,16 +463,152 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
 
 <script>
 // ══════════════════════════════════════════════════════════════════
+//  GITHUB BACKEND
+// ══════════════════════════════════════════════════════════════════
+const GH_CONFIG_KEY = 'seisa_gh_config';
+const APP_KEY       = 'seisa_app_v1';
+const GH_FILE       = 'seisa-data.json';
+
+let ghConfig = null; // { user, repo, token }
+let ghSyncing = false;
+
+function loadGHConfig() {
+  try { return JSON.parse(localStorage.getItem(GH_CONFIG_KEY)) || null; } catch(e) { return null; }
+}
+function saveGHConfig(cfg) {
+  localStorage.setItem(GH_CONFIG_KEY, JSON.stringify(cfg));
+  ghConfig = cfg;
+}
+
+async function guardarConfigGH() {
+  const user  = document.getElementById('gh-user').value.trim();
+  const repo  = document.getElementById('gh-repo').value.trim();
+  const token = document.getElementById('gh-token').value.trim();
+  if (!user || !repo || !token) { showToast('Completa todos los campos'); return; }
+  const cfg = { user, repo, token };
+  showToast('🔄 Verificando conexión...');
+  const ok = await testGHConnection(cfg);
+  if (!ok) { showToast('❌ No se pudo conectar. Verifica el token y repositorio.'); return; }
+  saveGHConfig(cfg);
+  closeModal('modal-github');
+  actualizarBtnGH();
+  showToast('✅ GitHub conectado correctamente');
+  await ghPull(); // Cargar datos remotos
+  renderHome();
+}
+
+async function testGHConnection(cfg) {
+  try {
+    const r = await fetch(`https://api.github.com/repos/${cfg.user}/${cfg.repo}`, {
+      headers: { Authorization: `token ${cfg.token}`, Accept: 'application/vnd.github.v3+json' }
+    });
+    return r.ok;
+  } catch(e) { return false; }
+}
+
+// ── Obtener SHA del archivo (necesario para actualizar) ────────────
+async function getFileSHA(cfg) {
+  try {
+    const r = await fetch(`https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/${GH_FILE}`, {
+      headers: { Authorization: `token ${cfg.token}`, Accept: 'application/vnd.github.v3+json' }
+    });
+    if (r.ok) { const d = await r.json(); return d.sha; }
+  } catch(e) {}
+  return null;
+}
+
+// ── Subir datos a GitHub ───────────────────────────────────────────
+async function ghPush() {
+  if (!ghConfig || ghSyncing) return;
+  ghSyncing = true;
+  actualizarBtnGH(true);
+  try {
+    const sha = await getFileSHA(ghConfig);
+    const content = btoa(unescape(encodeURIComponent(JSON.stringify(state, null, 2))));
+    const body = {
+      message: `[SEISA] Sync ${new Date().toISOString()}`,
+      content,
+      ...(sha ? { sha } : {})
+    };
+    const r = await fetch(`https://api.github.com/repos/${ghConfig.user}/${ghConfig.repo}/contents/${GH_FILE}`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `token ${ghConfig.token}`,
+        Accept: 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+    if (r.ok) {
+      showToast('☁️ Guardado en GitHub');
+    } else {
+      const err = await r.json();
+      console.error('ghPush error:', err);
+      showToast('⚠️ Error al guardar en GitHub');
+    }
+  } catch(e) {
+    console.error('ghPush:', e);
+    showToast('⚠️ Sin conexión — guardado local');
+  }
+  ghSyncing = false;
+  actualizarBtnGH(false);
+}
+
+// ── Descargar datos desde GitHub ───────────────────────────────────
+async function ghPull() {
+  if (!ghConfig) return false;
+  try {
+    const r = await fetch(`https://api.github.com/repos/${ghConfig.user}/${ghConfig.repo}/contents/${GH_FILE}`, {
+      headers: { Authorization: `token ${ghConfig.token}`, Accept: 'application/vnd.github.v3+json' }
+    });
+    if (!r.ok) return false;
+    const d = await r.json();
+    const raw = decodeURIComponent(escape(atob(d.content)));
+    const remote = JSON.parse(raw);
+    state = { ...defaultState(), ...remote };
+    saveStateLocal();
+    showToast('☁️ Datos sincronizados');
+    return true;
+  } catch(e) {
+    console.warn('ghPull:', e);
+    return false;
+  }
+}
+
+function actualizarBtnGH(syncing) {
+  const btn = document.getElementById('btn-gh-status');
+  if (!btn) return;
+  if (syncing) {
+    btn.textContent = '⟳ Sync...';
+    btn.style.color = 'var(--yellow)';
+  } else if (ghConfig) {
+    btn.textContent = '● GitHub';
+    btn.style.color = 'var(--green)';
+  } else {
+    btn.textContent = '⬡ GitHub';
+    btn.style.color = 'var(--text3)';
+  }
+}
+
+function mostrarConfigGH() {
+  if (ghConfig) {
+    document.getElementById('gh-user').value  = ghConfig.user;
+    document.getElementById('gh-repo').value  = ghConfig.repo;
+    document.getElementById('gh-token').value = ghConfig.token;
+  }
+  document.getElementById('modal-github').classList.remove('hidden');
+}
+
+// ══════════════════════════════════════════════════════════════════
 //  ESTADO GLOBAL
 // ══════════════════════════════════════════════════════════════════
-const APP_KEY = 'seisa_app_v1';
 
 let state = loadState();
 
 function defaultState() {
   return {
-    rutas:       [],   // rutas guardadas
-    rutaActual:  null, // ruta en curso { id, nombre, fecha, peajes, inicio, fin, paradas[], kmTotal, tiempoMin }
+    rutas:        [],
+    rutaActual:   null,
     paradaActual: 0,
   };
 }
@@ -455,8 +620,14 @@ function loadState() {
   } catch(e) { return defaultState(); }
 }
 
-function saveState() {
+function saveStateLocal() {
   try { localStorage.setItem(APP_KEY, JSON.stringify(state)); } catch(e) {}
+}
+
+// Guarda local + sube a GitHub
+function saveState() {
+  saveStateLocal();
+  if (ghConfig) ghPush(); // async, no bloquea
 }
 
 // Ruta en construcción (no guardada aún)
@@ -1170,7 +1341,7 @@ function showToast(msg) {
 // ══════════════════════════════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════════════════════════════
-(function init() {
+(async function init() {
   // Fecha hoy por defecto en crear ruta
   const hoy = new Date();
   const dd = String(hoy.getDate()).padStart(2,'0');
@@ -1183,6 +1354,19 @@ function showToast(msg) {
   window.addEventListener('popstate', () => {
     history.pushState({ s: 'screen-home' }, '');
   });
+
+  // Cargar config GitHub y sincronizar al inicio
+  ghConfig = loadGHConfig();
+  actualizarBtnGH(false);
+  if (ghConfig) {
+    showToast('🔄 Sincronizando con GitHub...');
+    await ghPull();
+  } else {
+    // Primera vez: sugerir conectar
+    setTimeout(() => {
+      if (!loadGHConfig()) mostrarConfigGH();
+    }, 1500);
+  }
 
   renderHome();
 })();
