@@ -103,6 +103,17 @@ html, body { height: 100%; overflow: hidden; font-family: var(--sans); backgroun
 .scroll::-webkit-scrollbar { display: none; }
 
 /* ── BOTTOM NAV ── */
+.bottom-nav {
+  display: flex; background: var(--bg2);
+  border-top: 1px solid var(--border); flex-shrink: 0;
+  position: relative; z-index: 50;
+}
+.nav-btn {
+  flex: 1; display: flex; flex-direction: column; align-items: center;
+  gap: 3px; padding: 10px 4px; cursor: pointer;
+  border: none; background: transparent; color: var(--text3);
+  font-size: 10px; font-family: var(--sans); transition: color .15s;
+}
 .nav-btn.active { color: var(--accent); }
 .nav-btn svg { width: 22px; height: 22px; }
 
@@ -172,9 +183,16 @@ select option { background: var(--surface2); }
    SCREEN 1: DASHBOARD
 ──────────────────────────────────────── */
 #screen-home { background: var(--bg); }
+.home-header {
+  padding: 20px 16px 16px;
+  background: linear-gradient(180deg, var(--bg2) 0%, transparent 100%);
+  flex-shrink: 0;
+}
 .home-greeting { font-size: 12px; color: var(--text2); margin-bottom: 2px; }
 .home-name { font-size: 22px; font-weight: 700; letter-spacing: -.5px; }
 .home-name span { color: var(--accent); }
+.stats-row { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; padding: 0 16px 16px; }
+.stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 12px 10px; text-align: center; }
 .stat-n { font-size: 24px; font-weight: 700; font-family: var(--mono); color: var(--accent); }
 .stat-l { font-size: 10px; color: var(--text2); margin-top: 2px; }
 
@@ -256,6 +274,7 @@ select option { background: var(--surface2); }
 .data-cell .dl { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: .07em; margin-bottom: 4px; }
 .data-cell .dv { font-size: 13px; font-weight: 500; font-family: var(--mono); color: var(--text); word-break: break-all; }
 .data-cell.full { grid-column: 1 / -1; }
+.action-list { padding: 0 16px 16px; display: flex; flex-direction: column; gap: 10px; }
 
 /* ────────────────────────────────────────
    SCREEN 4: CAMARA / ENTREGA
@@ -498,6 +517,12 @@ select option { background: var(--surface2); }
   transition: all .15s;
 }
 .ruta-chip:active { background: var(--surface); border-color: var(--accent); color: var(--accent); }
+.ruta-active-bar {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 16px; margin: 0 16px 12px;
+  background: rgba(0,212,255,.07); border: 1px solid rgba(0,212,255,.2);
+  border-radius: 12px;
+}
 .ruta-active-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); flex-shrink:0; animation: blink .8s ease-in-out infinite alternate; }
 .ruta-active-name { font-size: 13px; font-weight: 600; color: var(--accent); flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .ruta-active-label { font-size: 10px; color: var(--text3); }
@@ -776,11 +801,105 @@ select option { background: var(--surface2); }
 </div>
 
 <!-- ══════════════════════════════════════════
+     SCREEN: ADMIN (solo admin)
+══════════════════════════════════════════ -->
+<div class="screen hidden" id="screen-admin">
+  <div class="topbar">
+    <button class="topbar-back" onclick="showScreen('home')">←</button>
+    <h2>⚙️ Panel de Admin</h2>
+  </div>
+  <div class="scroll" style="padding:16px;display:flex;flex-direction:column;gap:16px;">
+
+    <!-- Crear usuario -->
+    <div class="card">
+      <div style="font-size:13px;font-weight:700;margin-bottom:12px;color:var(--accent);">➕ Crear usuario</div>
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <div class="field"><label>Nombre</label><input type="text" id="nu-nombre" placeholder="Juan Pérez"></div>
+        <div class="field"><label>Correo</label><input type="email" id="nu-email" placeholder="juan@seisa.com"></div>
+        <div class="field"><label>Contraseña</label><input type="password" id="nu-pass" placeholder="mínimo 6 caracteres"></div>
+        <div class="field">
+          <label>Rol</label>
+          <select id="nu-rol" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--text);font-family:var(--sans);font-size:14px;">
+            <option value="operador">🚚 Operador</option>
+            <option value="admin">⚙️ Administrador</option>
+          </select>
+        </div>
+        <div id="nu-error" style="font-size:12px;color:var(--red);min-height:14px;"></div>
+        <button class="btn btn-accent" id="btn-crear-usuario" onclick="crearUsuario()">Crear usuario</button>
+      </div>
+    </div>
+
+    <!-- Lista de usuarios -->
+    <div class="card">
+      <div style="font-size:13px;font-weight:700;margin-bottom:12px;color:var(--accent);">👥 Usuarios registrados</div>
+      <div id="admin-users-list" style="display:flex;flex-direction:column;gap:10px;">
+        <div style="color:var(--text3);font-size:13px;">Cargando...</div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SCREEN: HOME / RUTA
+══════════════════════════════════════════ -->
+<div class="screen" id="screen-home">
+  <div class="home-header">
+    <div style="display:flex;align-items:center;justify-content:space-between;">
+      <div>
+        <div class="home-greeting">Bienvenido,</div>
+        <div class="home-name" id="home-user-name">—</div>
+      </div>
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:6px;">
+        <div class="user-badge" onclick="doLogout()">
+          <div class="user-badge-dot"></div>
+          <span id="home-user-rol">operador</span>
+          <span style="font-size:10px;color:var(--text3);">· Salir</span>
+        </div>
+        <div id="admin-btn-wrap" style="display:none;">
+          <button class="btn btn-ghost btn-sm" onclick="abrirAdmin()" style="font-size:11px;padding:4px 10px;">⚙️ Admin</button>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="stats-row">
+    <div class="stat-card"><div class="stat-n" id="stat-total">0</div><div class="stat-l">Total</div></div>
+    <div class="stat-card"><div class="stat-n" id="stat-done" style="color:var(--green)">0</div><div class="stat-l">Entregados</div></div>
+    <div class="stat-card"><div class="stat-n" id="stat-pending" style="color:var(--orange)">0</div><div class="stat-l">Pendientes</div></div>
+  </div>
+  <div style="padding:0 16px 10px; display:flex; gap:8px;">
+    <button class="btn btn-accent" onclick="showScreen('nueva-ruta')" style="flex:1;">
+      🗺️ Nueva Ruta
+    </button>
+    <button class="btn btn-green" onclick="enviarMasivo()" style="flex:1;">
+      💬 Enviar a pendientes
+    </button>
+  </div>
+  <div style="padding:0 16px 10px;">
+    <button class="btn" onclick="abrirFinDeRuta()" style="background:linear-gradient(135deg,#ff5252,#cc0000);color:#fff;font-size:14px;font-weight:700;border:none;gap:8px;">
+      🏁 Fin de Ruta
+    </button>
+  </div>
+  <div id="ruta-activa-bar" style="display:none;" class="ruta-active-bar" onclick="showScreen('nueva-ruta')">
+    <div class="ruta-active-dot"></div>
+    <div class="ruta-active-name" id="ruta-activa-nombre">—</div>
+    <div class="ruta-active-label">Ruta activa ›</div>
+  </div>
+  <div class="scroll" id="route-list-wrap">
+    <div class="empty-list" id="route-empty">
+      <div class="ei">📦</div>
+      <p>No hay paquetes en ruta.<br>Ve a <strong>Escanear</strong> para cargar etiquetas.</p>
+    </div>
+    <div id="route-list"></div>
+  </div>
+  </div>
+
+<!-- ══════════════════════════════════════════
      SCREEN: NAVEGACIÓN — CONFIGURAR PARADAS
 ══════════════════════════════════════════ -->
 <div class="screen hidden" id="screen-navegacion">
   <div class="topbar">
-    <button class="topbar-back" onclick="showScreen('navegacion')">←</button>
+    <button class="topbar-back" onclick="showScreen('home')">←</button>
     <h2>🗺️ Planear ruta</h2>
     <span class="topbar-sub" id="nav-stop-count">0 paradas</span>
   </div>
@@ -1110,7 +1229,48 @@ select option { background: var(--surface2); }
 
 </div>
 
+<!-- ══════════════════════════════════════════
+     MODAL: EXCEPCION
+══════════════════════════════════════════ -->
+<div class="modal-overlay" id="modal-excepcion">
+  <div class="modal">
+    <div class="modal-handle"></div>
+    <h3>⚠️ Registrar Excepción</h3>
 
+    <!-- Tipo seleccionado -->
+    <div class="exc-modal-tipo" id="exc-modal-tipo-info">
+      <span class="exc-modal-tipo-icon" id="exc-modal-icon">⚠️</span>
+      <span class="exc-modal-tipo-label" id="exc-modal-label">—</span>
+    </div>
+
+    <!-- Fotos -->
+    <div class="field">
+      <label>📸 Fotos de evidencia</label>
+      <input type="file" id="exc-foto-input" accept="image/*" multiple style="display:none;">
+      <div style="display:flex;gap:8px;margin-bottom:8px;">
+        <button class="btn btn-ghost btn-sm" onclick="document.getElementById('exc-foto-input').click()" style="flex:1;font-size:13px;">
+          📷 Abrir cámara / galería
+        </button>
+      </div>
+      <div id="exc-photos-grid" class="exc-photos-grid"></div>
+    </div>
+
+    <!-- Comentario -->
+    <div class="field">
+      <label>💬 Comentarios</label>
+      <textarea id="exc-comentario" placeholder="Describe la situación..." style="height:90px;"></textarea>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:8px;margin-top:4px;">
+      <button class="btn btn-green" onclick="enviarExcepcionWhatsApp()">
+        📤 Enviar por WhatsApp
+      </button>
+      <button class="btn btn-ghost" onclick="closeModal('modal-excepcion')">
+        Cancelar
+      </button>
+    </div>
+  </div>
+</div>
 
 <!-- ══════════════════════════════════════════
      MODAL PASO 1: TIPO DE ZONIFICACIÓN
@@ -1247,6 +1407,333 @@ Casa verde, 8Q4F+HP México" style="
     </div>
     <!-- Zonas detectadas -->
     <div id="zona-chips" style="display:flex;flex-wrap:wrap;gap:6px;min-height:28px;margin-bottom:8px;"></div>
+  </div>
+</div>
+
+<div class="screen hidden" id="screen-nueva-ruta">
+  <div class="topbar">
+    <button class="topbar-back" onclick="showScreen('home')">←</button>
+    <h2>Nueva Ruta</h2>
+    <span class="topbar-sub" id="nr-fecha-label"></span>
+  </div>
+  <div class="scroll">
+    <div class="nueva-ruta-hero">
+      <div class="nueva-ruta-icon">🗺️</div>
+      <div class="nueva-ruta-title">¿Cómo se llama esta ruta?</div>
+      <div class="nueva-ruta-sub">Dale un nombre para identificarla<br>en la lista de paquetes</div>
+    </div>
+
+    <div style="padding: 0 16px 12px;">
+      <div class="field">
+        <label>Nombre de la ruta</label>
+        <input type="text" id="nr-nombre" class="ruta-name-input" placeholder="Ej. Ruta Norte Mañana"
+          oninput="updateNRPreview()" autocomplete="off" maxlength="40">
+      </div>
+      <div class="field">
+        <label>📅 Fecha de la ruta</label>
+        <input type="date" id="nr-fecha-input" oninput="updateNRPreview()"
+          style="font-size:15px;font-weight:600;text-align:center;letter-spacing:.02em;">
+      </div>
+    </div>
+
+    <div class="sec-header">Sugerencias rápidas</div>
+    <div class="ruta-suggestions">
+      <div class="ruta-chip" onclick="setRutaName('Ruta Norte')">🧭 Ruta Norte</div>
+      <div class="ruta-chip" onclick="setRutaName('Ruta Sur')">🧭 Ruta Sur</div>
+      <div class="ruta-chip" onclick="setRutaName('Ruta Centro')">🧭 Ruta Centro</div>
+      <div class="ruta-chip" onclick="setRutaName('Ruta Oriente')">🧭 Ruta Oriente</div>
+      <div class="ruta-chip" onclick="setRutaName('Ruta Poniente')">🧭 Ruta Poniente</div>
+      <div class="ruta-chip" onclick="setRutaName('Ruta Mañana')">🌅 Ruta Mañana</div>
+      <div class="ruta-chip" onclick="setRutaName('Ruta Tarde')">🌇 Ruta Tarde</div>
+      <div class="ruta-chip" onclick="setRutaName('Ruta Extra')">⭐ Ruta Extra</div>
+    </div>
+
+    <div style="padding: 0 16px 8px;">
+      <div id="nr-preview" style="
+        background: var(--surface); border: 1px solid var(--border);
+        border-radius: 12px; padding: 14px 16px; margin-bottom: 14px;
+        display: flex; align-items: center; gap: 12px; opacity: .5;
+        transition: opacity .2s;
+      ">
+        <span style="font-size: 24px;">🗺️</span>
+        <div>
+          <div id="nr-preview-nombre" style="font-size:15px;font-weight:700;">—</div>
+          <div id="nr-preview-fecha" style="font-size:11px;color:var(--text3);margin-top:2px;font-family:var(--mono);"></div>
+        </div>
+      </div>
+
+      <button class="btn btn-accent" id="btn-iniciar-escaneo" onclick="iniciarNuevaRuta()" disabled>
+        📷 Iniciar escaneo de etiquetas
+      </button>
+      <div style="height:10px;"></div>
+      <button class="btn btn-ghost" onclick="showScreen('home')">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SCREEN: SCAN MASIVO
+══════════════════════════════════════════ -->
+<div class="screen hidden" id="screen-scan">
+  <div class="topbar">
+    <button class="topbar-back" onclick="detenerEscaner();showScreen('home')">←</button>
+    <h2 id="scan-ruta-title">Escanear guías</h2>
+    <span class="topbar-sub" id="scan-count"></span>
+  </div>
+  <div class="scroll">
+
+    <!-- PASO 1: Escáner de código de barras -->
+    <div style="padding:14px 16px 8px;">
+      <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+        <div style="width:28px;height:28px;border-radius:50%;background:var(--accent);color:var(--bg);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:13px;flex-shrink:0;">1</div>
+        <div>
+          <div style="font-size:14px;font-weight:700;">Escanear código QR o de barras</div>
+          <div style="font-size:11px;color:var(--text3);">Apunta la cámara al código QR o código de barras del Tracking</div>
+        </div>
+      </div>
+
+      <!-- Visor de cámara -->
+      <div id="scanner-wrap" style="position:relative;border-radius:14px;overflow:hidden;background:#000;aspect-ratio:4/3;margin-bottom:10px;display:none;">
+        <div id="scanner-video" style="width:100%;height:100%;"></div>
+        <!-- Línea de escaneo animada -->
+        <div style="position:absolute;inset:0;pointer-events:none;">
+          <div style="position:absolute;left:5%;right:5%;top:50%;transform:translateY(-50%);height:80px;border:2px solid var(--accent);border-radius:8px;box-shadow:0 0 0 2000px rgba(0,0,0,.45);">
+            <div id="scan-line" style="position:absolute;top:0;left:0;right:0;height:2px;background:var(--accent);box-shadow:0 0 8px var(--accent);animation:scanLine 1.2s ease-in-out infinite;"></div>
+          </div>
+        </div>
+        <!-- Último tracking detectado -->
+        <div id="scanner-last" style="position:absolute;bottom:0;left:0;right:0;padding:10px 14px;background:rgba(0,0,0,.75);font-size:13px;font-weight:700;color:var(--green);font-family:var(--mono);text-align:center;display:none;"></div>
+        <!-- Debug: modo activo y último código visto -->
+        <div id="scanner-debug" style="position:absolute;top:8px;left:8px;right:8px;padding:6px 10px;background:rgba(0,0,0,.65);border-radius:8px;font-size:11px;color:#fff;font-family:monospace;display:none;word-break:break-all;"></div>
+        <!-- Canvas oculto para lectura de QR con jsQR -->
+        <canvas id="qr-canvas" style="display:none;"></canvas>
+      </div>
+
+      <div id="scanner-btns" style="display:flex;gap:8px;margin-bottom:10px;">
+        <button class="btn btn-accent" id="btn-iniciar-scanner" onclick="iniciarEscaner()" style="flex:1;">
+          📷 Iniciar escáner
+        </button>
+        <button class="btn btn-ghost btn-sm" id="btn-detener-scanner" onclick="detenerEscaner()" style="display:none;white-space:nowrap;">
+          ⏹ Detener
+        </button>
+      </div>
+
+      <!-- Ingreso manual como fallback -->
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input type="text" id="tracking-manual-input" placeholder="O escribe el tracking manualmente..."
+          style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--text);font-size:13px;font-family:var(--mono);outline:none;"
+          onkeydown="if(event.key==='Enter')agregarTrackingManual()">
+        <button class="btn btn-ghost btn-sm" onclick="agregarTrackingManual()" style="white-space:nowrap;flex-shrink:0;">＋ Agregar</button>
+      </div>
+    </div>
+
+    <!-- Guías escaneadas -->
+    <div id="trackings-detectados-wrap" style="display:none;padding:0 16px 16px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.08em;font-weight:600;">Guías escaneadas</div>
+        <button onclick="limpiarTrackings()" style="background:none;border:none;color:var(--text3);font-size:11px;cursor:pointer;padding:2px 6px;border-radius:6px;">🗑 Limpiar</button>
+      </div>
+      <div id="trackings-detectados-list" style="display:flex;flex-direction:column;gap:6px;margin-bottom:12px;"></div>
+      <button id="btn-cargar-etiquetas" onclick="cargarEtiquetasEnLista()" class="btn btn-green" style="width:100%;font-size:15px;font-weight:700;">
+        📋 Cargar etiquetas en lista
+      </button>
+      <div id="cargar-etiquetas-resultado" style="display:none;margin-top:10px;font-size:13px;color:var(--text2);padding:10px 14px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);"></div>
+    </div>
+
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SCREEN: DETALLE CLIENTE
+══════════════════════════════════════════ -->
+<div class="screen hidden" id="screen-client">
+  <div class="topbar">
+    <button class="topbar-back" onclick="showScreen('home')">←</button>
+    <h2 id="client-topbar-name">Cliente</h2>
+    <span id="client-status-badge"></span>
+  </div>
+  <div class="scroll">
+
+    <!-- ── HERO ── -->
+    <div class="client-hero">
+      <div class="client-name" id="c-nombre">—</div>
+      <!-- Teléfono inline con ícono y tap-to-call -->
+      <div id="c-tel-hero" style="display:flex;align-items:center;gap:6px;margin-top:5px;">
+        <span style="font-size:14px;">📞</span>
+        <a id="c-tel-link" href="#" style="font-size:14px;color:var(--accent);font-weight:600;text-decoration:none;">—</a>
+      </div>
+    </div>
+
+    <!-- ── TARJETA DOMICILIO ── -->
+    <div style="padding:14px 16px 0;">
+      <div style="
+        background:linear-gradient(135deg,var(--surface) 0%,var(--surface2) 100%);
+        border:1px solid var(--border);border-radius:16px;overflow:hidden;
+      ">
+        <!-- Encabezado -->
+        <div style="
+          display:flex;align-items:center;gap:10px;
+          padding:12px 14px 10px;
+          border-bottom:1px solid var(--border);
+          background:rgba(0,212,255,.05);
+        ">
+          <div style="width:32px;height:32px;border-radius:10px;background:rgba(0,212,255,.15);border:1px solid rgba(0,212,255,.25);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">🏠</div>
+          <div>
+            <div style="font-size:11px;font-weight:700;color:var(--accent);text-transform:uppercase;letter-spacing:.09em;">Domicilio de entrega</div>
+            <div id="c-municipio-label" style="font-size:11px;color:var(--text3);margin-top:1px;"></div>
+          </div>
+          <button onclick="copiarDireccion()" style="margin-left:auto;background:transparent;border:none;color:var(--text3);font-size:18px;cursor:pointer;padding:4px;" title="Copiar dirección">⎘</button>
+        </div>
+
+        <!-- Campos de dirección -->
+        <div style="padding:12px 14px;display:flex;flex-direction:column;gap:8px;">
+
+          <!-- Calle + Número -->
+          <div style="display:flex;align-items:baseline;gap:10px;">
+            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;font-weight:600;width:52px;flex-shrink:0;">Calle</div>
+            <div id="c-calle-num" style="font-size:15px;font-weight:700;color:var(--text);flex:1;"></div>
+          </div>
+
+          <div style="height:1px;background:var(--border);opacity:.5;"></div>
+
+          <!-- Colonia -->
+          <div style="display:flex;align-items:baseline;gap:10px;">
+            <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;font-weight:600;width:52px;flex-shrink:0;">Colonia</div>
+            <div id="c-colonia" style="font-size:14px;color:var(--text);flex:1;font-weight:500;"></div>
+          </div>
+
+          <div style="height:1px;background:var(--border);opacity:.5;"></div>
+
+          <!-- CP + Municipio en fila -->
+          <div style="display:flex;gap:16px;">
+            <div style="flex:1;">
+              <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-bottom:3px;">C.P.</div>
+              <div id="c-cp" style="font-size:14px;font-weight:600;font-family:var(--mono);color:var(--text);">—</div>
+            </div>
+            <div style="flex:2;">
+              <div style="font-size:10px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin-bottom:3px;">Municipio</div>
+              <div id="c-municipio" style="font-size:14px;font-weight:500;color:var(--text);">—</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Botón Google Maps -->
+        <button onclick="abrirEnMaps()" style="
+          width:100%;display:flex;align-items:center;justify-content:center;gap:8px;
+          padding:11px 14px;border:none;cursor:pointer;
+          background:rgba(0,212,255,.08);border-top:1px solid var(--border);
+          color:var(--accent);font-size:13px;font-weight:600;font-family:var(--sans);
+          transition:background .15s;
+        " onmousedown="this.style.background='rgba(0,212,255,.16)'" onmouseup="this.style.background='rgba(0,212,255,.08)'">
+          <span style="font-size:16px;">🗺️</span> Abrir en Google Maps
+        </button>
+      </div>
+    </div>
+
+    <!-- ── PAQUETES ── -->
+    <div style="padding:14px 16px 0;">
+      <div style="
+        background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;
+      ">
+        <div style="
+          display:flex;align-items:center;gap:10px;padding:12px 14px 10px;
+          border-bottom:1px solid var(--border);background:rgba(0,230,118,.04);
+        ">
+          <div style="width:32px;height:32px;border-radius:10px;background:rgba(0,230,118,.12);border:1px solid rgba(0,230,118,.25);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0;">📦</div>
+          <div style="font-size:11px;font-weight:700;color:var(--green);text-transform:uppercase;letter-spacing:.09em;">Paquetes</div>
+          <div id="c-pdd-badge" style="margin-left:auto;display:none;">
+            <span style="font-size:11px;font-weight:600;color:var(--orange);background:rgba(255,145,0,.12);border:1px solid rgba(255,145,0,.25);padding:3px 9px;border-radius:99px;">📅 PDD: <span id="c-pdd"></span></span>
+          </div>
+        </div>
+        <div id="c-paquetes-lista" style="padding:10px 14px;display:flex;flex-direction:column;gap:6px;"></div>
+      </div>
+    </div>
+
+    <!-- ── FOTOS ESCANEO ── -->
+    <div id="c-foto-wrap" style="display:none;padding:14px 16px 0;">
+      <div style="background:var(--surface);border:1px solid var(--border);border-radius:16px;overflow:hidden;">
+        <div style="padding:12px 14px 10px;border-bottom:1px solid var(--border);">
+          <div style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.09em;">📷 Fotos del escaneo</div>
+        </div>
+        <div id="c-fotos-paquetes" style="padding:12px 14px;"></div>
+      </div>
+    </div>
+
+    <div id="c-fotos-entrega-wrap">
+      <div class="sec-header" style="display:flex;align-items:center;justify-content:space-between;padding-right:16px;">
+        <span>📸 Fotos de producto entregado</span>
+        <label for="c-entrega-file-input" style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:99px;font-size:12px;font-weight:600;background:rgba(0,212,255,.12);border:1px solid rgba(0,212,255,.3);color:var(--accent);cursor:pointer;">
+          ＋ Agregar
+        </label>
+      </div>
+      <input type="file" id="c-entrega-file-input" accept="image/*" multiple style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">
+      <div id="c-fotos-entrega-grid" style="display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 16px;"></div>
+    </div>
+
+    <!-- FOTOS DEL ARTÍCULO -->
+    <div id="c-fotos-articulo-wrap">
+      <div class="sec-header" style="display:flex;align-items:center;justify-content:space-between;padding-right:16px;">
+        <span>📦 Fotos del artículo</span>
+        <label for="c-articulo-file-input" style="display:inline-flex;align-items:center;gap:5px;padding:5px 12px;border-radius:99px;font-size:12px;font-weight:600;background:rgba(0,230,118,.12);border:1px solid rgba(0,230,118,.3);color:var(--green);cursor:pointer;">
+          ＋ Agregar
+        </label>
+      </div>
+      <input type="file" id="c-articulo-file-input" accept="image/*" multiple style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">
+      <div id="c-fotos-articulo-grid" style="display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 16px;"></div>
+    </div>
+
+    <div id="c-fotos-excepcion-wrap">
+      <div class="sec-header" style="display:flex;align-items:center;justify-content:space-between;padding-right:16px;">
+        <span>⚠️ Fotos de excepción de entrega</span>
+        <label for="c-excepcion-file-input" style="
+          display:inline-flex;align-items:center;gap:5px;
+          padding:5px 12px;border-radius:99px;font-size:12px;font-weight:600;
+          background:rgba(255,145,0,.12);border:1px solid rgba(255,145,0,.3);
+          color:var(--orange);cursor:pointer;">
+          ＋ Agregar
+        </label>
+      </div>
+      <input type="file" id="c-excepcion-file-input" accept="image/*" multiple style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none;">
+      <div id="c-fotos-excepcion-grid" style="display:flex;flex-wrap:wrap;gap:8px;padding:0 16px 16px;"></div>
+    </div>
+
+    <div class="sec-header" style="display:flex;align-items:center;justify-content:space-between;padding-right:16px;">
+      <span>📍 Plus Code de entrega</span>
+    </div>
+    <div style="padding:0 16px 14px;display:flex;flex-direction:column;gap:8px;">
+      <div style="display:flex;gap:8px;">
+        <input type="text" id="c-pluscode-input" placeholder="Ej. 8Q3C+6P Cuautitlán" autocomplete="off"
+          style="flex:1;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:10px 13px;color:var(--text);font-size:13px;font-family:var(--sans);outline:none;"
+          onkeydown="if(event.key==='Enter')agregarPlusCodeCliente()">
+        <button class="btn btn-accent btn-sm" onclick="agregarPlusCodeCliente()" style="white-space:nowrap;flex-shrink:0;">＋ Agregar</button>
+      </div>
+      <div id="c-pluscode-list" style="display:flex;flex-direction:column;gap:6px;"></div>
+      <button class="btn btn-ghost" id="btn-ir-ruta" onclick="agregarClienteARuta()" style="display:none;margin-top:4px;border-color:var(--accent);color:var(--accent);">
+        📍 Agregar paradas a ruta
+      </button>
+    </div>
+
+    <!-- botones ocultos — solo para compatibilidad con JS existente -->
+    <div id="hidden-action-btns" style="position:absolute;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;">
+      <button id="btn-whatsapp-intro"></button>
+      <button id="btn-whatsapp-camino"></button>
+      <button id="btn-open-camera"></button>
+      <button id="btn-edit-client"></button>
+      <div id="exc-btn-wrap">
+        <div id="exc-dropdown"></div>
+        <button class="exc-btn" onclick="toggleExcDropdown()">
+          <span id="exc-arrow"></span>
+        </button>
+      </div>
+      <button id="btn-mark-done"></button>
+      <button id="btn-en-camino"></button>
+    </div>
+    <!-- único botón visible: deshacer entrega -->
+    <div style="padding:0 16px 16px;">
+      <button class="btn btn-ghost" id="btn-undo-done" onclick="deshacerEntrega()" style="display:none;color:var(--orange);border-color:var(--orange);font-size:13px;">
+        ↩ Deshacer entrega
+      </button>
+    </div>
   </div>
 </div>
 
@@ -1419,6 +1906,25 @@ Casa verde, 8Q4F+HP México" style="
       <button class="btn btn-green" id="btn-mark-done-camera" onclick="marcarEntregadoDesdeCamera()" style="display:none;background:var(--green);color:var(--bg);font-size:16px;padding:16px;">✅ Marcar como entregado</button>
     </div>
   </div>
+</div>
+
+<!-- ══════════════════════════════════════════
+     SCREEN: BASE DE DATOS
+══════════════════════════════════════════ -->
+<div class="screen hidden" id="screen-db">
+  <div class="topbar">
+    <button class="topbar-back" onclick="showScreen('home')">←</button>
+    <h2>Base de datos</h2>
+    <span class="topbar-sub" id="db-count-label">0 reg.</span>
+  </div>
+  <div class="db-toolbar">
+    <div class="search-box">
+      <span style="color:var(--text3);">🔍</span>
+      <input type="text" id="db-search" placeholder="Buscar nombre, tracking...">
+    </div>
+    <button class="btn btn-ghost btn-sm" onclick="exportCSV()">↓ CSV</button>
+  </div>
+  <div class="scroll" id="db-list"></div>
 </div>
 
 <!-- ══════════════════════════════════════════
@@ -2980,7 +3486,7 @@ document.getElementById('btn-mark-done').addEventListener('click', async () => {
       showToast('🎉 ¡Ruta completada!');
     }
   } else {
-    showScreen('navegacion');
+    showScreen('home');
   }
 });
 
@@ -3839,7 +4345,7 @@ window.cargarEtiquetasEnLista = async function() {
       trackingsDetectados = [];
       _saveTrackings();
       renderTrackingsDetectados();
-      showScreen('navegacion');
+      showScreen('home');
     }, 1800);
   }
 };
@@ -4022,7 +4528,7 @@ window.cruzarDatos = async function() {
   if (encontrados > 0) {
     await loadRecords();
     showToast(`✅ ${encontrados} clientes · 📍 ${geocodificados} ubicaciones`);
-    setTimeout(() => showScreen('navegacion'), 1800);
+    setTimeout(() => showScreen('home'), 1800);
   }
 };
 
@@ -8644,6 +9150,32 @@ window.scanEntregaEnviarWap = function() {
 
 </script>
 <!-- ══════════════════════════════════════════
+     SCREEN: HISTORIAL DE RUTAS
+══════════════════════════════════════════ -->
+<div class="screen hidden" id="screen-historial">
+  <div class="topbar">
+    <button class="topbar-back" onclick="showScreen('home')">←</button>
+    <h2>🗂️ Historial de Rutas</h2>
+    <span class="topbar-sub" id="hist-count-label">—</span>
+  </div>
+
+  <!-- Barra de búsqueda -->
+  <div style="padding:10px 16px 6px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;">
+    <div class="search-box">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input type="text" id="hist-search" placeholder="Buscar por nombre de ruta…" oninput="renderHistorial()">
+    </div>
+  </div>
+
+  <div class="scroll" id="hist-list">
+    <div class="empty-list" style="padding:60px 20px;text-align:center;color:var(--text3);">
+      <div style="font-size:48px;margin-bottom:12px;">🗂️</div>
+      <p style="font-size:14px;">Cargando historial...</p>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════
      MODAL: DETALLE DE RUTA HISTÓRICA
 ══════════════════════════════════════════ -->
 <div class="modal-overlay" id="modal-hist-detalle">
@@ -8659,6 +9191,38 @@ window.scanEntregaEnviarWap = function() {
     <button class="btn btn-ghost" onclick="closeModal('modal-hist-detalle');if(window._histMap){window._histMap.remove();window._histMap=null;}" style="margin-top:12px;">Cerrar</button>
   </div>
 </div>
+
+<!-- ══════════════════════════════════════════
+     SCREEN: IR A RUTA (mapa completo)
+══════════════════════════════════════════ -->
+<div class="screen hidden" id="screen-ir-ruta">
+  <div class="topbar" style="background:var(--bg);">
+    <button class="topbar-back" onclick="showScreen('client')">←</button>
+    <h2 id="ir-ruta-title">🗺️ Ir a Ruta</h2>
+    <span class="topbar-sub" id="ir-ruta-sub"></span>
+  </div>
+
+  <!-- Mapa Leaflet ocupa todo el espacio disponible -->
+  <div style="flex:1;position:relative;overflow:hidden;">
+    <div id="ir-ruta-map" style="width:100%;height:100%;"></div>
+
+    <!-- HUD inferior con lista de paradas -->
+    <div id="ir-ruta-hud" style="
+      position:absolute;bottom:0;left:0;right:0;
+      background:linear-gradient(0deg,var(--bg) 0%,rgba(10,22,40,.97) 80%,transparent 100%);
+      padding:14px 16px 20px;display:flex;flex-direction:column;gap:10px;
+    ">
+      <!-- Paradas ordenadas -->
+      <div id="ir-ruta-stops" style="display:flex;flex-direction:column;gap:6px;max-height:180px;overflow-y:auto;"></div>
+
+      <!-- Botón abrir en Google Maps nativo -->
+      <button class="btn btn-green" onclick="abrirGoogleMapsNativo()" style="font-size:14px;">
+        📱 Abrir en Google Maps
+      </button>
+    </div>
+  </div>
+</div>
+
 
 <script>
 // ── Bridge: expone funciones del módulo al HTML inline ──────────────
