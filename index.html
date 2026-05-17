@@ -1,0 +1,1404 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="theme-color" content="#0a1628">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="SEISA">
+<title>SEISA Rutas</title>
+<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<style>
+:root {
+  --bg:      #0a1628;
+  --bg2:     #0d1b2a;
+  --surface: #111f35;
+  --surface2:#172540;
+  --border:  #1e3560;
+  --text:    #dceeff;
+  --text2:   #8aabcc;
+  --text3:   #4a6a8a;
+  --accent:  #00d4ff;
+  --green:   #00e676;
+  --red:     #ff5252;
+  --orange:  #ff9100;
+  --yellow:  #ffd740;
+  --sans:    'Segoe UI', system-ui, sans-serif;
+  --mono:    'SF Mono', 'Fira Code', monospace;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+html, body { height: 100%; overflow: hidden; font-family: var(--sans); background: var(--bg); color: var(--text); }
+
+/* ── SCREENS ── */
+.screen { position: fixed; inset: 0; display: flex; flex-direction: column; background: var(--bg); transition: transform .3s cubic-bezier(.4,0,.2,1); }
+.screen.hidden { transform: translateX(100%); pointer-events: none; }
+
+/* ── TOPBAR ── */
+.topbar { display: flex; align-items: center; gap: 10px; padding: 14px 16px 10px; background: var(--bg2); border-bottom: 1px solid var(--border); flex-shrink: 0; padding-top: max(14px, env(safe-area-inset-top)); }
+.topbar h2 { flex: 1; font-size: 17px; font-weight: 700; }
+.topbar-back { width: 36px; height: 36px; border-radius: 50%; border: 1px solid var(--border); background: var(--surface); color: var(--text2); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+
+/* ── SCROLL ── */
+.scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
+/* ── CARDS ── */
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 16px; }
+.card + .card { margin-top: 10px; }
+
+/* ── BUTTONS ── */
+.btn { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 13px 18px; border-radius: 12px; border: none; font-size: 15px; font-weight: 700; cursor: pointer; font-family: var(--sans); transition: opacity .15s, transform .1s; width: 100%; }
+.btn:active { opacity: .8; transform: scale(.98); }
+.btn-accent { background: var(--accent); color: #000; }
+.btn-green  { background: var(--green);  color: #000; }
+.btn-red    { background: var(--red);    color: #fff; }
+.btn-ghost  { background: var(--surface2); color: var(--text2); border: 1px solid var(--border); }
+.btn-yellow { background: var(--yellow); color: #000; }
+
+/* ── INPUTS ── */
+.input { background: var(--surface2); border: 1.5px solid var(--border); border-radius: 10px; padding: 12px 14px; color: var(--text); font-size: 15px; font-family: var(--sans); outline: none; width: 100%; transition: border .15s; }
+.input:focus { border-color: var(--accent); }
+.label { font-size: 11px; color: var(--text3); text-transform: uppercase; letter-spacing: .08em; font-weight: 600; margin-bottom: 5px; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+
+/* ── TOGGLE ── */
+.toggle-row { display: flex; align-items: center; justify-content: space-between; padding: 12px 0; border-bottom: 1px solid var(--border); }
+.toggle { position: relative; width: 44px; height: 26px; flex-shrink: 0; }
+.toggle input { opacity: 0; width: 0; height: 0; }
+.toggle-slider { position: absolute; inset: 0; background: var(--surface2); border-radius: 13px; transition: .2s; cursor: pointer; }
+.toggle-slider:before { content:''; position:absolute; width:20px; height:20px; left:3px; bottom:3px; background:#fff; border-radius:50%; transition:.2s; }
+input:checked + .toggle-slider { background: var(--accent); }
+input:checked + .toggle-slider:before { transform: translateX(18px); }
+
+/* ── BADGE ── */
+.badge { display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px; border-radius: 99px; font-size: 11px; font-weight: 700; }
+.badge-green  { background: rgba(0,230,118,.15); color: var(--green); border: 1px solid rgba(0,230,118,.3); }
+.badge-orange { background: rgba(255,145,0,.15);  color: var(--orange); border: 1px solid rgba(255,145,0,.3); }
+.badge-red    { background: rgba(255,82,82,.15);   color: var(--red);   border: 1px solid rgba(255,82,82,.3); }
+
+/* ── PARADA ITEM ── */
+.parada-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.parada-num { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; flex-shrink: 0; }
+.parada-info { flex: 1; min-width: 0; }
+.parada-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.parada-sub  { font-size: 11px; color: var(--text3); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* ── NAV SCREEN ── */
+#nav-map { position: absolute; inset: 0; z-index: 1; }
+#nav-panel { position: absolute; bottom: 0; left: 0; right: 0; z-index: 100; padding: 0 12px calc(env(safe-area-inset-bottom,0px) + 12px); }
+#nav-panel-inner {
+  background: rgba(13,27,42,.95);
+  border: 1px solid rgba(30,53,96,.8);
+  border-radius: 20px;
+  padding: 14px;
+  backdrop-filter: blur(16px);
+  box-shadow: 0 4px 32px rgba(0,0,0,.7);
+  display: flex; flex-direction: column; gap: 10px;
+}
+#nav-topbar {
+  position: absolute; top: 0; left: 0; right: 0; z-index: 100;
+  background: linear-gradient(180deg,rgba(10,22,40,.92) 0%,transparent 100%);
+  padding: max(14px, env(safe-area-inset-top)) 14px 20px;
+}
+.nav-metric { text-align: center; }
+.nav-metric-val { font-size: 22px; font-weight: 800; font-family: var(--mono); line-height: 1; }
+.nav-metric-lbl { font-size: 9px; color: var(--text3); text-transform: uppercase; letter-spacing: .06em; margin-top: 2px; }
+.nav-divider { width: 1px; height: 36px; background: var(--border); }
+
+/* ── LISTA OVERLAY ── */
+#nav-lista-overlay { position: absolute; inset: 0; z-index: 200; background: var(--bg); display: flex; flex-direction: column; }
+#nav-lista-overlay.hidden { transform: translateX(100%); }
+
+/* ── TOAST ── */
+#toast { position: fixed; bottom: 100px; left: 50%; transform: translateX(-50%) translateY(20px); background: var(--surface); border: 1px solid var(--border); color: var(--text); padding: 10px 20px; border-radius: 24px; font-size: 13px; font-weight: 600; z-index: 9999; opacity: 0; transition: all .25s; pointer-events: none; white-space: nowrap; }
+#toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+/* ── SEARCH RESULTS ── */
+#search-results { position: absolute; top: 100%; left: 0; right: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 0 0 12px 12px; z-index: 1000; max-height: 220px; overflow-y: auto; display: none; }
+#search-results .result-item { padding: 12px 14px; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 13px; }
+#search-results .result-item:hover { background: var(--surface2); }
+.search-wrap { position: relative; }
+
+/* ── FLOATING BTNS ── */
+#nav-float-btns { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); z-index: 100; display: flex; flex-direction: column; gap: 8px; }
+.nav-float-btn { width: 44px; height: 44px; border-radius: 50%; border: none; background: rgba(13,27,42,.9); backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,.5); color: var(--text2); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+/* ── MODAL ── */
+.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 9000; display: flex; align-items: flex-end; }
+.modal-overlay.hidden { display: none; }
+.modal-sheet { background: var(--bg2); border-radius: 20px 20px 0 0; width: 100%; padding: 20px 16px calc(env(safe-area-inset-bottom,20px) + 16px); display: flex; flex-direction: column; gap: 10px; max-height: 80vh; overflow-y: auto; }
+.modal-title { font-size: 15px; font-weight: 700; text-align: center; margin-bottom: 4px; }
+
+/* ── RUTAS LIST (Home) ── */
+.ruta-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 14px 16px; display: flex; align-items: center; gap: 12px; cursor: pointer; transition: background .15s; }
+.ruta-card:active { background: var(--surface2); }
+.ruta-card-icon { width: 44px; height: 44px; border-radius: 12px; background: rgba(0,212,255,.12); border: 1px solid rgba(0,212,255,.25); display: flex; align-items: center; justify-content: center; font-size: 20px; flex-shrink: 0; }
+.ruta-card-info { flex: 1; min-width: 0; }
+.ruta-card-name { font-size: 14px; font-weight: 700; }
+.ruta-card-sub  { font-size: 11px; color: var(--text3); margin-top: 3px; }
+
+@keyframes pulse { 0%,100%{opacity:1}50%{opacity:.5} }
+@keyframes scanLine { 0%{top:0}50%{top:calc(100% - 2px)}100%{top:0} }
+</style>
+</head>
+<body>
+
+<!-- ════════════════════════════════
+     SCREEN 1: HOME
+════════════════════════════════ -->
+<div class="screen" id="screen-home">
+  <div class="topbar">
+    <h2>🚛 SEISA Rutas</h2>
+    <div style="display:flex;gap:6px;">
+      <button id="btn-gh-status" onclick="mostrarConfigGH()" style="width:auto;padding:6px 10px;font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text3);cursor:pointer;">⬡ GitHub</button>
+      <button class="btn btn-ghost" onclick="showHistorial()" style="width:auto;padding:6px 12px;font-size:12px;">📋</button>
+    </div>
+  </div>
+  <div class="scroll" style="padding:16px;display:flex;flex-direction:column;gap:12px;">
+    <!-- Ruta activa -->
+    <div id="home-ruta-activa" style="display:none;">
+      <div class="label" style="margin-bottom:8px;">Ruta en curso</div>
+      <div class="ruta-card" onclick="continuarRuta()" style="border-color:rgba(0,230,118,.4);background:rgba(0,230,118,.06);">
+        <div class="ruta-card-icon" style="background:rgba(0,230,118,.12);border-color:rgba(0,230,118,.3);">🟢</div>
+        <div class="ruta-card-info">
+          <div class="ruta-card-name" id="home-activa-nombre">—</div>
+          <div class="ruta-card-sub" id="home-activa-sub">Toca para continuar</div>
+        </div>
+        <div style="font-size:11px;color:var(--green);font-weight:700;">▶ Continuar</div>
+      </div>
+    </div>
+
+    <!-- Nueva ruta -->
+    <button class="btn btn-accent" onclick="showScreen('screen-crear')" style="font-size:17px;padding:18px;">
+      🗺️ Crear Nueva Ruta
+    </button>
+
+    <!-- Rutas guardadas -->
+    <div id="home-rutas-list"></div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════
+     SCREEN 2: CREAR RUTA
+════════════════════════════════ -->
+<div class="screen hidden" id="screen-crear">
+  <div class="topbar">
+    <button class="topbar-back" onclick="showScreen('screen-home')">←</button>
+    <h2>⚙️ Configurar Ruta</h2>
+  </div>
+  <div class="scroll" style="padding:16px;display:flex;flex-direction:column;gap:14px;">
+    <div class="card">
+      <div class="field">
+        <div class="label">Nombre de la ruta</div>
+        <input class="input" id="cr-nombre" placeholder="Ej. Walmart CDMX Norte" type="text">
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="field">
+        <div class="label">Fecha</div>
+        <input class="input" id="cr-fecha" type="date">
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="toggle-row">
+        <div>
+          <div style="font-size:14px;font-weight:600;">🛣️ Evitar peajes</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:2px;">Usar rutas sin casetas</div>
+        </div>
+        <label class="toggle">
+          <input type="checkbox" id="cr-peajes">
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="label" style="margin-bottom:10px;">📍 Punto de inicio</div>
+      <div class="search-wrap">
+        <input class="input" id="cr-inicio" placeholder="Buscar dirección o Plus Code..." oninput="buscarLugar('inicio',this.value)">
+        <div id="search-results-inicio" class="search-results-box"></div>
+      </div>
+      <div id="cr-inicio-label" style="font-size:11px;color:var(--green);margin-top:6px;display:none;"></div>
+    </div>
+
+    <div class="card">
+      <div class="label" style="margin-bottom:10px;">🏁 Punto final (base de regreso)</div>
+      <div class="search-wrap">
+        <input class="input" id="cr-final" placeholder="Buscar dirección o Plus Code..." oninput="buscarLugar('final',this.value)">
+        <div id="search-results-final" class="search-results-box"></div>
+      </div>
+      <div id="cr-final-label" style="font-size:11px;color:var(--green);margin-top:6px;display:none;"></div>
+    </div>
+
+    <button class="btn btn-accent" onclick="irACargarParadas()">
+      Siguiente → Cargar paradas
+    </button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════
+     SCREEN 3: CARGAR PARADAS
+════════════════════════════════ -->
+<div class="screen hidden" id="screen-paradas">
+  <div class="topbar">
+    <button class="topbar-back" onclick="showScreen('screen-crear')">←</button>
+    <h2>📍 Paradas</h2>
+    <span id="paradas-count-label" style="font-size:12px;color:var(--accent);font-weight:700;">0</span>
+  </div>
+
+  <!-- MAPA -->
+  <div id="paradas-map" style="height:260px;flex-shrink:0;"></div>
+
+  <!-- BUSCADOR -->
+  <div style="padding:10px 12px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;position:relative;">
+    <div class="search-wrap">
+      <input class="input" id="paradas-search" placeholder="🔍 Buscar dirección, Plus Code o toca el mapa..." oninput="buscarParada(this.value)" style="padding-right:40px;">
+      <div id="search-results-parada" class="search-results-box" style="position:absolute;left:0;right:0;z-index:500;"></div>
+    </div>
+    <div style="display:flex;gap:8px;margin-top:8px;">
+      <input class="input" id="paradas-pluscode" placeholder="Plus Code (ej. 76QF+5G)" style="flex:1;font-size:13px;font-family:var(--mono);">
+      <button class="btn btn-ghost" onclick="agregarPorPlusCode()" style="width:auto;padding:8px 14px;white-space:nowrap;flex-shrink:0;">＋ Agregar</button>
+    </div>
+  </div>
+
+  <!-- LISTA PARADAS -->
+  <div class="scroll" id="paradas-list-wrap" style="flex:1;">
+    <div id="paradas-list"></div>
+    <div id="paradas-empty" style="padding:24px;text-align:center;color:var(--text3);font-size:13px;">
+      Toca el mapa o busca una dirección para agregar paradas
+    </div>
+  </div>
+
+  <!-- BOTÓN OPTIMIZAR -->
+  <div style="padding:12px 16px calc(env(safe-area-inset-bottom,0px)+12px);background:var(--bg2);border-top:1px solid var(--border);flex-shrink:0;">
+    <button class="btn btn-green" onclick="optimizarRuta()" id="btn-optimizar" disabled>
+      ⚡ Optimizar Ruta
+    </button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════
+     SCREEN 4: RESUMEN OPTIMIZADO
+════════════════════════════════ -->
+<div class="screen hidden" id="screen-resumen">
+  <div class="topbar">
+    <button class="topbar-back" onclick="showScreen('screen-paradas')">←</button>
+    <h2>📊 Resumen de Ruta</h2>
+  </div>
+  <div class="scroll" style="padding:16px;display:flex;flex-direction:column;gap:12px;">
+
+    <!-- Métricas -->
+    <div class="card" style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);padding:0;overflow:hidden;">
+      <div style="padding:16px;background:var(--surface);text-align:center;">
+        <div style="font-size:28px;font-weight:800;color:var(--accent);font-family:var(--mono);" id="res-km">—</div>
+        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;margin-top:3px;">Kilómetros</div>
+      </div>
+      <div style="padding:16px;background:var(--surface);text-align:center;">
+        <div style="font-size:28px;font-weight:800;color:var(--green);font-family:var(--mono);" id="res-paradas">—</div>
+        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;margin-top:3px;">Paradas</div>
+      </div>
+      <div style="padding:16px;background:var(--surface);text-align:center;">
+        <div style="font-size:28px;font-weight:800;color:var(--yellow);font-family:var(--mono);" id="res-tiempo">—</div>
+        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;margin-top:3px;">Hrs trabajo aprox</div>
+      </div>
+      <div style="padding:16px;background:var(--surface);text-align:center;">
+        <div style="font-size:22px;font-weight:800;color:var(--orange);font-family:var(--mono);" id="res-fin">—</div>
+        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;margin-top:3px;">Hora aprox fin</div>
+      </div>
+    </div>
+
+    <!-- Orden de paradas -->
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div style="padding:12px 14px;border-bottom:1px solid var(--border);font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;">Orden optimizado</div>
+      <div id="res-orden-list"></div>
+    </div>
+
+    <!-- Botón iniciar -->
+    <button class="btn btn-green" onclick="iniciarRuta()" style="font-size:18px;padding:20px;">
+      🚀 Iniciar Ruta
+    </button>
+
+    <button class="btn btn-ghost" onclick="showScreen('screen-paradas')">
+      ← Editar paradas
+    </button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════
+     SCREEN 5: NAVEGADOR
+════════════════════════════════ -->
+<div class="screen hidden" id="screen-nav" style="background:#0a1628;overflow:hidden;">
+
+  <!-- MAPA FULL SCREEN -->
+  <div id="nav-map" style="position:absolute;inset:0;z-index:1;"></div>
+
+  <!-- TOPBAR -->
+  <div id="nav-topbar">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <button onclick="salirNavegacion()" style="width:40px;height:40px;border-radius:50%;border:none;background:rgba(13,27,42,.9);backdrop-filter:blur(6px);color:var(--text);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">←</button>
+      <div style="flex:1;min-width:0;background:rgba(13,27,42,.8);border-radius:10px;padding:8px 12px;backdrop-filter:blur(6px);">
+        <div id="nav-calle" style="font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">—</div>
+        <div id="nav-sub" style="font-size:10px;color:var(--text3);margin-top:1px;"></div>
+      </div>
+      <button onclick="toggleListaNav()" style="width:40px;height:40px;border-radius:50%;border:none;background:rgba(13,27,42,.9);backdrop-filter:blur(6px);color:var(--text2);font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;flex-shrink:0;">☰</button>
+    </div>
+  </div>
+
+  <!-- BOTONES FLOTANTES -->
+  <div id="nav-float-btns">
+    <button class="nav-float-btn" onclick="centrarGPS()" title="Mi ubicación">◎</button>
+    <button class="nav-float-btn" onclick="vistaGeneral()" title="Vista general">⊞</button>
+    <button class="nav-float-btn" onclick="editarUbicacion()" title="Editar ubicación" style="color:var(--yellow);">✏️</button>
+  </div>
+
+  <!-- PANEL INFERIOR -->
+  <div id="nav-panel">
+    <div id="nav-panel-inner">
+
+      <!-- Métricas -->
+      <div style="display:grid;grid-template-columns:1fr 1px 1fr 1px 1fr;gap:0;align-items:center;">
+        <div class="nav-metric">
+          <div class="nav-metric-val" id="nav-km" style="color:var(--accent);">—</div>
+          <div class="nav-metric-lbl">km total</div>
+        </div>
+        <div class="nav-divider"></div>
+        <div class="nav-metric">
+          <div class="nav-metric-val" id="nav-progreso" style="color:var(--green);">0/0</div>
+          <div class="nav-metric-lbl">paradas</div>
+        </div>
+        <div class="nav-divider"></div>
+        <div class="nav-metric">
+          <div class="nav-metric-val" id="nav-eta" style="color:var(--yellow);">—</div>
+          <div class="nav-metric-lbl">hora fin</div>
+        </div>
+      </div>
+
+      <div style="height:1px;background:var(--border);"></div>
+
+      <!-- Botones acción -->
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <button onclick="marcarEntregada()" style="padding:14px 8px;border-radius:13px;border:2px solid rgba(0,230,118,.5);background:rgba(0,230,118,.12);color:var(--green);font-size:15px;font-weight:800;cursor:pointer;font-family:var(--sans);">
+          ✓ Entregada
+        </button>
+        <button onclick="marcarFallida()" style="padding:14px 8px;border-radius:13px;border:2px solid rgba(255,82,82,.45);background:rgba(255,82,82,.12);color:var(--red);font-size:15px;font-weight:800;cursor:pointer;font-family:var(--sans);">
+          ✗ Fallida
+        </button>
+      </div>
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+        <button onclick="abrirGoogleMaps()" style="padding:10px 4px;border-radius:11px;border:1.5px solid rgba(52,168,83,.45);background:rgba(52,168,83,.12);color:#4caf50;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans);display:flex;align-items:center;justify-content:center;gap:6px;">
+          🗺️ Google Maps
+        </button>
+        <button onclick="deshacerAccion()" style="padding:10px 4px;border-radius:11px;border:1.5px solid rgba(255,215,64,.4);background:rgba(255,215,64,.1);color:var(--yellow);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans);display:flex;align-items:center;justify-content:center;gap:6px;">
+          ↩ Deshacer
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- LISTA OVERLAY -->
+  <div id="nav-lista-overlay" class="hidden" style="position:absolute;inset:0;z-index:200;background:var(--bg);display:flex;flex-direction:column;transition:transform .3s;">
+    <div style="display:flex;align-items:center;gap:10px;padding:14px 16px;background:var(--bg2);border-bottom:1px solid var(--border);">
+      <button onclick="toggleListaNav()" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text2);font-size:18px;width:36px;height:36px;cursor:pointer;display:flex;align-items:center;justify-content:center;">←</button>
+      <div style="font-size:15px;font-weight:700;">Lista de paradas</div>
+    </div>
+    <div class="scroll" id="nav-lista-items"></div>
+  </div>
+
+</div>
+
+<!-- ════════════════════════════════
+     MODAL: EDITAR UBICACIÓN
+════════════════════════════════ -->
+<div class="modal-overlay hidden" id="modal-editar-ub">
+  <div class="modal-sheet">
+    <div class="modal-title">✏️ Editar ubicación de entrega</div>
+    <div class="search-wrap" style="position:relative;">
+      <input class="input" id="edit-ub-input" placeholder="Buscar nueva dirección..." oninput="buscarEdicion(this.value)">
+      <div id="search-results-edicion" class="search-results-box" style="position:absolute;left:0;right:0;"></div>
+    </div>
+    <div id="edit-ub-preview" style="display:none;font-size:12px;color:var(--green);padding:8px;background:rgba(0,230,118,.08);border-radius:8px;border:1px solid rgba(0,230,118,.2);"></div>
+    <button class="btn btn-green" onclick="confirmarEdicionUb()">✓ Confirmar nueva ubicación</button>
+    <button class="btn btn-ghost" onclick="closeModal('modal-editar-ub')">Cancelar</button>
+  </div>
+</div>
+
+<!-- TOAST -->
+<div id="toast"></div>
+
+<!-- MODAL: CONFIG GITHUB -->
+<div class="modal-overlay hidden" id="modal-github">
+  <div class="modal-sheet">
+    <div style="font-size:24px;text-align:center;margin-bottom:4px;">🔗</div>
+    <div class="modal-title">Conectar con GitHub</div>
+    <div style="font-size:12px;color:var(--text3);text-align:center;margin-bottom:8px;">Los datos se guardarán en tu repositorio GitHub</div>
+
+    <div class="field">
+      <div class="label">Usuario de GitHub</div>
+      <input class="input" id="gh-user" placeholder="tu-usuario">
+    </div>
+    <div class="field">
+      <div class="label">Nombre del repositorio</div>
+      <input class="input" id="gh-repo" placeholder="seisa-rutas-data">
+    </div>
+    <div class="field">
+      <div class="label">Token de acceso personal</div>
+      <input class="input" id="gh-token" type="password" placeholder="ghp_xxxxxxxxxxxx">
+      <div style="font-size:11px;color:var(--text3);margin-top:4px;">Necesita permisos: <b>repo</b>. <a href="https://github.com/settings/tokens/new" target="_blank" style="color:var(--accent);">Crear token →</a></div>
+    </div>
+
+    <button class="btn btn-accent" onclick="guardarConfigGH()">✓ Guardar y conectar</button>
+    <button class="btn btn-ghost" onclick="closeModal('modal-github')">Omitir (solo local)</button>
+  </div>
+</div>
+
+<style>
+.search-results-box { background: var(--surface); border: 1px solid var(--border); border-radius: 0 0 10px 10px; display: none; max-height: 200px; overflow-y: auto; }
+.search-results-box .res-item { padding: 11px 14px; border-bottom: 1px solid var(--border); cursor: pointer; font-size: 13px; }
+.search-results-box .res-item:hover, .search-results-box .res-item:active { background: var(--surface2); }
+</style>
+
+<script>
+// ══════════════════════════════════════════════════════════════════
+//  GITHUB BACKEND
+// ══════════════════════════════════════════════════════════════════
+const GH_CONFIG_KEY = 'seisa_gh_config';
+const APP_KEY       = 'seisa_app_v1';
+const GH_FILE       = 'seisa-data.json';
+
+let ghConfig = null; // { user, repo, token }
+let ghSyncing = false;
+
+function loadGHConfig() {
+  try { return JSON.parse(localStorage.getItem(GH_CONFIG_KEY)) || null; } catch(e) { return null; }
+}
+function saveGHConfig(cfg) {
+  localStorage.setItem(GH_CONFIG_KEY, JSON.stringify(cfg));
+  ghConfig = cfg;
+}
+
+async function guardarConfigGH() {
+  const user  = document.getElementById('gh-user').value.trim();
+  const repo  = document.getElementById('gh-repo').value.trim();
+  const token = document.getElementById('gh-token').value.trim();
+  if (!user || !repo || !token) { showToast('Completa todos los campos'); return; }
+  const cfg = { user, repo, token };
+  showToast('🔄 Verificando conexión...');
+  const ok = await testGHConnection(cfg);
+  if (!ok) { showToast('❌ No se pudo conectar. Verifica el token y repositorio.'); return; }
+  saveGHConfig(cfg);
+  closeModal('modal-github');
+  actualizarBtnGH();
+  showToast('✅ GitHub conectado correctamente');
+  await ghPull(); // Cargar datos remotos
+  renderHome();
+}
+
+async function testGHConnection(cfg) {
+  try {
+    const r = await fetch(`https://api.github.com/repos/${cfg.user}/${cfg.repo}`, {
+      headers: { Authorization: `token ${cfg.token}`, Accept: 'application/vnd.github.v3+json' }
+    });
+    return r.ok;
+  } catch(e) { return false; }
+}
+
+// ── Obtener SHA del archivo (necesario para actualizar) ────────────
+async function getFileSHA(cfg) {
+  try {
+    const r = await fetch(`https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/${GH_FILE}`, {
+      headers: { Authorization: `token ${cfg.token}`, Accept: 'application/vnd.github.v3+json' }
+    });
+    if (r.ok) { const d = await r.json(); return d.sha; }
+  } catch(e) {}
+  return null;
+}
+
+// ── Subir datos a GitHub ───────────────────────────────────────────
+async function ghPush() {
+  if (!ghConfig || ghSyncing) return;
+  ghSyncing = true;
+  actualizarBtnGH(true);
+  try {
+    const sha = await getFileSHA(ghConfig);
+    const content = btoa(unescape(encodeURIComponent(JSON.stringify(state, null, 2))));
+    const body = {
+      message: `[SEISA] Sync ${new Date().toISOString()}`,
+      content,
+      ...(sha ? { sha } : {})
+    };
+    const r = await fetch(`https://api.github.com/repos/${ghConfig.user}/${ghConfig.repo}/contents/${GH_FILE}`, {
+      method: 'PUT',
+      headers: {
+        Authorization: `token ${ghConfig.token}`,
+        Accept: 'application/vnd.github.v3+json',
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify(body)
+    });
+    if (r.ok) {
+      showToast('☁️ Guardado en GitHub');
+    } else {
+      const err = await r.json();
+      console.error('ghPush error:', err);
+      showToast('⚠️ Error al guardar en GitHub');
+    }
+  } catch(e) {
+    console.error('ghPush:', e);
+    showToast('⚠️ Sin conexión — guardado local');
+  }
+  ghSyncing = false;
+  actualizarBtnGH(false);
+}
+
+// ── Descargar datos desde GitHub ───────────────────────────────────
+async function ghPull() {
+  if (!ghConfig) return false;
+  try {
+    const r = await fetch(`https://api.github.com/repos/${ghConfig.user}/${ghConfig.repo}/contents/${GH_FILE}`, {
+      headers: { Authorization: `token ${ghConfig.token}`, Accept: 'application/vnd.github.v3+json' }
+    });
+    if (!r.ok) return false;
+    const d = await r.json();
+    const raw = decodeURIComponent(escape(atob(d.content)));
+    const remote = JSON.parse(raw);
+    state = { ...defaultState(), ...remote };
+    saveStateLocal();
+    showToast('☁️ Datos sincronizados');
+    return true;
+  } catch(e) {
+    console.warn('ghPull:', e);
+    return false;
+  }
+}
+
+function actualizarBtnGH(syncing) {
+  const btn = document.getElementById('btn-gh-status');
+  if (!btn) return;
+  if (syncing) {
+    btn.textContent = '⟳ Sync...';
+    btn.style.color = 'var(--yellow)';
+  } else if (ghConfig) {
+    btn.textContent = '● GitHub';
+    btn.style.color = 'var(--green)';
+  } else {
+    btn.textContent = '⬡ GitHub';
+    btn.style.color = 'var(--text3)';
+  }
+}
+
+function mostrarConfigGH() {
+  if (ghConfig) {
+    document.getElementById('gh-user').value  = ghConfig.user;
+    document.getElementById('gh-repo').value  = ghConfig.repo;
+    document.getElementById('gh-token').value = ghConfig.token;
+  }
+  document.getElementById('modal-github').classList.remove('hidden');
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  ESTADO GLOBAL
+// ══════════════════════════════════════════════════════════════════
+
+let state = loadState();
+
+function defaultState() {
+  return {
+    rutas:        [],
+    rutaActual:   null,
+    paradaActual: 0,
+  };
+}
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(APP_KEY);
+    return raw ? JSON.parse(raw) : defaultState();
+  } catch(e) { return defaultState(); }
+}
+
+function saveStateLocal() {
+  try { localStorage.setItem(APP_KEY, JSON.stringify(state)); } catch(e) {}
+}
+
+// Guarda local + sube a GitHub
+function saveState() {
+  saveStateLocal();
+  if (ghConfig) ghPush(); // async, no bloquea
+}
+
+// Ruta en construcción (no guardada aún)
+let rutaBuild = {
+  nombre: '', fecha: '', peajes: false,
+  inicio: null, final: null,
+  paradas: []  // [{id, nombre, lat, lng, hecha, fallida, horaAccion}]
+};
+
+// Mapas
+let mapParadas = null;
+let mapNav     = null;
+let paradaMarkers = [];
+let navMarkers    = [];
+let navPolyline   = null;
+let navGPSMarker  = null;
+let navGPSWatch   = null;
+let editUbData    = null; // {lat,lng,nombre} para edición temporal
+
+// ══════════════════════════════════════════════════════════════════
+//  NAVEGACIÓN DE PANTALLAS
+// ══════════════════════════════════════════════════════════════════
+function showScreen(id) {
+  document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+  const target = document.getElementById(id);
+  if (target) {
+    target.classList.remove('hidden');
+    // Inicializar mapas cuando se muestran
+    if (id === 'screen-paradas') initMapaParadas();
+    if (id === 'screen-nav')     initMapaNav();
+  }
+}
+
+function closeModal(id) {
+  document.getElementById(id)?.classList.add('hidden');
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  HOME
+// ══════════════════════════════════════════════════════════════════
+function renderHome() {
+  // Ruta activa
+  const activa = state.rutaActual;
+  const activaEl = document.getElementById('home-ruta-activa');
+  if (activa) {
+    activaEl.style.display = 'block';
+    document.getElementById('home-activa-nombre').textContent = activa.nombre;
+    const hechas = activa.paradas.filter(p => p.hecha || p.fallida).length;
+    document.getElementById('home-activa-sub').textContent = `${hechas}/${activa.paradas.length} paradas · ${activa.fecha}`;
+  } else {
+    activaEl.style.display = 'none';
+  }
+
+  // Rutas guardadas
+  const lista = document.getElementById('home-rutas-list');
+  const rutas = state.rutas.slice().reverse().slice(0, 10);
+  if (!rutas.length) { lista.innerHTML = ''; return; }
+  lista.innerHTML = '<div class="label" style="margin-bottom:8px;">Rutas anteriores</div>' +
+    rutas.map(r => {
+      const hechas = r.paradas.filter(p => p.hecha).length;
+      const fallidas = r.paradas.filter(p => p.fallida).length;
+      return `<div class="ruta-card" style="margin-bottom:8px;" onclick="verRuta('${r.id}')">
+        <div class="ruta-card-icon">🗺️</div>
+        <div class="ruta-card-info">
+          <div class="ruta-card-name">${r.nombre}</div>
+          <div class="ruta-card-sub">${r.fecha} · ${hechas} entregadas · ${fallidas} fallidas</div>
+        </div>
+      </div>`;
+    }).join('');
+}
+
+function continuarRuta() {
+  if (!state.rutaActual) return;
+  rutaBuild = { ...state.rutaActual };
+  showScreen('screen-nav');
+  actualizarNavPanel();
+  renderListaNav();
+  trazarRutaCompleta();
+}
+
+function verRuta(id) {
+  const r = state.rutas.find(x => x.id === id);
+  if (!r) return;
+  showToast(`${r.nombre} · ${r.paradas.filter(p=>p.hecha).length}/${r.paradas.length} entregadas`);
+}
+
+function showHistorial() {
+  showToast('Historial próximamente');
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  CREAR RUTA
+// ══════════════════════════════════════════════════════════════════
+function irACargarParadas() {
+  const nombre = document.getElementById('cr-nombre').value.trim();
+  const fecha  = document.getElementById('cr-fecha').value;
+  const peajes = !document.getElementById('cr-peajes').checked;
+
+  if (!nombre) { showToast('Escribe un nombre para la ruta'); return; }
+  if (!fecha)  { showToast('Selecciona la fecha'); return; }
+  if (!rutaBuild.inicio) { showToast('Selecciona el punto de inicio'); return; }
+  if (!rutaBuild.final)  { showToast('Selecciona el punto final'); return; }
+
+  rutaBuild.nombre = nombre;
+  rutaBuild.fecha  = fecha;
+  rutaBuild.peajes = peajes;
+  rutaBuild.paradas = rutaBuild.paradas || [];
+  rutaBuild.id = 'ruta_' + Date.now();
+
+  showScreen('screen-paradas');
+  renderParadasList();
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  GEOCODING (Nominatim — gratis, sin API key)
+// ══════════════════════════════════════════════════════════════════
+let searchTimers = {};
+
+function buscarLugar(tipo, q) {
+  clearTimeout(searchTimers[tipo]);
+  const box = document.getElementById('search-results-' + tipo);
+  if (q.length < 3) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  searchTimers[tipo] = setTimeout(() => geocode(q, box, (lat, lng, nombre) => {
+    if (tipo === 'inicio') {
+      rutaBuild.inicio = { lat, lng, nombre };
+      document.getElementById('cr-inicio-label').textContent = '✓ ' + nombre;
+      document.getElementById('cr-inicio-label').style.display = 'block';
+    } else {
+      rutaBuild.final = { lat, lng, nombre };
+      document.getElementById('cr-final-label').textContent = '✓ ' + nombre;
+      document.getElementById('cr-final-label').style.display = 'block';
+    }
+    box.style.display = 'none';
+  }), 500);
+}
+
+function buscarParada(q) {
+  clearTimeout(searchTimers['parada']);
+  const box = document.getElementById('search-results-parada');
+  if (q.length < 3) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  searchTimers['parada'] = setTimeout(() => geocode(q, box, (lat, lng, nombre) => {
+    agregarParada(lat, lng, nombre);
+    document.getElementById('paradas-search').value = '';
+    box.style.display = 'none';
+  }), 500);
+}
+
+function buscarEdicion(q) {
+  clearTimeout(searchTimers['edicion']);
+  const box = document.getElementById('search-results-edicion');
+  if (q.length < 3) { box.style.display = 'none'; box.innerHTML = ''; return; }
+  searchTimers['edicion'] = setTimeout(() => geocode(q, box, (lat, lng, nombre) => {
+    editUbData = { lat, lng, nombre };
+    document.getElementById('edit-ub-preview').textContent = '📍 ' + nombre;
+    document.getElementById('edit-ub-preview').style.display = 'block';
+    box.style.display = 'none';
+  }), 500);
+}
+
+async function geocode(q, box, onSelect) {
+  try {
+    // Intentar Plus Code primero
+    if (isPlusCode(q)) {
+      const r = await resolverPlusCode(q);
+      if (r) { mostrarResultados([r], box, onSelect); return; }
+    }
+    // Nominatim
+    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&countrycodes=mx&addressdetails=1`;
+    const res  = await fetch(url, { headers: { 'Accept-Language': 'es' } });
+    const data = await res.json();
+    const items = data.map(d => ({
+      nombre: d.display_name.split(',').slice(0,3).join(','),
+      lat: parseFloat(d.lat), lng: parseFloat(d.lon)
+    }));
+    mostrarResultados(items, box, onSelect);
+  } catch(e) { console.warn('geocode error:', e); }
+}
+
+function mostrarResultados(items, box, onSelect) {
+  if (!items.length) { box.style.display = 'none'; return; }
+  box.innerHTML = items.map((item, i) =>
+    `<div class="res-item" data-i="${i}">${item.nombre}</div>`
+  ).join('');
+  box.style.display = 'block';
+  box.querySelectorAll('.res-item').forEach((el, i) => {
+    el.onclick = () => onSelect(items[i].lat, items[i].lng, items[i].nombre);
+  });
+}
+
+// ── Decodificador de Plus Codes (sin API, implementación propia) ──
+const PLUS_CHARS = '23456789CFGHJMPQRVWX';
+
+function decodePlusCode(code) {
+  try {
+    const c = code.toUpperCase().replace(/\s/g, '');
+    if (!c.includes('+')) return null;
+    const plusIdx = c.indexOf('+');
+    const prefix  = c.slice(0, plusIdx).replace(/0/g, '');
+    if (prefix.length < 8) return null; // código corto, necesita referencia
+
+    const chars = prefix.slice(0, 8);
+    const v = chars.split('').map(ch => PLUS_CHARS.indexOf(ch));
+    if (v.some(x => x < 0)) return null;
+
+    // Decodificar 4 pares: resolución 20°, 1°, 0.05°, 0.0025°
+    const lat = -90 + v[0]*20 + v[2]*1 + v[4]*0.05 + v[6]*0.0025 + 0.00125;
+    const lng = -180 + v[1]*20 + v[3]*1 + v[5]*0.05 + v[7]*0.0025 + 0.00125;
+
+    return { lat: Math.round(lat * 1e5) / 1e5, lng: Math.round(lng * 1e5) / 1e5 };
+  } catch(e) { return null; }
+}
+
+function isPlusCode(q) {
+  return /^[23456789CFGHJMPQRVWX]{4,8}\+[23456789CFGHJMPQRVWX]{0,}$/i.test(q.replace(/\s/g,'').toUpperCase()) ||
+         /^[A-Z0-9]{4,8}\+[A-Z0-9]{0,}$/i.test(q.replace(/\s/g,'').toUpperCase());
+}
+
+async function resolverPlusCode(code) {
+  const coords = decodePlusCode(code);
+  if (!coords) return null;
+  // Reverse geocode para obtener el nombre de la calle
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${coords.lat}&lon=${coords.lng}&format=json&language=es`;
+    const r = await fetch(url, { headers: { 'Accept-Language': 'es' } });
+    const d = await r.json();
+    const addr = d.address || {};
+    const nombre = [addr.road, addr.house_number, addr.suburb || addr.neighbourhood || addr.city_district]
+      .filter(Boolean).join(' ') || code;
+    return { lat: coords.lat, lng: coords.lng, nombre };
+  } catch(e) {
+    return { lat: coords.lat, lng: coords.lng, nombre: code };
+  }
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  MAPA PARADAS
+// ══════════════════════════════════════════════════════════════════
+function initMapaParadas() {
+  if (mapParadas) {
+    mapParadas.invalidateSize();
+    if (rutaBuild.inicio) mapParadas.setView([rutaBuild.inicio.lat, rutaBuild.inicio.lng], 12);
+    return;
+  }
+  const centro = rutaBuild.inicio
+    ? [rutaBuild.inicio.lat, rutaBuild.inicio.lng]
+    : [19.4326, -99.1332];
+
+  mapParadas = L.map('paradas-map', { zoomControl: false }).setView(centro, 12);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    attribution: '© OpenStreetMap © CARTO', maxZoom: 19, subdomains: 'abcd'
+  }).addTo(mapParadas);
+
+  // Marcadores de inicio y fin
+  if (rutaBuild.inicio) {
+    L.marker([rutaBuild.inicio.lat, rutaBuild.inicio.lng], { icon: crearIcono('🏠', '#00e676') })
+      .addTo(mapParadas).bindPopup('Inicio: ' + rutaBuild.inicio.nombre);
+  }
+  if (rutaBuild.final) {
+    L.marker([rutaBuild.final.lat, rutaBuild.final.lng], { icon: crearIcono('🏁', '#ff9100') })
+      .addTo(mapParadas).bindPopup('Final: ' + rutaBuild.final.nombre);
+  }
+
+  // Click en mapa → agregar parada
+  mapParadas.on('click', async function(e) {
+    const { lat, lng } = e.latlng;
+    showToast('📍 Buscando dirección...');
+    try {
+      const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&language=es`;
+      const r = await fetch(url);
+      const d = await r.json();
+      const nombre = (d.address?.road || '') + ' ' + (d.address?.house_number || '') +
+                     (d.address?.suburb ? ', ' + d.address.suburb : '');
+      agregarParada(lat, lng, nombre.trim() || `${lat.toFixed(5)},${lng.toFixed(5)}`);
+    } catch(e) {
+      agregarParada(lat, lng, `${lat.toFixed(5)},${lng.toFixed(5)}`);
+    }
+  });
+}
+
+function crearIcono(emoji, color) {
+  return L.divIcon({
+    html: `<div style="width:32px;height:32px;border-radius:50%;background:${color};border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 8px rgba(0,0,0,.4);">${emoji}</div>`,
+    className: '', iconSize: [32,32], iconAnchor: [16,16]
+  });
+}
+
+function crearIconoNum(n, color) {
+  return L.divIcon({
+    html: `<div style="width:28px;height:28px;border-radius:50%;background:${color};border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#000;box-shadow:0 2px 8px rgba(0,0,0,.4);">${n}</div>`,
+    className: '', iconSize: [28,28], iconAnchor: [14,14]
+  });
+}
+
+function agregarParada(lat, lng, nombre) {
+  const id = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
+  const parada = { id, nombre, lat, lng, hecha: false, fallida: false, horaAccion: null };
+  rutaBuild.paradas.push(parada);
+  actualizarMapaParadas();
+  renderParadasList();
+  showToast('✅ Parada ' + rutaBuild.paradas.length + ' agregada');
+}
+
+async function agregarPorPlusCode() {
+  const code = document.getElementById('paradas-pluscode').value.trim();
+  if (!code) return;
+  showToast('Resolviendo Plus Code...');
+  const r = await resolverPlusCode(code);
+  if (r) {
+    agregarParada(r.lat, r.lng, r.nombre || code);
+    document.getElementById('paradas-pluscode').value = '';
+  } else {
+    showToast('⚠️ No se pudo resolver el Plus Code');
+  }
+}
+
+function actualizarMapaParadas() {
+  if (!mapParadas) return;
+  paradaMarkers.forEach(m => m.remove());
+  paradaMarkers = [];
+  rutaBuild.paradas.forEach((p, i) => {
+    const m = L.marker([p.lat, p.lng], { icon: crearIconoNum(i+1, '#00d4ff') })
+      .addTo(mapParadas)
+      .bindPopup(`<b>${i+1}. ${p.nombre}</b>`);
+    paradaMarkers.push(m);
+  });
+  if (rutaBuild.paradas.length) {
+    const last = rutaBuild.paradas[rutaBuild.paradas.length - 1];
+    mapParadas.panTo([last.lat, last.lng]);
+  }
+}
+
+function renderParadasList() {
+  const lista  = document.getElementById('paradas-list');
+  const empty  = document.getElementById('paradas-empty');
+  const btn    = document.getElementById('btn-optimizar');
+  const count  = document.getElementById('paradas-count-label');
+  const n = rutaBuild.paradas.length;
+  count.textContent = n;
+  btn.disabled = n < 1;
+  if (!n) { empty.style.display = 'block'; lista.innerHTML = ''; return; }
+  empty.style.display = 'none';
+  lista.innerHTML = rutaBuild.paradas.map((p, i) => `
+    <div class="parada-item">
+      <div class="parada-num" style="background:rgba(0,212,255,.15);color:var(--accent);border:1px solid rgba(0,212,255,.3);">${i+1}</div>
+      <div class="parada-info">
+        <div class="parada-name">${p.nombre}</div>
+        <div class="parada-sub">${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</div>
+      </div>
+      <button onclick="eliminarParada('${p.id}')" style="background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;padding:4px;">✕</button>
+    </div>`).join('');
+}
+
+function eliminarParada(id) {
+  rutaBuild.paradas = rutaBuild.paradas.filter(p => p.id !== id);
+  actualizarMapaParadas();
+  renderParadasList();
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  OPTIMIZAR RUTA (nearest neighbor desde inicio)
+// ══════════════════════════════════════════════════════════════════
+function optimizarRuta() {
+  if (!rutaBuild.paradas.length) return;
+  showToast('⚡ Optimizando...');
+
+  // Nearest neighbor desde el punto de inicio
+  let sinVisitar = [...rutaBuild.paradas];
+  let actual = rutaBuild.inicio || sinVisitar[0];
+  let ordenadas = [];
+
+  while (sinVisitar.length) {
+    let minDist = Infinity, minIdx = 0;
+    sinVisitar.forEach((p, i) => {
+      const d = distHaversine(actual.lat, actual.lng, p.lat, p.lng);
+      if (d < minDist) { minDist = d; minIdx = i; }
+    });
+    ordenadas.push(sinVisitar[minIdx]);
+    actual = sinVisitar[minIdx];
+    sinVisitar.splice(minIdx, 1);
+  }
+
+  rutaBuild.paradas = ordenadas;
+
+  // Calcular km y tiempo total
+  let kmTotal = 0;
+  let puntos = [rutaBuild.inicio, ...ordenadas, rutaBuild.final].filter(Boolean);
+  for (let i = 0; i < puntos.length - 1; i++) {
+    kmTotal += distHaversine(puntos[i].lat, puntos[i].lng, puntos[i+1].lat, puntos[i+1].lng) * 1.35;
+  }
+  rutaBuild.kmTotal = Math.round(kmTotal * 10) / 10;
+
+  // Tiempo aprox: 30 km/h promedio + 9 min por parada
+  const minManejo = Math.round((kmTotal / 30) * 60);
+  const minParadas = ordenadas.length * 9;
+  rutaBuild.tiempoMin = minManejo + minParadas;
+
+  // Hora estimada de fin
+  const ahora = new Date();
+  const fin = new Date(ahora.getTime() + rutaBuild.tiempoMin * 60000);
+  const hh = fin.getHours() % 12 || 12;
+  const mm = String(fin.getMinutes()).padStart(2,'0');
+  const ap = fin.getHours() >= 12 ? 'PM' : 'AM';
+  rutaBuild.horaFin = `${hh}:${mm} ${ap}`;
+  rutaBuild.tiempoHrs = Math.round(rutaBuild.tiempoMin / 6) / 10;
+
+  renderResumen();
+  showScreen('screen-resumen');
+}
+
+function distHaversine(lat1, lng1, lat2, lng2) {
+  const R = 6371;
+  const dLat = (lat2-lat1)*Math.PI/180;
+  const dLng = (lng2-lng1)*Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+}
+
+function renderResumen() {
+  document.getElementById('res-km').textContent      = rutaBuild.kmTotal + ' km';
+  document.getElementById('res-paradas').textContent = rutaBuild.paradas.length;
+  document.getElementById('res-tiempo').textContent  = rutaBuild.tiempoHrs + ' hrs';
+  document.getElementById('res-fin').textContent     = rutaBuild.horaFin;
+
+  document.getElementById('res-orden-list').innerHTML = rutaBuild.paradas.map((p, i) => `
+    <div class="parada-item">
+      <div class="parada-num" style="background:rgba(0,212,255,.12);color:var(--accent);border:1px solid rgba(0,212,255,.25);">${i+1}</div>
+      <div class="parada-info">
+        <div class="parada-name">${p.nombre}</div>
+      </div>
+    </div>`).join('');
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  INICIAR RUTA
+// ══════════════════════════════════════════════════════════════════
+function iniciarRuta() {
+  state.rutaActual = { ...rutaBuild };
+  state.paradaActual = 0;
+  saveState();
+  showScreen('screen-nav');
+  setTimeout(() => {
+    actualizarNavPanel();
+    renderListaNav();
+    trazarRutaCompleta();
+    iniciarGPS();
+  }, 300);
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  MAPA NAVEGACIÓN
+// ══════════════════════════════════════════════════════════════════
+function initMapaNav() {
+  if (mapNav) { mapNav.invalidateSize(); return; }
+  mapNav = L.map('nav-map', { zoomControl: false, attributionControl: false }).setView([19.4326, -99.1332], 13);
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+    maxZoom: 19, subdomains: 'abcd'
+  }).addTo(mapNav);
+}
+
+function trazarRutaCompleta() {
+  if (!mapNav || !state.rutaActual) return;
+  navMarkers.forEach(m => m.remove()); navMarkers = [];
+  if (navPolyline) { navPolyline.remove(); navPolyline = null; }
+
+  const ruta = state.rutaActual;
+  const idx  = state.paradaActual;
+  const puntos = [];
+
+  // Marcadores de paradas
+  ruta.paradas.forEach((p, i) => {
+    let color = '#00d4ff', emoji = String(i+1);
+    if (p.hecha)   { color = '#00e676'; emoji = '✓'; }
+    if (p.fallida) { color = '#ff5252'; emoji = '✗'; }
+
+    const m = L.marker([p.lat, p.lng], {
+      icon: L.divIcon({
+        html: `<div style="width:${i===idx?'36px':'28px'};height:${i===idx?'36px':'28px'};border-radius:50%;background:${color};border:${i===idx?'3px':'2px'} solid #fff;display:flex;align-items:center;justify-content:center;font-size:${i===idx?'14px':'11px'};font-weight:800;color:#000;box-shadow:0 2px 10px rgba(0,0,0,.5);">${emoji}</div>`,
+        className:'', iconSize:[i===idx?36:28,i===idx?36:28], iconAnchor:[i===idx?18:14,i===idx?18:14]
+      })
+    }).addTo(mapNav);
+    navMarkers.push(m);
+    puntos.push([p.lat, p.lng]);
+  });
+
+  // Línea de ruta
+  if (puntos.length > 1) {
+    navPolyline = L.polyline(puntos, { color: '#00d4ff', weight: 3, opacity: 0.6, dashArray: '8 6' }).addTo(mapNav);
+  }
+
+  // Centrar en parada actual
+  if (ruta.paradas[idx]) {
+    mapNav.setView([ruta.paradas[idx].lat, ruta.paradas[idx].lng], 15);
+  }
+}
+
+function iniciarGPS() {
+  if (!navigator.geolocation) return;
+  navGPSWatch = navigator.geolocation.watchPosition(
+    pos => {
+      const { latitude: lat, longitude: lng } = pos.coords;
+      if (!navGPSMarker) {
+        navGPSMarker = L.marker([lat, lng], {
+          icon: L.divIcon({
+            html: '<div style="width:16px;height:16px;border-radius:50%;background:#00d4ff;border:3px solid #fff;box-shadow:0 0 12px #00d4ff;"></div>',
+            className:'', iconSize:[16,16], iconAnchor:[8,8]
+          })
+        }).addTo(mapNav);
+      } else {
+        navGPSMarker.setLatLng([lat, lng]);
+      }
+    },
+    null,
+    { enableHighAccuracy: true, maximumAge: 3000 }
+  );
+}
+
+function centrarGPS() {
+  if (navGPSMarker) {
+    mapNav.setView(navGPSMarker.getLatLng(), 16);
+  } else {
+    navigator.geolocation?.getCurrentPosition(pos => {
+      mapNav.setView([pos.coords.latitude, pos.coords.longitude], 16);
+    });
+  }
+}
+
+function vistaGeneral() {
+  if (!state.rutaActual?.paradas.length) return;
+  const pts = state.rutaActual.paradas.map(p => [p.lat, p.lng]);
+  mapNav.fitBounds(L.latLngBounds(pts), { padding: [40, 40] });
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  PANEL NAV
+// ══════════════════════════════════════════════════════════════════
+function actualizarNavPanel() {
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+  const idx   = state.paradaActual;
+  const total = ruta.paradas.length;
+  const p     = ruta.paradas[idx];
+  const hechas = ruta.paradas.filter(x => x.hecha || x.fallida).length;
+
+  document.getElementById('nav-calle').textContent = p ? (p.nombre || 'Parada ' + (idx+1)) : '✅ Ruta completada';
+  document.getElementById('nav-sub').textContent   = p ? `Parada ${idx+1} de ${total}` : '';
+  document.getElementById('nav-km').textContent    = (ruta.kmTotal || '—') + ' km';
+  document.getElementById('nav-progreso').textContent = `${hechas}/${total}`;
+  document.getElementById('nav-eta').textContent   = ruta.horaFin || '—';
+}
+
+function renderListaNav() {
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+  const idx = state.paradaActual;
+  document.getElementById('nav-lista-items').innerHTML = ruta.paradas.map((p, i) => {
+    let color = 'var(--accent)', bg = 'rgba(0,212,255,.12)', emoji = String(i+1);
+    if (p.hecha)    { color='var(--green)'; bg='rgba(0,230,118,.12)'; emoji='✓'; }
+    if (p.fallida)  { color='var(--red)';   bg='rgba(255,82,82,.12)'; emoji='✗'; }
+    const esActual = i === idx && !p.hecha && !p.fallida;
+    return `<div class="parada-item" style="${esActual?'background:rgba(0,212,255,.07);border-left:3px solid var(--accent);':''}" onclick="irAParada(${i});toggleListaNav();">
+      <div class="parada-num" style="background:${bg};color:${color};border:1px solid ${color}44;">${emoji}</div>
+      <div class="parada-info">
+        <div class="parada-name">${p.nombre}</div>
+        ${p.horaAccion ? `<div class="parada-sub">${p.hecha?'✓ Entregada':'✗ Fallida'} · ${p.horaAccion}</div>` : ''}
+      </div>
+      ${esActual ? '<div style="font-size:10px;color:var(--accent);font-weight:700;">▶ Actual</div>' : ''}
+    </div>`;
+  }).join('') + `<div style="height:20px;"></div>`;
+}
+
+function irAParada(idx) {
+  state.paradaActual = idx;
+  saveState();
+  actualizarNavPanel();
+  trazarRutaCompleta();
+}
+
+function toggleListaNav() {
+  const ov = document.getElementById('nav-lista-overlay');
+  ov.classList.toggle('hidden');
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  ACCIONES: ENTREGADA / FALLIDA / DESHACER
+// ══════════════════════════════════════════════════════════════════
+function marcarEntregada() {
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+  const idx = state.paradaActual;
+  const p   = ruta.paradas[idx];
+  if (!p || p.hecha || p.fallida) { showToast('Sin parada activa'); return; }
+
+  const ahora = new Date();
+  const hora  = fmtHora(ahora);
+  p.hecha      = true;
+  p.fallida    = false;
+  p.horaAccion = hora;
+
+  avanzarYAbrir(idx, ruta, '✅ Entregada · ' + hora);
+}
+
+function marcarFallida() {
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+  const idx = state.paradaActual;
+  const p   = ruta.paradas[idx];
+  if (!p || p.hecha || p.fallida) { showToast('Sin parada activa'); return; }
+
+  const ahora = new Date();
+  const hora  = fmtHora(ahora);
+  p.hecha      = true;
+  p.fallida    = true;
+  p.horaAccion = hora;
+
+  avanzarYAbrir(idx, ruta, '⚠️ Fallida · ' + hora);
+}
+
+function avanzarYAbrir(idx, ruta, msg) {
+  saveState();
+  showToast(msg);
+
+  // Buscar siguiente parada pendiente
+  let siguiente = -1;
+  for (let i = idx + 1; i < ruta.paradas.length; i++) {
+    if (!ruta.paradas[i].hecha && !ruta.paradas[i].fallida) { siguiente = i; break; }
+  }
+
+  if (siguiente >= 0) {
+    state.paradaActual = siguiente;
+    saveState();
+    actualizarNavPanel();
+    renderListaNav();
+    trazarRutaCompleta();
+    // Abrir Google Maps a la siguiente parada
+    const sig = ruta.paradas[siguiente];
+    setTimeout(() => {
+      window.open(`https://www.google.com/maps/dir/?api=1&destination=${sig.lat},${sig.lng}&travelmode=driving`, '_blank');
+    }, 700);
+  } else {
+    // Ruta completada
+    actualizarNavPanel();
+    renderListaNav();
+    showToast('🎉 ¡Ruta completada!');
+    setTimeout(() => finalizarRuta(), 2000);
+  }
+}
+
+function deshacerAccion() {
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+  // Buscar la última parada marcada hacia atrás
+  for (let i = state.paradaActual; i >= 0; i--) {
+    const p = ruta.paradas[i];
+    if (p && (p.hecha || p.fallida)) {
+      p.hecha = false; p.fallida = false; p.horaAccion = null;
+      state.paradaActual = i;
+      saveState();
+      actualizarNavPanel();
+      renderListaNav();
+      trazarRutaCompleta();
+      showToast('↩ Deshecho · parada ' + (i+1));
+      return;
+    }
+  }
+  showToast('Nada que deshacer');
+}
+
+function abrirGoogleMaps() {
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+  const p = ruta.paradas[state.paradaActual];
+  if (!p) return;
+  window.open(`https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}&travelmode=driving`, '_blank');
+}
+
+function finalizarRuta() {
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+  // Guardar en historial
+  state.rutas.push({ ...ruta, fechaFin: new Date().toISOString() });
+  state.rutaActual  = null;
+  state.paradaActual = 0;
+  if (state.rutas.length > 50) state.rutas = state.rutas.slice(-50);
+  saveState();
+  showScreen('screen-home');
+  renderHome();
+}
+
+function salirNavegacion() {
+  if (navGPSWatch) { navigator.geolocation.clearWatch(navGPSWatch); navGPSWatch = null; }
+  showScreen('screen-home');
+  renderHome();
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  EDITAR UBICACIÓN
+// ══════════════════════════════════════════════════════════════════
+function editarUbicacion() {
+  editUbData = null;
+  document.getElementById('edit-ub-input').value = '';
+  document.getElementById('edit-ub-preview').style.display = 'none';
+  document.getElementById('modal-editar-ub').classList.remove('hidden');
+}
+
+function confirmarEdicionUb() {
+  if (!editUbData) { showToast('Busca una dirección primero'); return; }
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+  const p = ruta.paradas[state.paradaActual];
+  if (!p) return;
+  p.lat    = editUbData.lat;
+  p.lng    = editUbData.lng;
+  p.nombre = editUbData.nombre;
+  saveState();
+  actualizarNavPanel();
+  trazarRutaCompleta();
+  closeModal('modal-editar-ub');
+  showToast('✅ Ubicación actualizada');
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  UTILIDADES
+// ══════════════════════════════════════════════════════════════════
+function fmtHora(d) {
+  const h = d.getHours() % 12 || 12;
+  const m = String(d.getMinutes()).padStart(2,'0');
+  const ap = d.getHours() >= 12 ? 'PM' : 'AM';
+  return `${h}:${m} ${ap}`;
+}
+
+let toastTimer = null;
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  INIT
+// ══════════════════════════════════════════════════════════════════
+(async function init() {
+  // Fecha hoy por defecto en crear ruta
+  const hoy = new Date();
+  const dd = String(hoy.getDate()).padStart(2,'0');
+  const mm = String(hoy.getMonth()+1).padStart(2,'0');
+  document.getElementById('cr-fecha').value = `${hoy.getFullYear()}-${mm}-${dd}`;
+
+  // Botón atrás físico
+  history.replaceState({ s: 'screen-home' }, '');
+  history.pushState({ s: 'screen-home' }, '');
+  window.addEventListener('popstate', () => {
+    history.pushState({ s: 'screen-home' }, '');
+  });
+
+  // Cargar config GitHub y sincronizar al inicio
+  ghConfig = loadGHConfig();
+  actualizarBtnGH(false);
+  if (ghConfig) {
+    showToast('🔄 Sincronizando con GitHub...');
+    await ghPull();
+  } else {
+    // Primera vez: sugerir conectar
+    setTimeout(() => {
+      if (!loadGHConfig()) mostrarConfigGH();
+    }, 1500);
+  }
+
+  renderHome();
+})();
+</script>
+</body>
+</html>
