@@ -793,18 +793,30 @@ async function geocode(q, box, onSelect) {
   mostrarCargando(box);
 
   try {
-    // ── Plus Code primero ──
+    // ── Plus Code primero (soporta 'GP3P+538 Naucalpan de Juárez') ──
     if (isPlusCode(q.trim())) {
-      const r = await resolverPlusCode(q.trim());
+      const r = await resolverPlusCode(q.trim()); // pasa el texto completo con ciudad
       if (r) { mostrarResultados([r], box, onSelect); return; }
+      // Si falla, intentar Nominatim con el texto completo
     }
 
     // ── Nominatim (OpenStreetMap) ──
     // User-Agent requerido por Nominatim ToS
-    const url = 'https://nominatim.openstreetmap.org/search?' +
-      'q=' + encodeURIComponent(q) +
-      '&format=json&limit=6&addressdetails=1&accept-language=es' +
-      '&countrycodes=mx';
+    // Detectar si es CP + calle + número (ej. '53370 Av Juárez 45')
+    const cpMatch = q.match(/^(\d{5})\s+(.+)$/);
+    let searchUrl;
+    if (cpMatch) {
+      // Búsqueda estructurada por CP + calle
+      searchUrl = 'https://nominatim.openstreetmap.org/search?' +
+        'street=' + encodeURIComponent(cpMatch[2]) +
+        '&postalcode=' + encodeURIComponent(cpMatch[1]) +
+        '&countrycodes=mx&format=json&limit=6&addressdetails=1&accept-language=es';
+    } else {
+      searchUrl = 'https://nominatim.openstreetmap.org/search?' +
+        'q=' + encodeURIComponent(q) +
+        '&format=json&limit=6&addressdetails=1&accept-language=es&countrycodes=mx';
+    }
+    const url = searchUrl;
 
     const res = await fetch(url, {
       headers: {
@@ -823,12 +835,14 @@ async function geocode(q, box, onSelect) {
 
     const items = data.map(d => {
       const a = d.address || {};
-      const nombre = [
+      const partes = [
         a.road || a.pedestrian || a.path,
         a.house_number,
         a.suburb || a.neighbourhood || a.city_district,
         a.city || a.town || a.municipality
-      ].filter(Boolean).join(', ') || d.display_name.split(',').slice(0,3).join(',');
+      ].filter(Boolean);
+      if (a.postcode) partes.push('CP ' + a.postcode);
+      const nombre = partes.join(', ') || d.display_name.split(',').slice(0,3).join(',');
       return { nombre, lat: parseFloat(d.lat), lng: parseFloat(d.lon) };
     });
 
@@ -875,49 +889,135 @@ function mostrarResultados(items, box, onSelect) {
   box.style.display = 'block';
 }
 
-// ── Decodificador de Plus Codes (sin API, implementación propia) ──
+// ── Plus Code: detectar, decodificar (completo y corto con referencia) ──
 const PLUS_CHARS = '23456789CFGHJMPQRVWX';
 
-function decodePlusCode(code) {
+// Detecta si la cadena ES o EMPIEZA con un plus code (completo o corto + ciudad)
+function isPlusCode(q) {
+  // Completo: 8 chars + '+' + sufijo  → ej. 76F2CVM8+QQ
+  // Corto:    4-6 chars + '+' + sufijo + espacio + ciudad → ej. GP3P+538 Naucalpan
+  return /^[23456789CFGHJMPQRVWX]{2,8}\+[23456789CFGHJMPQRVWX0-9]*/i.test(q.trim());
+}
+
+// Decodifica un plus code COMPLETO (≥8 chars antes del +)
+function decodePlusCodeCompleto(prefix8) {
+  const chars = prefix8.toUpperCase().slice(0, 8);
+  const v = chars.split('').map(ch => PLUS_CHARS.indexOf(ch));
+  if (v.some(x => x < 0)) return null;
+  const lat = -90  + v[0]*20 + v[2]*1 + v[4]*0.05 + v[6]*0.0025 + 0.00125;
+  const lng = -180 + v[1]*20 + v[3]*1 + v[5]*0.05 + v[7]*0.0025 + 0.00125;
+  return { lat: Math.round(lat*1e5)/1e5, lng: Math.round(lng*1e5)/1e5 };
+}
+
+// Decodifica un plus code CORTO usando coordenadas de referencia
+function decodePlusCodeCorto(shortCode, refLat, refLng) {
   try {
-    const c = code.toUpperCase().replace(/\s/g, '');
-    if (!c.includes('+')) return null;
-    const plusIdx = c.indexOf('+');
-    const prefix  = c.slice(0, plusIdx).replace(/0/g, '');
-    if (prefix.length < 8) return null; // código corto, necesita referencia
+    const clean = shortCode.toUpperCase();
+    const plusIdx = clean.indexOf('+');
+    const prefix = clean.slice(0, plusIdx);  // 2-6 chars
+    const suffix = clean.slice(plusIdx + 1); // 2-3 chars
 
-    const chars = prefix.slice(0, 8);
-    const v = chars.split('').map(ch => PLUS_CHARS.indexOf(ch));
-    if (v.some(x => x < 0)) return null;
+    // Escala de resolución según longitud del prefijo
+    // 2 chars → 1° bloques, 4 chars → 0.05°, 6 chars → 0.0025°
+    const stepLat = prefix.length === 2 ? 1 : prefix.length === 4 ? 0.05 : 0.0025;
+    const stepLng = prefix.length === 2 ? 1 : prefix.length === 4 ? 0.05 : 0.0025;
 
-    // Decodificar 4 pares: resolución 20°, 1°, 0.05°, 0.0025°
-    const lat = -90 + v[0]*20 + v[2]*1 + v[4]*0.05 + v[6]*0.0025 + 0.00125;
-    const lng = -180 + v[1]*20 + v[3]*1 + v[5]*0.05 + v[7]*0.0025 + 0.00125;
+    // Calcular bloque del código corto
+    let lat = refLat, lng = refLng;
 
-    return { lat: Math.round(lat * 1e5) / 1e5, lng: Math.round(lng * 1e5) / 1e5 };
+    if (prefix.length >= 2) {
+      const p1 = PLUS_CHARS.indexOf(prefix[0]);
+      const p2 = PLUS_CHARS.indexOf(prefix[1]);
+      if (p1 < 0 || p2 < 0) return null;
+      // Snapping al grid más cercano a la referencia
+      const blockSize = prefix.length === 2 ? 1 : 0.05;
+      lat = Math.floor(refLat / blockSize) * blockSize + p1 * (blockSize / 20);
+      lng = Math.floor(refLng / blockSize) * blockSize + p2 * (blockSize / 20);
+    }
+    if (prefix.length >= 4) {
+      const p3 = PLUS_CHARS.indexOf(prefix[2]);
+      const p4 = PLUS_CHARS.indexOf(prefix[3]);
+      if (p3 < 0 || p4 < 0) return null;
+      lat = Math.floor(refLat) + p3 * 0.05;
+      lng = Math.floor(refLng) + p4 * 0.05;
+    }
+    if (suffix.length >= 2) {
+      const s1 = PLUS_CHARS.indexOf(suffix[0]);
+      const s2 = PLUS_CHARS.indexOf(suffix[1]);
+      if (s1 >= 0 && s2 >= 0) {
+        lat += s1 * (0.05 / 20);
+        lng += s2 * (0.05 / 20);
+      }
+    }
+    return { lat: Math.round((lat + 0.00125)*1e5)/1e5, lng: Math.round((lng + 0.00125)*1e5)/1e5 };
   } catch(e) { return null; }
 }
 
-function isPlusCode(q) {
-  // Plus code: 4-8 alfanuméricos + un + + 0-2 alfanuméricos
-  const clean = q.replace(/\s/g, '').toUpperCase();
-  return /^[23456789CFGHJMPQRVWX]{4,8}\+[23456789CFGHJMPQRVWX]*$/.test(clean);
+async function resolverPlusCode(input) {
+  const q = input.trim();
+  const plusIdx = q.indexOf('+');
+  if (plusIdx < 0) return null;
+
+  const prefix = q.slice(0, plusIdx).replace(/0/g, '');
+  const resto  = q.slice(plusIdx); // ej. "+538 Naucalpan de Juárez, Estado de México"
+
+  // ── Caso 1: código COMPLETO (8+ chars antes del +) ───────────────────────
+  if (prefix.length >= 8) {
+    const coords = decodePlusCodeCompleto(prefix);
+    if (!coords) return null;
+    return await reverseGeocode(coords.lat, coords.lng, q);
+  }
+
+  // ── Caso 2: código CORTO con referencia de ciudad ────────────────────────
+  // Formato: "GP3P+538 Naucalpan de Juárez, Estado de México"
+  // o simplemente "GP3P+538" (usamos México como referencia por defecto)
+  const spaceIdx = resto.indexOf(' ');
+  const ciudad   = spaceIdx >= 0 ? resto.slice(spaceIdx + 1).trim() : 'México';
+
+  if (!ciudad) {
+    // Sin referencia: intentar buscar en México como default
+    return await resolverPlusCodeConReferencia(q, 'México');
+  }
+  return await resolverPlusCodeConReferencia(q, ciudad);
 }
 
-async function resolverPlusCode(code) {
-  const coords = decodePlusCode(code);
-  if (!coords) return null;
-  // Reverse geocode para obtener el nombre de la calle
+async function resolverPlusCodeConReferencia(plusCode, ciudad) {
   try {
-    const url = `https://nominatim.openstreetmap.org/reverse?lat=${coords.lat}&lon=${coords.lng}&format=json&language=es`;
-    const r = await fetch(url, { headers: { 'Accept-Language': 'es' } });
-    const d = await r.json();
-    const addr = d.address || {};
-    const nombre = [addr.road, addr.house_number, addr.suburb || addr.neighbourhood || addr.city_district]
-      .filter(Boolean).join(' ') || code;
-    return { lat: coords.lat, lng: coords.lng, nombre };
+    // 1. Geocodificar la ciudad de referencia
+    const refUrl = 'https://nominatim.openstreetmap.org/search?' +
+      'q=' + encodeURIComponent(ciudad) +
+      '&format=json&limit=1&addressdetails=0';
+    const refRes = await fetch(refUrl, { headers: { 'User-Agent': 'SEISA-App/1.0' } });
+    const refData = await refRes.json();
+    if (!refData.length) return null;
+
+    const refLat = parseFloat(refData[0].lat);
+    const refLng = parseFloat(refData[0].lon);
+
+    // 2. Decodificar el plus code corto usando la referencia
+    const clean = plusCode.split(' ')[0]; // solo la parte del plus code
+    const coords = decodePlusCodeCorto(clean, refLat, refLng);
+    if (!coords) return null;
+
+    // 3. Reverse geocode para nombre legible
+    return await reverseGeocode(coords.lat, coords.lng, plusCode);
   } catch(e) {
-    return { lat: coords.lat, lng: coords.lng, nombre: code };
+    console.warn('resolverPlusCodeConReferencia:', e);
+    return null;
+  }
+}
+
+async function reverseGeocode(lat, lng, fallbackNombre) {
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=es`;
+    const r = await fetch(url, { headers: { 'User-Agent': 'SEISA-App/1.0' } });
+    const d = await r.json();
+    const a = d.address || {};
+    const nombre = [a.road, a.house_number, a.suburb || a.neighbourhood, a.city || a.town]
+      .filter(Boolean).join(', ') || fallbackNombre;
+    return { lat, lng, nombre };
+  } catch(e) {
+    return { lat, lng, nombre: fallbackNombre };
   }
 }
 
