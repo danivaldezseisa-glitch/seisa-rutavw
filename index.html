@@ -1791,7 +1791,6 @@ onAuthStateChanged(auth, async (user) => {
   } else {
     currentUser = null;
     mostrarLogin();
-    // login-btn era de screen-login (ya no existe)
   }
 });
 
@@ -1985,7 +1984,9 @@ window.showScreen = function(name) {
     s.classList.add('hidden');
     s.classList.remove('slide-left');
   });
-  document.getElementById('screen-' + name).classList.remove('hidden');
+  const _targetScreen = document.getElementById('screen-' + name);
+  if (!_targetScreen) { console.warn('showScreen: screen not found:', name); return; }
+  _targetScreen.classList.remove('hidden');
   document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
   const nb = document.querySelector(`.nav-btn[onclick="showScreen('${name}')"]`);
   if (nb) nb.classList.add('active');
@@ -1994,19 +1995,16 @@ window.showScreen = function(name) {
   saveCurrentScreen(name, name === 'client' ? currentClientId : null);
   // Pushear al historial del navegador para soporte del botón físico de atrás
   history.pushState({ app: true, screen: name }, '');
-  if (name === 'db') renderDB();
-  if (name === 'home') renderRoute();
-  if (name === 'admin') cargarUsuarios();
+  
+  
+  
   if (name === 'historial') { if (typeof window.cargarHistorial === 'function') window.cargarHistorial(); else if (typeof cargarHistorial === 'function') cargarHistorial(); }
-  if (name === 'nueva-ruta') initNuevaRutaScreen();
+  
   if (name === 'navegacion') { renderNavStops(); renderPuntosFijos(); }
   // Si había navegación activa y regresamos a nav-guiada, restaurar mapa
   if (name === 'nav-guiada' && navParadas.length > 0) renderNavGuiada();
 
-  // Iniciar escáner automáticamente al entrar a la pantalla de scan
-  if (name === 'scan') {
-    setTimeout(function() { if (!scannerActivo) iniciarEscaner(); }, 300);
-  }
+
 }
 
 function initNuevaRutaScreen() {
