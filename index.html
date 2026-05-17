@@ -216,18 +216,24 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
 
     <div class="card">
       <div class="label" style="margin-bottom:10px;">📍 Punto de inicio</div>
-      <div class="search-wrap">
-        <input class="input" id="cr-inicio" placeholder="Buscar dirección o Plus Code..." oninput="buscarLugar('inicio',this.value)">
-        <div id="search-results-inicio" class="search-results-box"></div>
+      <div style="display:flex;gap:8px;">
+        <div class="search-wrap" style="flex:1;">
+          <input class="input" id="cr-inicio" placeholder="Buscar dirección o Plus Code..." oninput="buscarLugar('inicio',this.value)">
+          <div id="search-results-inicio" class="search-results-box"></div>
+        </div>
+        <button onclick="usarGPS('inicio')" title="Usar mi ubicación actual" style="width:44px;height:44px;flex-shrink:0;border-radius:10px;border:1.5px solid var(--border);background:var(--surface2);color:var(--accent);font-size:20px;cursor:pointer;">◎</button>
       </div>
       <div id="cr-inicio-label" style="font-size:11px;color:var(--green);margin-top:6px;display:none;"></div>
     </div>
 
     <div class="card">
       <div class="label" style="margin-bottom:10px;">🏁 Punto final (base de regreso)</div>
-      <div class="search-wrap">
-        <input class="input" id="cr-final" placeholder="Buscar dirección o Plus Code..." oninput="buscarLugar('final',this.value)">
-        <div id="search-results-final" class="search-results-box"></div>
+      <div style="display:flex;gap:8px;">
+        <div class="search-wrap" style="flex:1;">
+          <input class="input" id="cr-final" placeholder="Buscar dirección o Plus Code..." oninput="buscarLugar('final',this.value)">
+          <div id="search-results-final" class="search-results-box"></div>
+        </div>
+        <button onclick="usarGPS('final')" title="Usar mi ubicación actual" style="width:44px;height:44px;flex-shrink:0;border-radius:10px;border:1.5px solid var(--border);background:var(--surface2);color:var(--accent);font-size:20px;cursor:pointer;">◎</button>
       </div>
       <div id="cr-final-label" style="font-size:11px;color:var(--green);margin-top:6px;display:none;"></div>
     </div>
@@ -258,8 +264,9 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
       <div id="search-results-parada" class="search-results-box" style="position:absolute;left:0;right:0;z-index:500;"></div>
     </div>
     <div style="display:flex;gap:8px;margin-top:8px;">
-      <input class="input" id="paradas-pluscode" placeholder="Plus Code (ej. 76QF+5G)" style="flex:1;font-size:13px;font-family:var(--mono);">
-      <button class="btn btn-ghost" onclick="agregarPorPlusCode()" style="width:auto;padding:8px 14px;white-space:nowrap;flex-shrink:0;">＋ Agregar</button>
+      <input class="input" id="paradas-pluscode" placeholder="Plus Code (ej. GP3P+538 Naucalpan)" style="flex:1;font-size:13px;font-family:var(--mono);" onkeydown="if(event.key==='Enter')agregarPorPlusCode()">
+      <button onclick="agregarPorPlusCode()" style="width:auto;padding:8px 12px;white-space:nowrap;flex-shrink:0;border-radius:10px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text2);font-size:13px;font-weight:700;cursor:pointer;">＋</button>
+      <button onclick="mostrarPegadoMasivo()" style="width:auto;padding:8px 12px;white-space:nowrap;flex-shrink:0;border-radius:10px;border:1.5px solid rgba(255,145,0,.4);background:rgba(255,145,0,.1);color:var(--orange);font-size:12px;font-weight:700;cursor:pointer;">📋 Masivo</button>
     </div>
   </div>
 
@@ -388,8 +395,8 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
       </div>
 
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-        <button onclick="abrirGoogleMaps()" style="padding:10px 4px;border-radius:11px;border:1.5px solid rgba(52,168,83,.45);background:rgba(52,168,83,.12);color:#4caf50;font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans);display:flex;align-items:center;justify-content:center;gap:6px;">
-          🗺️ Google Maps
+        <button onclick="verIndicaciones()" style="padding:10px 4px;border-radius:11px;border:1.5px solid rgba(0,212,255,.3);background:rgba(0,212,255,.08);color:var(--accent);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans);display:flex;align-items:center;justify-content:center;gap:6px;">
+          🛣️ Indicaciones
         </button>
         <button onclick="deshacerAccion()" style="padding:10px 4px;border-radius:11px;border:1.5px solid rgba(255,215,64,.4);background:rgba(255,215,64,.1);color:var(--yellow);font-size:12px;font-weight:700;cursor:pointer;font-family:var(--sans);display:flex;align-items:center;justify-content:center;gap:6px;">
           ↩ Deshacer
@@ -408,6 +415,38 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
     <div class="scroll" id="nav-lista-items"></div>
   </div>
 
+</div>
+
+<!-- ════════════════════════════════
+     MODAL: PEGADO MASIVO
+════════════════════════════════ -->
+<div class="modal-overlay hidden" id="modal-masivo">
+  <div class="modal-sheet">
+    <div class="modal-title">📋 Pegado masivo de Plus Codes</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:8px;">Un código por línea. Formatos aceptados:</div>
+    <div style="font-size:11px;font-family:var(--mono);color:var(--accent);background:var(--surface2);padding:8px 12px;border-radius:8px;margin-bottom:10px;line-height:1.8;">GP3P+538 Naucalpan de Juárez<br>76F2CVM8+QQ<br>53370 Av Juárez 45</div>
+    <textarea id="masivo-textarea" class="input" style="height:150px;resize:none;font-family:var(--mono);font-size:13px;line-height:1.7;" placeholder="Pega aquí los Plus Codes o direcciones..."></textarea>
+    <div id="masivo-status" style="font-size:12px;color:var(--text3);min-height:18px;text-align:center;"></div>
+    <button class="btn btn-green" onclick="procesarMasivo()" id="btn-masivo-procesar">⚡ Procesar y agregar</button>
+    <button class="btn btn-ghost" onclick="closeModal('modal-masivo')">Cancelar</button>
+  </div>
+</div>
+
+<!-- ════════════════════════════════
+     MODAL: EDITAR PARADA
+════════════════════════════════ -->
+<div class="modal-overlay hidden" id="modal-editar-parada">
+  <div class="modal-sheet">
+    <div class="modal-title">✏️ Editar parada</div>
+    <input type="hidden" id="editar-parada-id">
+    <div class="search-wrap" style="position:relative;">
+      <input class="input" id="editar-parada-input" placeholder="Buscar nueva dirección o Plus Code..." oninput="buscarEdicionParada(this.value)">
+      <div id="search-results-editar-parada" class="search-results-box" style="position:absolute;left:0;right:0;z-index:600;"></div>
+    </div>
+    <div id="editar-parada-preview" style="display:none;font-size:12px;color:var(--green);padding:8px 12px;background:rgba(0,230,118,.08);border-radius:8px;border:1px solid rgba(0,230,118,.2);margin-top:4px;"></div>
+    <button class="btn btn-green" onclick="confirmarEditarParada()">✓ Confirmar cambio</button>
+    <button class="btn btn-ghost" onclick="closeModal('modal-editar-parada')">Cancelar</button>
+  </div>
 </div>
 
 <!-- ════════════════════════════════
@@ -1128,15 +1167,36 @@ function renderParadasList() {
   btn.disabled = n < 1;
   if (!n) { empty.style.display = 'block'; lista.innerHTML = ''; return; }
   empty.style.display = 'none';
-  lista.innerHTML = rutaBuild.paradas.map((p, i) => `
-    <div class="parada-item">
-      <div class="parada-num" style="background:rgba(0,212,255,.15);color:var(--accent);border:1px solid rgba(0,212,255,.3);">${i+1}</div>
-      <div class="parada-info">
-        <div class="parada-name">${p.nombre}</div>
-        <div class="parada-sub">${p.lat.toFixed(5)}, ${p.lng.toFixed(5)}</div>
-      </div>
-      <button onclick="eliminarParada('${p.id}')" style="background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;padding:4px;">✕</button>
-    </div>`).join('');
+  lista.innerHTML = '';
+  rutaBuild.paradas.forEach((p, i) => {
+    const div = document.createElement('div');
+    div.className = 'parada-item';
+    // Número
+    const num = document.createElement('div');
+    num.className = 'parada-num';
+    num.style.cssText = 'background:rgba(0,212,255,.15);color:var(--accent);border:1px solid rgba(0,212,255,.3);';
+    num.textContent = i + 1;
+    // Info
+    const info = document.createElement('div');
+    info.className = 'parada-info';
+    const nameEl = document.createElement('div'); nameEl.className = 'parada-name'; nameEl.textContent = p.nombre;
+    const subEl  = document.createElement('div'); subEl.className  = 'parada-sub';  subEl.textContent  = p.lat.toFixed(5) + ', ' + p.lng.toFixed(5);
+    info.appendChild(nameEl); info.appendChild(subEl);
+    // Botones
+    const btns = document.createElement('div');
+    btns.style.cssText = 'display:flex;gap:2px;flex-shrink:0;';
+    const btnEdit = document.createElement('button');
+    btnEdit.textContent = '✏️'; btnEdit.title = 'Editar';
+    btnEdit.style.cssText = 'background:none;border:none;font-size:15px;cursor:pointer;padding:5px;';
+    btnEdit.onclick = () => abrirEditarParada(p.id);
+    const btnDel = document.createElement('button');
+    btnDel.textContent = '✕'; btnDel.title = 'Eliminar';
+    btnDel.style.cssText = 'background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;padding:5px;';
+    btnDel.onclick = () => eliminarParada(p.id);
+    btns.appendChild(btnEdit); btns.appendChild(btnDel);
+    div.appendChild(num); div.appendChild(info); div.appendChild(btns);
+    lista.appendChild(div);
+  });
 }
 
 function eliminarParada(id) {
@@ -1420,11 +1480,11 @@ function avanzarYAbrir(idx, ruta, msg) {
     actualizarNavPanel();
     renderListaNav();
     trazarRutaCompleta();
-    // Abrir Google Maps a la siguiente parada
+    // Trazar ruta a la siguiente parada en el mapa interno
     const sig = ruta.paradas[siguiente];
     setTimeout(() => {
-      window.open(`https://www.google.com/maps/dir/?api=1&destination=${sig.lat},${sig.lng}&travelmode=driving`, '_blank');
-    }, 700);
+      if (mapNav && sig) trazarRutaASiguiente(sig.lat, sig.lng);
+    }, 400);
   } else {
     // Ruta completada
     actualizarNavPanel();
@@ -1454,12 +1514,72 @@ function deshacerAccion() {
   showToast('Nada que deshacer');
 }
 
-function abrirGoogleMaps() {
+let navRouteLayer = null;
+
+function verIndicaciones() {
   const ruta = state.rutaActual;
   if (!ruta) return;
   const p = ruta.paradas[state.paradaActual];
   if (!p) return;
-  window.open(`https://www.google.com/maps/dir/?api=1&destination=${p.lat},${p.lng}&travelmode=driving`, '_blank');
+  // Si hay GPS, trazar desde posición actual
+  if (navGPSMarker) {
+    const pos = navGPSMarker.getLatLng();
+    trazarRutaDesdeHasta(pos.lat, pos.lng, p.lat, p.lng);
+  } else {
+    // Sin GPS, centrar en destino
+    mapNav.setView([p.lat, p.lng], 16);
+    showToast("📍 " + p.nombre);
+  }
+}
+
+async function trazarRutaASiguiente(lat, lng) {
+  if (navGPSMarker) {
+    const pos = navGPSMarker.getLatLng();
+    await trazarRutaDesdeHasta(pos.lat, pos.lng, lat, lng);
+  } else {
+    mapNav.setView([lat, lng], 15);
+  }
+}
+
+async function trazarRutaDesdeHasta(lat1, lng1, lat2, lng2) {
+  // Eliminar ruta anterior
+  if (navRouteLayer) { navRouteLayer.remove(); navRouteLayer = null; }
+
+  try {
+    // OSRM routing (gratis, sin API key)
+    const url = `https://router.project-osrm.org/route/v1/driving/${lng1},${lat1};${lng2},${lat2}?overview=full&geometries=geojson&steps=true`;
+    const r = await fetch(url);
+    const d = await r.json();
+    if (!d.routes?.length) { showToast("Sin ruta disponible"); return; }
+
+    const route = d.routes[0];
+    const coords = route.geometry.coordinates.map(c => [c[1], c[0]]);
+    navRouteLayer = L.polyline(coords, {
+      color: "#00d4ff", weight: 5, opacity: 0.85
+    }).addTo(mapNav);
+
+    // Ajustar vista
+    mapNav.fitBounds(navRouteLayer.getBounds(), { padding: [60, 60] });
+
+    // Distancia y tiempo
+    const km  = (route.distance / 1000).toFixed(1);
+    const min = Math.round(route.duration / 60);
+    showToast(`🛣️ ${km} km · ~${min} min`);
+
+    // Mostrar primer paso de indicaciones
+    if (route.legs?.[0]?.steps?.length) {
+      const step = route.legs[0].steps[0];
+      const dir = step.maneuver?.type || "";
+      const name = step.name || "";
+      if (name) {
+        document.getElementById("nav-calle").textContent = name;
+        document.getElementById("nav-sub").textContent = `${dir} → ${(step.distance/1000).toFixed(2)} km`;
+      }
+    }
+  } catch(e) {
+    showToast("⚠️ Sin conexión para ruta");
+    mapNav.setView([lat2, lng2], 15);
+  }
 }
 
 function finalizarRuta() {
@@ -1529,7 +1649,143 @@ function showToast(msg) {
 // ══════════════════════════════════════════════════════════════════
 //  INIT
 // ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
+//  GPS EN INICIO / FINAL
+// ══════════════════════════════════════════════════════════════════
+function usarGPS(tipo) {
+  if (!navigator.geolocation) { showToast('GPS no disponible'); return; }
+  showToast('📡 Obteniendo ubicación...');
+  navigator.geolocation.getCurrentPosition(async pos => {
+    const lat = pos.coords.latitude;
+    const lng = pos.coords.longitude;
+    const data = await reverseGeocode(lat, lng, `${lat.toFixed(5)},${lng.toFixed(5)}`);
+    if (tipo === 'inicio') {
+      rutaBuild.inicio = { lat, lng, nombre: data.nombre };
+      const el = document.getElementById('cr-inicio');
+      const lb = document.getElementById('cr-inicio-label');
+      if (el) el.value = data.nombre;
+      if (lb) { lb.textContent = '◎ ' + data.nombre; lb.style.display = 'block'; }
+    } else {
+      rutaBuild.final = { lat, lng, nombre: data.nombre };
+      const el = document.getElementById('cr-final');
+      const lb = document.getElementById('cr-final-label');
+      if (el) el.value = data.nombre;
+      if (lb) { lb.textContent = '◎ ' + data.nombre; lb.style.display = 'block'; }
+    }
+    showToast('✅ Ubicación GPS capturada');
+  }, () => showToast('⚠️ No se pudo obtener el GPS'), { enableHighAccuracy: true, timeout: 8000 });
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  EDITAR PARADA
+// ══════════════════════════════════════════════════════════════════
+let editParadaData = null;
+
+function abrirEditarParada(id) {
+  editParadaData = null;
+  document.getElementById('editar-parada-id').value = id;
+  document.getElementById('editar-parada-input').value = '';
+  document.getElementById('editar-parada-preview').style.display = 'none';
+  const box = document.getElementById('search-results-editar-parada');
+  if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+  document.getElementById('modal-editar-parada').classList.remove('hidden');
+}
+
+function buscarEdicionParada(q) {
+  clearTimeout(searchTimers['editar-parada']);
+  const box = document.getElementById('search-results-editar-parada');
+  if (!q || q.trim().length < 3) { ocultarBox(box); return; }
+  searchTimers['editar-parada'] = setTimeout(() => geocode(q.trim(), box, (lat, lng, nombre) => {
+    editParadaData = { lat, lng, nombre };
+    const prev = document.getElementById('editar-parada-preview');
+    if (prev) { prev.textContent = '📍 ' + nombre; prev.style.display = 'block'; }
+    ocultarBox(box);
+  }), 600);
+}
+
+function confirmarEditarParada() {
+  if (!editParadaData) { showToast('Busca una dirección primero'); return; }
+  const id = document.getElementById('editar-parada-id').value;
+  const p  = rutaBuild.paradas.find(x => x.id === id);
+  if (!p) return;
+  p.lat    = editParadaData.lat;
+  p.lng    = editParadaData.lng;
+  p.nombre = editParadaData.nombre;
+  actualizarMapaParadas();
+  renderParadasList();
+  closeModal('modal-editar-parada');
+  showToast('✅ Parada actualizada');
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  PEGADO MASIVO
+// ══════════════════════════════════════════════════════════════════
+function mostrarPegadoMasivo() {
+  document.getElementById('masivo-textarea').value = '';
+  document.getElementById('masivo-status').textContent = '';
+  document.getElementById('modal-masivo').classList.remove('hidden');
+}
+
+async function procesarMasivo() {
+  const raw   = document.getElementById('masivo-textarea').value;
+  const lineas = raw.split('\n').map(l => l.trim()).filter(Boolean);
+  if (!lineas.length) { showToast('Pega al menos una línea'); return; }
+
+  const btn = document.getElementById('btn-masivo-procesar');
+  const statusEl = document.getElementById('masivo-status');
+  btn.disabled = true;
+  let ok = 0, err = 0;
+
+  for (let i = 0; i < lineas.length; i++) {
+    const linea = lineas[i];
+    statusEl.textContent = `Procesando ${i+1}/${lineas.length}...`;
+    try {
+      let lat, lng, nombre;
+
+      if (isPlusCode(linea)) {
+        // Plus code con o sin referencia de ciudad
+        const r = await resolverPlusCode(linea);
+        if (r) { lat = r.lat; lng = r.lng; nombre = r.nombre; }
+        else throw new Error('Plus code inválido');
+      } else {
+        // Dirección normal (CP + calle, o texto libre)
+        const resultado = await new Promise((resolve) => {
+          const box = { style: { display: '' }, innerHTML: '', querySelectorAll: () => [] };
+          geocode(linea, {
+            style: {},
+            innerHTML: '',
+            querySelectorAll: () => [],
+            appendChild: () => {}
+          }, (la, ln, no) => resolve({ lat: la, lng: ln, nombre: no }));
+          setTimeout(() => resolve(null), 5000);
+        });
+        if (!resultado) throw new Error('Sin resultado');
+        lat = resultado.lat; lng = resultado.lng; nombre = resultado.nombre;
+      }
+
+      if (lat && lng) {
+        const id = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,5);
+        rutaBuild.paradas.push({ id, nombre, lat, lng, hecha: false, fallida: false, horaAccion: null });
+        ok++;
+      } else throw new Error('Coords inválidas');
+
+      // Rate limit Nominatim: 1 req/seg
+      if (i < lineas.length - 1) await new Promise(r => setTimeout(r, 1100));
+    } catch(e) {
+      console.warn('masivo error:', linea, e.message);
+      err++;
+    }
+  }
+
+  actualizarMapaParadas();
+  renderParadasList();
+  btn.disabled = false;
+  statusEl.textContent = `✅ ${ok} agregadas${err ? ' · ⚠️ ' + err + ' errores' : ''}`;
+  if (ok > 0) setTimeout(() => closeModal('modal-masivo'), 1500);
+}
+
 (async function init() {
+
   // Fecha hoy por defecto en crear ruta
   const hoy = new Date();
   const dd = String(hoy.getDate()).padStart(2,'0');
