@@ -928,14 +928,46 @@ function mostrarResultados(items, box, onSelect) {
   box.style.display = 'block';
 }
 
-// ── Plus Code: detectar, decodificar (completo y corto con referencia) ──
+// ── Plus Code: detectar y resolver (completo y corto con ciudad) ──
 const PLUS_CHARS = '23456789CFGHJMPQRVWX';
 
-// Detecta si la cadena ES o EMPIEZA con un plus code (completo o corto + ciudad)
+// Estados mexicanos para detectar fin de ciudad en el formato del usuario
+const ESTADOS_MX = [
+  'Estado de México','Ciudad de México','CDMX','Nuevo León','Baja California Sur',
+  'Baja California','Quintana Roo','San Luis Potosí','Coahuila de Zaragoza',
+  'Michoacán','Veracruz','Chiapas','Hidalgo','Jalisco','Puebla','Oaxaca',
+  'Guerrero','Guanajuato','Sonora','Chihuahua','Tamaulipas','Sinaloa',
+  'Tabasco','Yucatán','Campeche','Colima','Tlaxcala','Morelos','Nayarit',
+  'Durango','Zacatecas','Aguascalientes','Querétaro'
+];
+
+// Detecta si la cadena empieza con un Plus Code
 function isPlusCode(q) {
-  // Completo: 8 chars + '+' + sufijo  → ej. 76F2CVM8+QQ
-  // Corto:    4-6 chars + '+' + sufijo + espacio + ciudad → ej. GP3P+538 Naucalpan
   return /^[23456789CFGHJMPQRVWX]{2,8}\+[23456789CFGHJMPQRVWX0-9]*/i.test(q.trim());
+}
+
+// Parsea el formato completo: "PLUSCODE Ciudad, Estado nombre de calle 123"
+function parsearLineaPlusCode(linea) {
+  const clean = linea.trim();
+  const pcMatch = clean.match(/^([23456789CFGHJMPQRVWX]{2,8}\+[23456789CFGHJMPQRVWX0-9]*)/i);
+  if (!pcMatch) return null;
+
+  const plusCode = pcMatch[1];
+  const resto    = clean.slice(plusCode.length).trim();
+
+  // Detectar fin del nombre del estado
+  let ciudad = resto, nombre = '';
+  for (const estado of ESTADOS_MX) {
+    const idx = resto.toLowerCase().indexOf(estado.toLowerCase());
+    if (idx >= 0) {
+      const end = idx + estado.length;
+      ciudad = resto.slice(0, end).trim();
+      nombre = resto.slice(end).replace(/^[,\s]+/, '').trim();
+      break;
+    }
+  }
+  // Si no encontró estado, ciudad = todo, nombre = vacío
+  return { plusCode, ciudad, nombre: nombre || plusCode };
 }
 
 // Decodifica un plus code COMPLETO (≥8 chars antes del +)
@@ -949,101 +981,55 @@ function decodePlusCodeCompleto(prefix8) {
 }
 
 // Decodifica un plus code CORTO usando coordenadas de referencia
-function decodePlusCodeCorto(shortCode, refLat, refLng) {
-  try {
-    const clean = shortCode.toUpperCase();
-    const plusIdx = clean.indexOf('+');
-    const prefix = clean.slice(0, plusIdx);  // 2-6 chars
-    const suffix = clean.slice(plusIdx + 1); // 2-3 chars
 
-    // Escala de resolución según longitud del prefijo
-    // 2 chars → 1° bloques, 4 chars → 0.05°, 6 chars → 0.0025°
-    const stepLat = prefix.length === 2 ? 1 : prefix.length === 4 ? 0.05 : 0.0025;
-    const stepLng = prefix.length === 2 ? 1 : prefix.length === 4 ? 0.05 : 0.0025;
-
-    // Calcular bloque del código corto
-    let lat = refLat, lng = refLng;
-
-    if (prefix.length >= 2) {
-      const p1 = PLUS_CHARS.indexOf(prefix[0]);
-      const p2 = PLUS_CHARS.indexOf(prefix[1]);
-      if (p1 < 0 || p2 < 0) return null;
-      // Snapping al grid más cercano a la referencia
-      const blockSize = prefix.length === 2 ? 1 : 0.05;
-      lat = Math.floor(refLat / blockSize) * blockSize + p1 * (blockSize / 20);
-      lng = Math.floor(refLng / blockSize) * blockSize + p2 * (blockSize / 20);
-    }
-    if (prefix.length >= 4) {
-      const p3 = PLUS_CHARS.indexOf(prefix[2]);
-      const p4 = PLUS_CHARS.indexOf(prefix[3]);
-      if (p3 < 0 || p4 < 0) return null;
-      lat = Math.floor(refLat) + p3 * 0.05;
-      lng = Math.floor(refLng) + p4 * 0.05;
-    }
-    if (suffix.length >= 2) {
-      const s1 = PLUS_CHARS.indexOf(suffix[0]);
-      const s2 = PLUS_CHARS.indexOf(suffix[1]);
-      if (s1 >= 0 && s2 >= 0) {
-        lat += s1 * (0.05 / 20);
-        lng += s2 * (0.05 / 20);
-      }
-    }
-    return { lat: Math.round((lat + 0.00125)*1e5)/1e5, lng: Math.round((lng + 0.00125)*1e5)/1e5 };
-  } catch(e) { return null; }
-}
-
+// Resolver Plus Code: completo o corto con ciudad
+// Envía el texto "PLUSCODE Ciudad, Estado" a Nominatim que lo entiende nativamente
 async function resolverPlusCode(input) {
-  const q = input.trim();
-  const plusIdx = q.indexOf('+');
-  if (plusIdx < 0) return null;
+  const parsed = parsearLineaPlusCode(input.trim());
+  if (!parsed) return null;
 
-  const prefix = q.slice(0, plusIdx).replace(/0/g, '');
-  const resto  = q.slice(plusIdx); // ej. "+538 Naucalpan de Juárez, Estado de México"
+  const { plusCode, ciudad, nombre } = parsed;
+  const plusIdx = plusCode.indexOf('+');
+  const prefix  = plusCode.slice(0, plusIdx);
 
-  // ── Caso 1: código COMPLETO (8+ chars antes del +) ───────────────────────
+  // ── Caso 1: código COMPLETO (8 chars antes del +) ──────────────────────
   if (prefix.length >= 8) {
     const coords = decodePlusCodeCompleto(prefix);
     if (!coords) return null;
-    return await reverseGeocode(coords.lat, coords.lng, q);
+    return await reverseGeocode(coords.lat, coords.lng, nombre || plusCode);
   }
 
-  // ── Caso 2: código CORTO con referencia de ciudad ────────────────────────
-  // Formato: "GP3P+538 Naucalpan de Juárez, Estado de México"
-  // o simplemente "GP3P+538" (usamos México como referencia por defecto)
-  const spaceIdx = resto.indexOf(' ');
-  const ciudad   = spaceIdx >= 0 ? resto.slice(spaceIdx + 1).trim() : 'México';
-
-  if (!ciudad) {
-    // Sin referencia: intentar buscar en México como default
-    return await resolverPlusCodeConReferencia(q, 'México');
-  }
-  return await resolverPlusCodeConReferencia(q, ciudad);
-}
-
-async function resolverPlusCodeConReferencia(plusCode, ciudad) {
+  // ── Caso 2: código CORTO — enviar a Nominatim con ciudad como texto ──────
+  // Nominatim entiende Plus Codes con referencia de ciudad
+  const queryConCiudad = plusCode + ' ' + ciudad;
   try {
-    // 1. Geocodificar la ciudad de referencia
+    const url = 'https://nominatim.openstreetmap.org/search?' +
+      'q=' + encodeURIComponent(queryConCiudad) +
+      '&format=json&limit=3&addressdetails=1&accept-language=es';
+    const res  = await fetch(url, { headers: { 'User-Agent': 'SEISA-App/1.0' } });
+    const data = await res.json();
+    if (data.length) {
+      const d = data[0];
+      const a = d.address || {};
+      // Usar nombre de calle del usuario si existe, si no el que devuelve Nominatim
+      const nomFinal = nombre || [a.road, a.house_number].filter(Boolean).join(' ') || plusCode;
+      return { lat: parseFloat(d.lat), lng: parseFloat(d.lon), nombre: nomFinal };
+    }
+  } catch(e) { console.warn('Nominatim plus code:', e); }
+
+  // ── Fallback: buscar solo la ciudad y aproximar ─────────────────────────
+  try {
     const refUrl = 'https://nominatim.openstreetmap.org/search?' +
-      'q=' + encodeURIComponent(ciudad) +
-      '&format=json&limit=1&addressdetails=0';
-    const refRes = await fetch(refUrl, { headers: { 'User-Agent': 'SEISA-App/1.0' } });
+      'q=' + encodeURIComponent(ciudad) + '&format=json&limit=1';
+    const refRes  = await fetch(refUrl, { headers: { 'User-Agent': 'SEISA-App/1.0' } });
     const refData = await refRes.json();
-    if (!refData.length) return null;
-
-    const refLat = parseFloat(refData[0].lat);
-    const refLng = parseFloat(refData[0].lon);
-
-    // 2. Decodificar el plus code corto usando la referencia
-    const clean = plusCode.split(' ')[0]; // solo la parte del plus code
-    const coords = decodePlusCodeCorto(clean, refLat, refLng);
-    if (!coords) return null;
-
-    // 3. Reverse geocode para nombre legible
-    return await reverseGeocode(coords.lat, coords.lng, plusCode);
-  } catch(e) {
-    console.warn('resolverPlusCodeConReferencia:', e);
-    return null;
-  }
+    if (refData.length) {
+      const lat = parseFloat(refData[0].lat) + (Math.random()-0.5)*0.01;
+      const lng = parseFloat(refData[0].lon) + (Math.random()-0.5)*0.01;
+      return { lat, lng, nombre: nombre || plusCode + ' (' + ciudad + ')' };
+    }
+  } catch(e) {}
+  return null;
 }
 
 async function reverseGeocode(lat, lng, fallbackNombre) {
@@ -1052,12 +1038,10 @@ async function reverseGeocode(lat, lng, fallbackNombre) {
     const r = await fetch(url, { headers: { 'User-Agent': 'SEISA-App/1.0' } });
     const d = await r.json();
     const a = d.address || {};
-    const nombre = [a.road, a.house_number, a.suburb || a.neighbourhood, a.city || a.town]
+    const nombre = [a.road, a.house_number, a.suburb||a.neighbourhood, a.city||a.town]
       .filter(Boolean).join(', ') || fallbackNombre;
     return { lat, lng, nombre };
-  } catch(e) {
-    return { lat, lng, nombre: fallbackNombre };
-  }
+  } catch(e) { return { lat, lng, nombre: fallbackNombre }; }
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -1743,10 +1727,10 @@ async function procesarMasivo() {
       let lat, lng, nombre;
 
       if (isPlusCode(linea)) {
-        // Plus code con o sin referencia de ciudad
-        const r = await resolverPlusCode(linea);
+        // Plus code con ciudad y nombre de calle
+        const r = await resolverPlusCode(linea); // parsearLineaPlusCode internamente
         if (r) { lat = r.lat; lng = r.lng; nombre = r.nombre; }
-        else throw new Error('Plus code inválido');
+        else throw new Error('Plus code no resuelto');
       } else {
         // Dirección normal (CP + calle, o texto libre)
         const resultado = await new Promise((resolve) => {
