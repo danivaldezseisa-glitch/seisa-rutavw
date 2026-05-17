@@ -749,8 +749,8 @@ let searchTimers = {};
 function buscarLugar(tipo, q) {
   clearTimeout(searchTimers[tipo]);
   const box = document.getElementById('search-results-' + tipo);
-  if (q.length < 3) { box.style.display = 'none'; box.innerHTML = ''; return; }
-  searchTimers[tipo] = setTimeout(() => geocode(q, box, (lat, lng, nombre) => {
+  if (!q || q.trim().length < 3) { ocultarBox(box); return; }
+  searchTimers[tipo] = setTimeout(() => geocode(q.trim(), box, (lat, lng, nombre) => {
     if (tipo === 'inicio') {
       rutaBuild.inicio = { lat, lng, nombre };
       document.getElementById('cr-inicio-label').textContent = '✓ ' + nombre;
@@ -767,54 +767,112 @@ function buscarLugar(tipo, q) {
 function buscarParada(q) {
   clearTimeout(searchTimers['parada']);
   const box = document.getElementById('search-results-parada');
-  if (q.length < 3) { box.style.display = 'none'; box.innerHTML = ''; return; }
-  searchTimers['parada'] = setTimeout(() => geocode(q, box, (lat, lng, nombre) => {
+  if (!q || q.trim().length < 3) { ocultarBox(box); return; }
+  searchTimers['parada'] = setTimeout(() => geocode(q.trim(), box, (lat, lng, nombre) => {
     agregarParada(lat, lng, nombre);
     document.getElementById('paradas-search').value = '';
-    box.style.display = 'none';
-  }), 500);
+    ocultarBox(box);
+  }), 600);
 }
 
 function buscarEdicion(q) {
   clearTimeout(searchTimers['edicion']);
   const box = document.getElementById('search-results-edicion');
-  if (q.length < 3) { box.style.display = 'none'; box.innerHTML = ''; return; }
-  searchTimers['edicion'] = setTimeout(() => geocode(q, box, (lat, lng, nombre) => {
+  if (!q || q.trim().length < 3) { ocultarBox(box); return; }
+  searchTimers['edicion'] = setTimeout(() => geocode(q.trim(), box, (lat, lng, nombre) => {
     editUbData = { lat, lng, nombre };
     document.getElementById('edit-ub-preview').textContent = '📍 ' + nombre;
     document.getElementById('edit-ub-preview').style.display = 'block';
-    box.style.display = 'none';
-  }), 500);
+    ocultarBox(box);
+  }), 600);
 }
 
 async function geocode(q, box, onSelect) {
+  ocultarBox(box);
+  if (!q || q.trim().length < 3) return;
+  mostrarCargando(box);
+
   try {
-    // Intentar Plus Code primero
-    if (isPlusCode(q)) {
-      const r = await resolverPlusCode(q);
+    // ── Plus Code primero ──
+    if (isPlusCode(q.trim())) {
+      const r = await resolverPlusCode(q.trim());
       if (r) { mostrarResultados([r], box, onSelect); return; }
     }
-    // Nominatim
-    const url = `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=5&countrycodes=mx&addressdetails=1`;
-    const res  = await fetch(url, { headers: { 'Accept-Language': 'es' } });
+
+    // ── Nominatim (OpenStreetMap) ──
+    // User-Agent requerido por Nominatim ToS
+    const url = 'https://nominatim.openstreetmap.org/search?' +
+      'q=' + encodeURIComponent(q) +
+      '&format=json&limit=6&addressdetails=1&accept-language=es' +
+      '&countrycodes=mx';
+
+    const res = await fetch(url, {
+      headers: {
+        'User-Agent': 'SEISA-App/1.0',
+        'Accept-Language': 'es'
+      }
+    });
+
+    if (!res.ok) throw new Error('Nominatim ' + res.status);
     const data = await res.json();
-    const items = data.map(d => ({
-      nombre: d.display_name.split(',').slice(0,3).join(','),
-      lat: parseFloat(d.lat), lng: parseFloat(d.lon)
-    }));
+
+    if (!data.length) {
+      mostrarResultados([], box, onSelect);
+      return;
+    }
+
+    const items = data.map(d => {
+      const a = d.address || {};
+      const nombre = [
+        a.road || a.pedestrian || a.path,
+        a.house_number,
+        a.suburb || a.neighbourhood || a.city_district,
+        a.city || a.town || a.municipality
+      ].filter(Boolean).join(', ') || d.display_name.split(',').slice(0,3).join(',');
+      return { nombre, lat: parseFloat(d.lat), lng: parseFloat(d.lon) };
+    });
+
     mostrarResultados(items, box, onSelect);
-  } catch(e) { console.warn('geocode error:', e); }
+  } catch(e) {
+    console.warn('geocode error:', e);
+    ocultarBox(box);
+  }
+}
+
+function mostrarCargando(box) {
+  if (!box) return;
+  box.innerHTML = '<div class="res-item" style="color:var(--text3);">🔍 Buscando...</div>';
+  box.style.display = 'block';
+}
+
+function ocultarBox(box) {
+  if (!box) return;
+  box.style.display = 'none';
+  box.innerHTML = '';
 }
 
 function mostrarResultados(items, box, onSelect) {
-  if (!items.length) { box.style.display = 'none'; return; }
-  box.innerHTML = items.map((item, i) =>
-    `<div class="res-item" data-i="${i}">${item.nombre}</div>`
-  ).join('');
-  box.style.display = 'block';
-  box.querySelectorAll('.res-item').forEach((el, i) => {
-    el.onclick = () => onSelect(items[i].lat, items[i].lng, items[i].nombre);
+  if (!box) return;
+  if (!items.length) {
+    box.innerHTML = '<div class="res-item" style="color:var(--text3);">Sin resultados</div>';
+    box.style.display = 'block';
+    setTimeout(() => ocultarBox(box), 2000);
+    return;
+  }
+  // Crear elementos DOM (evita problemas de escape)
+  box.innerHTML = '';
+  items.forEach((item) => {
+    const el = document.createElement('div');
+    el.className = 'res-item';
+    el.textContent = item.nombre;
+    el.addEventListener('pointerdown', (e) => {
+      e.preventDefault();
+      ocultarBox(box);
+      onSelect(item.lat, item.lng, item.nombre);
+    });
+    box.appendChild(el);
   });
+  box.style.display = 'block';
 }
 
 // ── Decodificador de Plus Codes (sin API, implementación propia) ──
@@ -841,8 +899,9 @@ function decodePlusCode(code) {
 }
 
 function isPlusCode(q) {
-  return /^[23456789CFGHJMPQRVWX]{4,8}\+[23456789CFGHJMPQRVWX]{0,}$/i.test(q.replace(/\s/g,'').toUpperCase()) ||
-         /^[A-Z0-9]{4,8}\+[A-Z0-9]{0,}$/i.test(q.replace(/\s/g,'').toUpperCase());
+  // Plus code: 4-8 alfanuméricos + un + + 0-2 alfanuméricos
+  const clean = q.replace(/\s/g, '').toUpperCase();
+  return /^[23456789CFGHJMPQRVWX]{4,8}\+[23456789CFGHJMPQRVWX]*$/.test(clean);
 }
 
 async function resolverPlusCode(code) {
