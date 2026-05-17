@@ -275,11 +275,24 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
       <input class="input" id="paradas-search" placeholder="🔍 Buscar dirección, Plus Code o toca el mapa..." oninput="buscarParada(this.value)" style="padding-right:40px;">
       <div id="search-results-parada" class="search-results-box" style="position:absolute;left:0;right:0;z-index:500;"></div>
     </div>
+    <!-- PASO 1: Plus Code -->
     <div style="display:flex;gap:8px;margin-top:8px;">
-      <input class="input" id="paradas-pluscode" placeholder="Plus Code (ej. GP3P+538 Naucalpan)" style="flex:1;font-size:13px;font-family:var(--mono);" onkeydown="if(event.key==='Enter')agregarPorPlusCode()">
-      <button onclick="agregarPorPlusCode()" style="width:auto;padding:8px 12px;white-space:nowrap;flex-shrink:0;border-radius:10px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text2);font-size:13px;font-weight:700;cursor:pointer;">＋</button>
-      <button onclick="mostrarPegadoMasivo()" style="width:auto;padding:8px 12px;white-space:nowrap;flex-shrink:0;border-radius:10px;border:1.5px solid rgba(255,145,0,.4);background:rgba(255,145,0,.1);color:var(--orange);font-size:12px;font-weight:700;cursor:pointer;">📋 Masivo</button>
+      <input class="input" id="paradas-pluscode"
+        placeholder="Plus Code · ej: GP7F+JX5 Naucalpan de Juárez, Estado de México"
+        style="flex:1;font-size:13px;font-family:var(--mono);">
+      <button onclick="resolverPlusCodeUI()" style="width:auto;padding:8px 14px;flex-shrink:0;border-radius:10px;border:1.5px solid var(--accent);background:rgba(0,212,255,.12);color:var(--accent);font-size:13px;font-weight:700;cursor:pointer;">Buscar</button>
+      <button onclick="mostrarPegadoMasivo()" style="width:auto;padding:8px 10px;flex-shrink:0;border-radius:10px;border:1.5px solid rgba(255,145,0,.4);background:rgba(255,145,0,.1);color:var(--orange);font-size:12px;font-weight:700;cursor:pointer;">📋</button>
     </div>
+    <!-- PASO 2 y 3: confirmar nombre y agregar -->
+    <div id="pc-confirm-box" style="display:none;margin-top:8px;background:var(--surface);border:1.5px solid var(--accent);border-radius:12px;padding:12px 14px;">
+      <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;">📍 Ubicación encontrada</div>
+      <div id="pc-coords-label" style="font-size:12px;color:var(--text3);font-family:var(--mono);margin-bottom:10px;"></div>
+      <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">Nombre / Calle y número</div>
+      <input class="input" id="pc-nombre-input" placeholder="Ej: José Ma. Morelos 6" style="font-size:14px;margin-bottom:10px;">
+      <button onclick="confirmarAgregarPlusCode()" class="btn btn-green" style="padding:11px;">＋ Agregar parada</button>
+    </div>
+    <div id="pc-loading" style="display:none;margin-top:8px;font-size:12px;color:var(--text3);text-align:center;padding:8px;">🔍 Resolviendo Plus Code...</div>
+    <div id="pc-error" style="display:none;margin-top:8px;font-size:12px;color:var(--red);text-align:center;padding:8px;"></div>
   </div>
 
   <!-- LISTA PARADAS -->
@@ -1215,18 +1228,87 @@ function agregarParada(lat, lng, nombre) {
   showToast('✅ Parada ' + rutaBuild.paradas.length + ' agregada');
 }
 
-async function agregarPorPlusCode() {
-  const code = document.getElementById('paradas-pluscode').value.trim();
-  if (!code) return;
-  showToast('Resolviendo Plus Code...');
-  const r = await resolverPlusCode(code);
-  if (r) {
-    agregarParada(r.lat, r.lng, r.nombre || code);
-    document.getElementById('paradas-pluscode').value = '';
-  } else {
-    showToast('⚠️ No se pudo resolver el Plus Code');
+// ── Plus Code: paso 1 resolver → paso 2 confirmar nombre ─────────
+let _pcCoordsTemp = null;
+
+async function resolverPlusCodeUI() {
+  const raw = document.getElementById('paradas-pluscode').value.trim();
+  if (!raw) { showToast('Pega un Plus Code primero'); return; }
+
+  document.getElementById('pc-confirm-box').style.display = 'none';
+  document.getElementById('pc-error').style.display       = 'none';
+  document.getElementById('pc-loading').style.display     = 'block';
+  _pcCoordsTemp = null;
+
+  try {
+    let result = null;
+
+    // Google Geocoding (más preciso para Plus Codes)
+    if (googleMapsReady && window.gmGeocoder) {
+      const parsed = parsearLineaPlusCode(raw);
+      const query  = parsed ? (parsed.plusCode + ' ' + parsed.ciudad) : raw;
+      result = await new Promise(resolve => {
+        window.gmGeocoder.geocode({ address: query, region: 'MX', language: 'es' }, (res, status) => {
+          if (status === 'OK' && res[0]) {
+            resolve({
+              lat:    res[0].geometry.location.lat(),
+              lng:    res[0].geometry.location.lng(),
+              nombre: (parsearLineaPlusCode(raw)?.nombre) || ''
+            });
+          } else resolve(null);
+        });
+      });
+    }
+
+    // Fallback OLC + Nominatim
+    if (!result) {
+      result = await resolverPlusCode(raw);
+    }
+
+    document.getElementById('pc-loading').style.display = 'none';
+
+    if (!result) {
+      document.getElementById('pc-error').textContent = '⚠️ No se encontró la ubicación. Verifica el Plus Code.';
+      document.getElementById('pc-error').style.display = 'block';
+      return;
+    }
+
+    _pcCoordsTemp = { lat: result.lat, lng: result.lng };
+    document.getElementById('pc-coords-label').textContent =
+      result.lat.toFixed(6) + ', ' + result.lng.toFixed(6);
+    // Pre-llenar nombre si viene en el texto
+    const parsed = parsearLineaPlusCode(raw);
+    document.getElementById('pc-nombre-input').value = parsed?.nombre || result.nombre || '';
+    document.getElementById('pc-confirm-box').style.display = 'block';
+
+    // Mostrar en mapa
+    if (mapParadas) mapParadas.setView([result.lat, result.lng], 16);
+    setTimeout(() => document.getElementById('pc-nombre-input')?.focus(), 150);
+
+  } catch(e) {
+    document.getElementById('pc-loading').style.display = 'none';
+    document.getElementById('pc-error').textContent = '⚠️ Error: ' + e.message;
+    document.getElementById('pc-error').style.display = 'block';
   }
 }
+
+function confirmarAgregarPlusCode() {
+  if (!_pcCoordsTemp) { showToast('Primero resuelve el Plus Code'); return; }
+  const nombre = document.getElementById('pc-nombre-input').value.trim();
+  if (!nombre) {
+    showToast('Escribe el nombre o número de calle');
+    document.getElementById('pc-nombre-input').focus();
+    return;
+  }
+  agregarParada(_pcCoordsTemp.lat, _pcCoordsTemp.lng, nombre);
+  _pcCoordsTemp = null;
+  document.getElementById('paradas-pluscode').value   = '';
+  document.getElementById('pc-confirm-box').style.display = 'none';
+  document.getElementById('pc-error').style.display       = 'none';
+}
+
+// Legacy (por si algún código lo llama)
+async function agregarPorPlusCode() { resolverPlusCodeUI(); }
 
 function actualizarMapaParadas() {
   if (!mapParadas) return;
