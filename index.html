@@ -2660,7 +2660,7 @@ window.eliminarFotoExcepcion = async function(idx) {
   } catch(e) { showToast('⚠️ Error al eliminar foto'); }
 };
 
-document.getElementById('c-entrega-file-input').addEventListener('change', async function() {
+(function(){const _el_c_entrega_file_input=document.getElementById('c-entrega-file-input');if(_el_c_entrega_file_input){document.getElementById('c-entrega-file-input').addEventListener('change', async function() {
   const files = Array.from(this.files);
   if (!files.length || !currentClientId) return;
   const r = allRecords.find(x => x.id === currentClientId);
@@ -2682,7 +2682,8 @@ document.getElementById('c-entrega-file-input').addEventListener('change', async
     } catch(e) { showToast('⚠️ Error al subir foto'); }
   }
   this.value = '';
-});
+});}})();
+
 
 // Fotos del artículo
 function renderFotosArticuloGrid(fotos) {
@@ -2694,7 +2695,7 @@ function renderFotosArticuloGrid(fotos) {
   ).join('');
 }
 
-document.getElementById('c-articulo-file-input').addEventListener('change', async function() {
+(function(){const _el_c_articulo_file_input=document.getElementById('c-articulo-file-input');if(_el_c_articulo_file_input){document.getElementById('c-articulo-file-input').addEventListener('change', async function() {
   const files = Array.from(this.files);
   if (!files.length || !currentClientId) return;
   const r = allRecords.find(x => x.id === currentClientId);
@@ -2716,7 +2717,8 @@ document.getElementById('c-articulo-file-input').addEventListener('change', asyn
     } catch(e) { showToast('⚠️ Error al subir foto del artículo'); }
   }
   this.value = '';
-});
+});}})();
+
 
 // ─── ENVÍO MASIVO ────────────────────────────────────────────────────
 let masivoQueue = [];
@@ -2786,26 +2788,28 @@ function enviarSiguiente() {
 }
 
 // ─── WHATSAPP ────────────────────────────────────────────────────────
-document.getElementById('btn-whatsapp-intro').addEventListener('click', () => {
+(function(){const _el_btn_whatsapp_intro=document.getElementById('btn-whatsapp-intro');if(_el_btn_whatsapp_intro){document.getElementById('btn-whatsapp-intro').addEventListener('click', () => {
   const r = allRecords.find(x => x.id === currentClientId);
   if (!r?.telefono) { showToast('No hay número de teléfono'); return; }
   const tel = r.telefono.replace(/\D/g, '');
   const num = tel.startsWith('52') ? tel : '52' + tel;
   const url = `https://wa.me/${num}?text=${encodeURIComponent(MSG_PRESENTACION)}`;
   window.open(url, '_blank');
-});
+});}})();
 
-document.getElementById('btn-whatsapp-camino').addEventListener('click', () => {
+
+(function(){const _el_btn_whatsapp_camino=document.getElementById('btn-whatsapp-camino');if(_el_btn_whatsapp_camino){document.getElementById('btn-whatsapp-camino').addEventListener('click', () => {
   const r = allRecords.find(x => x.id === currentClientId);
   if (!r?.telefono) { showToast('No hay número de teléfono'); return; }
   const tel = r.telefono.replace(/\D/g, '');
   const num = tel.startsWith('52') ? tel : '52' + tel;
   const url = `https://wa.me/${num}?text=${encodeURIComponent(MSG_CAMINO)}`;
   window.open(url, '_blank');
-});
+});}})();
+
 
 // ─── MARK DONE ───────────────────────────────────────────────────────
-document.getElementById('btn-mark-done').addEventListener('click', async () => {
+(function(){const _el_btn_mark_done=document.getElementById('btn-mark-done');if(_el_btn_mark_done){document.getElementById('btn-mark-done').addEventListener('click', async () => {
   if (!currentClientId) return;
   const horaEntrega = new Date().toISOString();
   await updateRecord(currentClientId, { entregado: true, horaEntrega });
@@ -2828,7 +2832,8 @@ document.getElementById('btn-mark-done').addEventListener('click', async () => {
   } else {
     showScreen('navegacion');
   }
-});
+});}})();
+
 
 // ─── DESHACER ENTREGA ─────────────────────────────────────────────────
 window.deshacerEntrega = async function() {
@@ -2867,7 +2872,7 @@ window.toggleEnCamino = async function() {
 };
 
 // ─── EDIT CLIENT ─────────────────────────────────────────────────────
-document.getElementById('btn-edit-client').addEventListener('click', () => {
+(function(){const _el_btn_edit_client=document.getElementById('btn-edit-client');if(_el_btn_edit_client){document.getElementById('btn-edit-client').addEventListener('click', () => {
   const r = allRecords.find(x => x.id === currentClientId);
   if (!r) return;
   document.getElementById('edit-id').value = r.id;
@@ -2880,7 +2885,8 @@ document.getElementById('btn-edit-client').addEventListener('click', () => {
   document.getElementById('edit-order').value = r.shipment_order || '';
   document.getElementById('edit-tracking').value = r.tracking || '';
   document.getElementById('modal-edit').classList.add('open');
-});
+});}})();
+
 
 window.closeModal = function(id) {
   document.getElementById(id).classList.remove('open');
@@ -2905,7 +2911,7 @@ window.saveEdit = async function() {
 }
 
 // ─── CAMERA (nativa) ─────────────────────────────────────────────────
-document.getElementById('btn-open-camera').addEventListener('click', () => {
+(function(){const _el_btn_open_camera=document.getElementById('btn-open-camera');if(_el_btn_open_camera){document.getElementById('btn-open-camera').addEventListener('click', () => {
   const r = allRecords.find(x => x.id === currentClientId);
   document.getElementById('cam-client-name').textContent = r?.nombre?.split(' ')[0] || '';
   camModo = 'entrega';
@@ -2925,7 +2931,8 @@ document.getElementById('btn-open-camera').addEventListener('click', () => {
   setCamOpt('receptor', 'cliente');
   setCamOpt('verificacion', 'nopedido');
   showScreen('camera');
-});
+});}})();
+
 
 window.openTimestamp = function() {
   const a = document.createElement('a');
@@ -2939,7 +2946,7 @@ window.openNativeCamera = function() {
   document.getElementById('cam-file-input').click();
 };
 
-document.getElementById('cam-file-input').addEventListener('change', async function() {
+(function(){const _el_cam_file_input=document.getElementById('cam-file-input');if(_el_cam_file_input){document.getElementById('cam-file-input').addEventListener('change', async function() {
   const files = Array.from(this.files);
   if (!files.length) return;
 
@@ -2999,7 +3006,8 @@ document.getElementById('cam-file-input').addEventListener('change', async funct
     }
   }
   this.value = '';
-});
+});}})();
+
 
 window.setCamOpt = function(group, val) {
   const activeStyle = 'border:2px solid var(--accent);background:rgba(0,212,255,.15);color:var(--accent);';
@@ -3691,7 +3699,7 @@ window.cargarEtiquetasEnLista = async function() {
 };
 
 // ─── ARCHIVO DATOS ────────────────────────────────────────────────────
-document.getElementById('archivo-datos-input')?.addEventListener('change', async function() {
+(function(){const _el_archivo_datos_input=document.getElementById('archivo-datos-input');if(_el_archivo_datos_input){document.getElementById('archivo-datos-input')?.addEventListener('change', async function() {
   const file = this.files[0];
   if (!file) return;
   document.getElementById('archivo-datos-nombre').textContent = file.name;
@@ -3766,7 +3774,8 @@ document.getElementById('archivo-datos-input')?.addEventListener('change', async
 
   showToast(`✅ ${filas.length} filas cargadas`);
   verificarBtnCruzar();
-});
+});}})();
+
 
 function verificarBtnCruzar() {
   const btn = document.getElementById('btn-cruzar-datos');
