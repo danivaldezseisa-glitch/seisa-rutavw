@@ -718,7 +718,7 @@ select option { background: var(--surface2); }
 <!-- ══════════════════════════════════════════
      SCREEN: NAVEGACIÓN — CONFIGURAR PARADAS
 ══════════════════════════════════════════ -->
-<div class="screen hidden" id="screen-navegacion">
+<div class="screen" id="screen-navegacion">
   <div class="topbar">
     <button class="topbar-back" onclick="showScreen('navegacion')">←</button>
     <h2>🗺️ Planear ruta</h2>
@@ -1786,6 +1786,7 @@ onAuthStateChanged(auth, async (user) => {
     actualizarUIUsuario();
     await loadRecords();
     updateStats();
+    showScreen('navegacion');
     restoreScreen();
   } else {
     currentUser = null;
@@ -1896,7 +1897,7 @@ let allRecords = [];
 // ── Punto inicial y final fijos (persisten entre sesiones) ───────────
 // navPuntoInicial, navPuntoFinal y savePuntosFijos declarados en script pre-módulo
 let currentClientId = null;
-let currentScreen = 'home';
+let currentScreen = 'navegacion';
 
 // ── Botón físico de atrás (Android/iOS) ──────────────────────────────────
 // Mapa: en qué pantalla estoy → a dónde regreso
@@ -1967,11 +1968,8 @@ function restoreScreen() {
   try {
     const savedScreen = sessionStorage.getItem('seisa_screen');
     const savedClient = sessionStorage.getItem('seisa_client');
-    if (!savedScreen || savedScreen === 'home') return; // home es el default
-    if (savedScreen === 'client' && savedClient) {
-      // Restaurar pantalla de cliente
-      setTimeout(() => openClient(savedClient), 100);
-    } else if (!SCREENS_NO_RESTORE.includes(savedScreen)) {
+    if (!savedScreen || savedScreen === 'home' || savedScreen === 'navegacion') return;
+    if (!SCREENS_NO_RESTORE.includes(savedScreen)) {
       setTimeout(() => showScreen(savedScreen), 100);
     }
   } catch(e) {}
