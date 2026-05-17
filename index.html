@@ -510,12 +510,36 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
   <div class="modal-sheet">
     <div class="modal-title">✏️ Editar parada</div>
     <input type="hidden" id="editar-parada-id">
+
+    <!-- Dirección actual -->
+    <div id="editar-parada-actual" style="font-size:12px;color:var(--text3);padding:8px 12px;background:var(--surface2);border-radius:8px;margin-bottom:8px;"></div>
+
+    <!-- Buscar nueva dirección -->
+    <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">Nueva ubicación</div>
     <div class="search-wrap" style="position:relative;">
-      <input class="input" id="editar-parada-input" placeholder="Buscar nueva dirección o Plus Code..." oninput="buscarEdicionParada(this.value)">
+      <input class="input" id="editar-parada-input"
+        placeholder="Buscar dirección, Plus Code o toca el mapa..."
+        oninput="buscarEdicionParada(this.value)">
       <div id="search-results-editar-parada" class="search-results-box" style="position:absolute;left:0;right:0;z-index:600;"></div>
     </div>
-    <div id="editar-parada-preview" style="display:none;font-size:12px;color:var(--green);padding:8px 12px;background:rgba(0,230,118,.08);border-radius:8px;border:1px solid rgba(0,230,118,.2);margin-top:4px;"></div>
-    <button class="btn btn-green" onclick="confirmarEditarParada()">✓ Confirmar cambio</button>
+
+    <!-- Plus Code directo -->
+    <div style="display:flex;gap:8px;margin-top:8px;">
+      <input class="input" id="editar-pluscode-input"
+        placeholder="O pega un Plus Code..."
+        style="flex:1;font-size:13px;font-family:var(--mono);">
+      <button onclick="resolverPlusCodeEditar()"
+        style="padding:8px 14px;border-radius:10px;border:1.5px solid var(--accent);background:rgba(0,212,255,.12);color:var(--accent);font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;">Buscar</button>
+    </div>
+
+    <!-- Preview de nueva ubicación -->
+    <div id="editar-parada-preview" style="display:none;margin-top:8px;font-size:12px;color:var(--green);padding:8px 12px;background:rgba(0,230,118,.08);border-radius:8px;border:1px solid rgba(0,230,118,.2);"></div>
+
+    <!-- Nombre personalizado -->
+    <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-top:10px;margin-bottom:5px;">Nombre de la parada</div>
+    <input class="input" id="editar-parada-nombre" placeholder="Ej: José Ma. Morelos 6" style="font-size:14px;">
+
+    <button class="btn btn-green" onclick="confirmarEditarParada()" style="margin-top:4px;">✓ Confirmar y re-optimizar ruta</button>
     <button class="btn btn-ghost" onclick="closeModal('modal-editar-parada')">Cancelar</button>
   </div>
 </div>
@@ -1122,42 +1146,78 @@ async function resolverPlusCode(input) {
   const pi = plusCode.indexOf('+');
   const prefix = plusCode.slice(0, pi).replace(/0/g,'');
 
-  // ── Código COMPLETO (8 chars antes del +) ─────────────────────
+  // ── Código COMPLETO (8+ chars antes del +) ────────────────────
   if (prefix.length >= 8) {
     const digits = prefix + plusCode.slice(pi+1).replace(/0/g,'');
     const coords = olcDecodeCompleto(digits);
-    return { lat: coords.lat, lng: coords.lng, nombre };
+    // Reverse geocode para obtener nombre de calle
+    const rev = await nominatimReverse(coords.lat, coords.lng);
+    return { lat: coords.lat, lng: coords.lng, nombre: rev || nombre };
   }
 
-  // ── Código CORTO — necesita referencia de ciudad ───────────────
+  // ── Código CORTO — buscar referencia de ciudad en Nominatim ───
   try {
-    const refUrl = 'https://nominatim.openstreetmap.org/search?' +
-      'q=' + encodeURIComponent(ciudad) + '&format=json&limit=1&accept-language=es';
-    const res  = await fetch(refUrl, { headers: {'User-Agent':'SEISA-App/1.0'} });
-    const data = await res.json();
-    if (!data.length) return null;
-    const refLat = parseFloat(data[0].lat);
-    const refLng = parseFloat(data[0].lon);
+    // Buscar con tipo=municipality para mayor precisión
+    const queries = [
+      'city=' + encodeURIComponent(ciudad.split(',')[0].trim()) +
+        '&state=' + encodeURIComponent(ciudad.split(',')[1]?.trim() || '') +
+        '&country=Mexico',
+      'q=' + encodeURIComponent(ciudad),
+    ];
+
+    let refLat = null, refLng = null;
+    for (const q of queries) {
+      const url = 'https://nominatim.openstreetmap.org/search?' +
+        q + '&format=json&limit=3&accept-language=es&addressdetails=1';
+      const res  = await fetch(url, { headers: {'User-Agent':'SEISA-App/1.0'} });
+      const data = await res.json();
+      if (!data.length) continue;
+
+      // Preferir resultado de tipo municipality/city sobre state/country
+      const best = data.find(d =>
+        ['city','town','municipality','village','suburb'].includes(d.type) ||
+        ['city','town','municipality','village'].includes(d.addresstype)
+      ) || data[0];
+
+      refLat = parseFloat(best.lat);
+      refLng = parseFloat(best.lon);
+      break;
+    }
+
+    if (refLat === null) return null;
+
     const coords = olcRecoverShort(plusCode, refLat, refLng);
     if (!coords) return null;
-    return { lat: coords.lat, lng: coords.lng, nombre };
+
+    // Reverse geocode para obtener nombre de calle real
+    const nombreCalle = await nominatimReverse(coords.lat, coords.lng);
+    return { lat: coords.lat, lng: coords.lng, nombre: nombre || nombreCalle || plusCode };
+
   } catch(e) {
     console.warn('resolverPlusCode:', e);
     return null;
   }
 }
 
-
-async function reverseGeocode(lat, lng, fallbackNombre) {
+// Reverse geocode con Nominatim → nombre de calle
+async function nominatimReverse(lat, lng) {
   try {
-    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=es`;
+    const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=es&zoom=18`;
     const r = await fetch(url, { headers: { 'User-Agent': 'SEISA-App/1.0' } });
     const d = await r.json();
     const a = d.address || {};
-    const nombre = [a.road, a.house_number, a.suburb||a.neighbourhood, a.city||a.town]
-      .filter(Boolean).join(', ') || fallbackNombre;
-    return { lat, lng, nombre };
-  } catch(e) { return { lat, lng, nombre: fallbackNombre }; }
+    const calle  = a.road || a.pedestrian || a.path || '';
+    const numero = a.house_number || '';
+    const colonia= a.suburb || a.neighbourhood || a.city_district || '';
+    return [calle, numero].filter(Boolean).join(' ') +
+           (colonia ? ', ' + colonia : '');
+  } catch(e) { return ''; }
+}
+
+
+async function reverseGeocode(lat, lng, fallbackNombre) {
+  const nombre = await nominatimReverse(lat, lng) || fallbackNombre;
+  return { lat, lng, nombre };
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -1297,8 +1357,9 @@ async function resolverPlusCodeUI() {
     const coloniaStr = result.colonia ? ' · ' + result.colonia : '';
     document.getElementById('pc-coords-label').textContent = coordsStr + coloniaStr;
     // Pre-llenar nombre: calle de Google o nombre del Plus Code
+    // Nombre: primero lo que viene después del Plus Code, si no la calle de reverse geocode
     const parsedRaw = parsearLineaPlusCode(raw);
-    const nombreSugerido = result.nombre || parsedRaw?.nombre || '';
+    const nombreSugerido = parsedRaw?.nombre || result.nombre || '';
     document.getElementById('pc-nombre-input').value = nombreSugerido;
     document.getElementById('pc-confirm-box').style.display = 'block';
 
@@ -2406,6 +2467,20 @@ function abrirEditarParada(id) {
   document.getElementById('editar-parada-preview').style.display = 'none';
   const box = document.getElementById('search-results-editar-parada');
   if (box) { box.style.display = 'none'; box.innerHTML = ''; }
+
+  // Mostrar nombre y coords actuales
+  const p = rutaBuild.paradas.find(x => x.id === id);
+  const actualEl = document.getElementById('editar-parada-actual');
+  if (actualEl && p) {
+    actualEl.textContent = '📍 ' + p.nombre + ' · ' + p.lat.toFixed(5) + ', ' + p.lng.toFixed(5);
+  }
+  const nombreEl = document.getElementById('editar-parada-nombre');
+  if (nombreEl && p) nombreEl.value = p.nombre;
+
+  // Limpiar plus code
+  const pcEl = document.getElementById('editar-pluscode-input');
+  if (pcEl) pcEl.value = '';
+
   document.getElementById('modal-editar-parada').classList.remove('hidden');
 }
 
@@ -2416,23 +2491,72 @@ function buscarEdicionParada(q) {
   searchTimers['editar-parada'] = setTimeout(() => geocode(q.trim(), box, (lat, lng, nombre) => {
     editParadaData = { lat, lng, nombre };
     const prev = document.getElementById('editar-parada-preview');
-    if (prev) { prev.textContent = '📍 ' + nombre; prev.style.display = 'block'; }
+    if (prev) { prev.textContent = '✓ ' + nombre; prev.style.display = 'block'; }
+    // Pre-llenar nombre si está vacío
+    const nombreEl = document.getElementById('editar-parada-nombre');
+    if (nombreEl && !nombreEl.value.trim()) nombreEl.value = nombre;
     ocultarBox(box);
   }), 600);
 }
 
+// Plus Code en el modal de editar
+async function resolverPlusCodeEditar() {
+  const raw = document.getElementById('editar-pluscode-input')?.value.trim();
+  if (!raw) return;
+  showToast('🔍 Resolviendo...');
+  let result = null;
+  if (googleMapsReady && gmGeocoder) {
+    const parsed = parsearLineaPlusCode(raw);
+    const query  = parsed ? parsed.plusCode + ' ' + parsed.ciudad : raw;
+    result = await new Promise(resolve => {
+      gmGeocoder.geocode({ address: query, region: 'MX', language: 'es' }, (res, status) => {
+        if (status === 'OK' && res[0]) {
+          const addr   = res[0].address_components || [];
+          const street = addr.find(c => c.types.includes('route'))?.long_name || '';
+          const number = addr.find(c => c.types.includes('street_number'))?.long_name || '';
+          const nombre = [street, number].filter(Boolean).join(' ')
+            || parsearLineaPlusCode(raw)?.nombre
+            || res[0].formatted_address.split(',')[0];
+          resolve({ lat: res[0].geometry.location.lat(), lng: res[0].geometry.location.lng(), nombre });
+        } else resolve(null);
+      });
+    });
+  }
+  if (!result) result = await resolverPlusCode(raw);
+  if (!result) { showToast('⚠️ No se pudo resolver'); return; }
+  editParadaData = { lat: result.lat, lng: result.lng, nombre: result.nombre };
+  const prev = document.getElementById('editar-parada-preview');
+  if (prev) { prev.textContent = '✓ ' + result.lat.toFixed(5) + ', ' + result.lng.toFixed(5); prev.style.display = 'block'; }
+  const nombreEl = document.getElementById('editar-parada-nombre');
+  if (nombreEl && result.nombre) nombreEl.value = result.nombre;
+  showToast('✅ Ubicación encontrada');
+}
+
 function confirmarEditarParada() {
-  if (!editParadaData) { showToast('Busca una dirección primero'); return; }
+  if (!editParadaData) { showToast('Selecciona una nueva ubicación primero'); return; }
   const id = document.getElementById('editar-parada-id').value;
   const p  = rutaBuild.paradas.find(x => x.id === id);
   if (!p) return;
+
+  // Usar nombre personalizado si se escribió, si no el de la búsqueda
+  const nombreCustom = document.getElementById('editar-parada-nombre')?.value.trim();
   p.lat    = editParadaData.lat;
   p.lng    = editParadaData.lng;
-  p.nombre = editParadaData.nombre;
+  p.nombre = nombreCustom || editParadaData.nombre;
+
   actualizarMapaParadas();
   renderParadasList();
   closeModal('modal-editar-parada');
-  showToast('✅ Parada actualizada');
+
+  // Re-optimizar automáticamente si hay más de 1 parada
+  if (rutaBuild.paradas.length > 1) {
+    showToast('✅ Parada actualizada — re-optimizando...');
+    setTimeout(() => {
+      optimizarRuta();
+    }, 400);
+  } else {
+    showToast('✅ Parada actualizada');
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════
