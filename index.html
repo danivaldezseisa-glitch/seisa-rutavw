@@ -365,39 +365,49 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
     <button class="topbar-back" onclick="showScreen('screen-paradas')">←</button>
     <h2>📊 Resumen de Ruta</h2>
   </div>
-  <div class="scroll" style="padding:16px;display:flex;flex-direction:column;gap:12px;">
+
+  <!-- MAPA RUTA COMPLETA -->
+  <div id="res-map" style="height:260px;flex-shrink:0;position:relative;background:var(--surface);">
+    <div id="res-map-loading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text3);z-index:10;background:var(--surface);">
+      🗺️ Trazando ruta...
+    </div>
+  </div>
+
+  <div class="scroll" style="padding:12px 16px;display:flex;flex-direction:column;gap:10px;">
 
     <!-- Métricas -->
-    <div class="card" style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);padding:0;overflow:hidden;">
-      <div style="padding:16px;background:var(--surface);text-align:center;">
-        <div style="font-size:28px;font-weight:800;color:var(--accent);font-family:var(--mono);" id="res-km">—</div>
-        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;margin-top:3px;">Kilómetros</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;">
+      <div class="card" style="padding:10px;text-align:center;">
+        <div style="font-size:20px;font-weight:800;color:var(--accent);font-family:var(--mono);" id="res-km">—</div>
+        <div style="font-size:9px;color:var(--text3);text-transform:uppercase;margin-top:2px;">km</div>
       </div>
-      <div style="padding:16px;background:var(--surface);text-align:center;">
-        <div style="font-size:28px;font-weight:800;color:var(--green);font-family:var(--mono);" id="res-paradas">—</div>
-        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;margin-top:3px;">Paradas</div>
+      <div class="card" style="padding:10px;text-align:center;">
+        <div style="font-size:20px;font-weight:800;color:var(--green);font-family:var(--mono);" id="res-paradas">—</div>
+        <div style="font-size:9px;color:var(--text3);text-transform:uppercase;margin-top:2px;">paradas</div>
       </div>
-      <div style="padding:16px;background:var(--surface);text-align:center;">
-        <div style="font-size:28px;font-weight:800;color:var(--yellow);font-family:var(--mono);" id="res-tiempo">—</div>
-        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;margin-top:3px;">Hrs trabajo aprox</div>
+      <div class="card" style="padding:10px;text-align:center;">
+        <div style="font-size:20px;font-weight:800;color:var(--yellow);font-family:var(--mono);" id="res-tiempo">—</div>
+        <div style="font-size:9px;color:var(--text3);text-transform:uppercase;margin-top:2px;">hrs</div>
       </div>
-      <div style="padding:16px;background:var(--surface);text-align:center;">
-        <div style="font-size:22px;font-weight:800;color:var(--orange);font-family:var(--mono);" id="res-fin">—</div>
-        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;margin-top:3px;">Hora aprox fin</div>
+      <div class="card" style="padding:10px;text-align:center;">
+        <div style="font-size:16px;font-weight:800;color:var(--orange);font-family:var(--mono);" id="res-fin">—</div>
+        <div style="font-size:9px;color:var(--text3);text-transform:uppercase;margin-top:2px;">fin</div>
       </div>
     </div>
 
-    <!-- Orden de paradas -->
+    <!-- Lista paradas -->
     <div class="card" style="padding:0;overflow:hidden;">
-      <div style="padding:12px 14px;border-bottom:1px solid var(--border);font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;">Orden optimizado</div>
+      <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;display:flex;justify-content:space-between;">
+        <span>Orden optimizado</span>
+        <span id="res-km-real" style="color:var(--accent);"></span>
+      </div>
       <div id="res-orden-list"></div>
     </div>
 
-    <!-- Botón iniciar -->
-    <button class="btn btn-green" onclick="iniciarRuta()" style="font-size:18px;padding:20px;">
+    <!-- Botones -->
+    <button class="btn btn-green" onclick="iniciarRuta()" style="font-size:17px;padding:18px;">
       🚀 Iniciar Ruta
     </button>
-
     <button class="btn btn-ghost" onclick="showScreen('screen-paradas')">
       ← Editar paradas
     </button>
@@ -904,6 +914,7 @@ function showScreen(id) {
   if (target) {
     target.classList.remove('hidden');
     if (id === 'screen-paradas') initMapaParadas();
+    if (id === 'screen-resumen' && resMap) { resMap = null; resDirectionsRenderer = null; }
     if (id === 'screen-nav')     initMapaNav();
     if (id === 'screen-crear')   { cargarBase(); renderBaseUI(); }
   }
@@ -1648,25 +1659,176 @@ function distHaversine(lat1, lng1, lat2, lng2) {
 }
 
 function renderResumen() {
+  // Métricas estimadas (se actualizan con datos reales de Google)
   document.getElementById('res-km').textContent      = rutaBuild.kmTotal + ' km';
   document.getElementById('res-paradas').textContent = rutaBuild.paradas.length;
   document.getElementById('res-tiempo').textContent  = rutaBuild.tiempoHrs + ' hrs';
   document.getElementById('res-fin').textContent     = rutaBuild.horaFin;
 
-  document.getElementById('res-orden-list').innerHTML = rutaBuild.paradas.map((p, i) => `
-    <div class="parada-item">
-      <div class="parada-num" style="background:rgba(0,212,255,.12);color:var(--accent);border:1px solid rgba(0,212,255,.25);">${i+1}</div>
-      <div class="parada-info">
-        <div class="parada-name">${p.nombre}</div>
-      </div>
-    </div>`).join('');
+  // Lista de paradas
+  const lista = document.getElementById('res-orden-list');
+  lista.innerHTML = '';
+
+  // Inicio
+  if (rutaBuild.inicio) {
+    const d = document.createElement('div');
+    d.className = 'parada-item';
+    d.style.cssText = 'background:rgba(0,230,118,.05);border-left:3px solid var(--green);';
+    d.innerHTML = '<div class="parada-num" style="background:rgba(0,230,118,.15);color:var(--green);border:1px solid rgba(0,230,118,.3);">🏠</div><div class="parada-info"><div class="parada-name"></div><div class="parada-sub">Inicio</div></div>';
+    d.querySelector('.parada-name').textContent = rutaBuild.inicio.nombre;
+    lista.appendChild(d);
+  }
+
+  // Paradas
+  rutaBuild.paradas.forEach((p, i) => {
+    const d = document.createElement('div');
+    d.className = 'parada-item';
+    d.innerHTML = `<div class="parada-num" style="background:rgba(0,212,255,.12);color:var(--accent);border:1px solid rgba(0,212,255,.25);">${i+1}</div><div class="parada-info"><div class="parada-name"></div></div>`;
+    d.querySelector('.parada-name').textContent = p.nombre;
+    lista.appendChild(d);
+  });
+
+  // Final/Base
+  const base = rutaBuild.final || loadBase().final;
+  if (base) {
+    const d = document.createElement('div');
+    d.className = 'parada-item';
+    d.style.cssText = 'background:rgba(255,145,0,.05);border-left:3px solid var(--orange);';
+    d.innerHTML = '<div class="parada-num" style="background:rgba(255,145,0,.15);color:var(--orange);border:1px solid rgba(255,145,0,.3);">🏁</div><div class="parada-info"><div class="parada-name"></div><div class="parada-sub">Regreso a base</div></div>';
+    d.querySelector('.parada-name').textContent = base.nombre;
+    lista.appendChild(d);
+  }
+
+  // Trazar ruta en el mapa
+  setTimeout(() => trazarRutaResumen(), 300);
+}
+
+let resMap = null;
+let resDirectionsRenderer = null;
+
+async function trazarRutaResumen() {
+  const loadingEl = document.getElementById('res-map-loading');
+
+  // Construir waypoints: inicio → paradas → final
+  const todos = [
+    rutaBuild.inicio,
+    ...rutaBuild.paradas,
+    rutaBuild.final || loadBase().final
+  ].filter(p => p?.lat);
+
+  if (todos.length < 2) {
+    if (loadingEl) loadingEl.style.display = 'none';
+    return;
+  }
+
+  // ── Inicializar mapa del resumen ─────────────────────────────────
+  if (!resMap) {
+    const centro = todos[0];
+    resMap = new google.maps.Map(document.getElementById('res-map'), {
+      center: { lat: centro.lat, lng: centro.lng },
+      zoom: 11,
+      disableDefaultUI: true,
+      gestureHandling: 'none', // solo vista, no interactivo
+      styles: [
+        { elementType: 'geometry', stylers: [{ color: '#1a2744' }] },
+        { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#2d4a70' }] },
+        { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#1e6091' }] },
+        { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0a1628' }] },
+        { featureType: 'poi', stylers: [{ visibility: 'off' }] },
+        { elementType: 'labels.text.fill', stylers: [{ color: '#7a9fc0' }] },
+        { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
+      ]
+    });
+    resDirectionsRenderer = new google.maps.DirectionsRenderer({
+      map: resMap,
+      suppressMarkers: true,
+      polylineOptions: { strokeColor: '#00d4ff', strokeWeight: 5, strokeOpacity: 0.9 },
+    });
+  }
+
+  // Agregar marcadores numerados
+  todos.forEach((p, i) => {
+    const esInicio = i === 0;
+    const esFinal  = i === todos.length - 1;
+    const label = esInicio ? '🏠' : esFinal ? '🏁' : String(i);
+    const color  = esInicio ? '#00e676' : esFinal ? '#ff9100' : '#00d4ff';
+    new google.maps.Marker({
+      position: { lat: p.lat, lng: p.lng },
+      map: resMap,
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: esInicio || esFinal ? 10 : 8,
+        fillColor: color, fillOpacity: 1,
+        strokeColor: '#fff', strokeWeight: 2,
+      },
+      label: { text: esInicio ? '1' : esFinal ? String(todos.length) : String(i+1), color: '#000', fontSize: '10px', fontWeight: '800' },
+      zIndex: esFinal || esInicio ? 10 : 5,
+    });
+  });
+
+  // ── Google Directions API: ruta calle por calle ───────────────────
+  // Google permite máx 25 waypoints por request
+  const origen  = todos[0];
+  const destino = todos[todos.length - 1];
+  const waypts  = todos.slice(1, -1).map(p => ({
+    location: new google.maps.LatLng(p.lat, p.lng),
+    stopover: true,
+  }));
+
+  const svc = new google.maps.DirectionsService();
+  svc.route({
+    origin:      new google.maps.LatLng(origen.lat, origen.lng),
+    destination: new google.maps.LatLng(destino.lat, destino.lng),
+    waypoints:   waypts,
+    optimizeWaypoints: false, // ya optimizamos nosotros
+    travelMode:  google.maps.TravelMode.DRIVING,
+    avoidTolls:  !!rutaBuild.peajes,
+    region: 'MX',
+  }, (result, status) => {
+    if (loadingEl) loadingEl.style.display = 'none';
+    if (status !== 'OK') {
+      console.warn('Directions resumen:', status);
+      // Fallback: ajustar bounds al menos
+      const bounds = new google.maps.LatLngBounds();
+      todos.forEach(p => bounds.extend({ lat: p.lat, lng: p.lng }));
+      resMap.fitBounds(bounds, 20);
+      return;
+    }
+    resDirectionsRenderer.setDirections(result);
+
+    // Calcular km y tiempo reales de Google
+    let kmReal = 0, minReal = 0;
+    result.routes[0].legs.forEach(leg => {
+      kmReal  += leg.distance.value / 1000;
+      minReal += leg.duration.value / 60;
+    });
+    kmReal  = Math.round(kmReal * 10) / 10;
+    minReal = Math.round(minReal);
+    const hrsReal = Math.round(minReal / 6) / 10;
+
+    // Actualizar métricas con datos reales
+    document.getElementById('res-km').textContent     = kmReal + ' km';
+    document.getElementById('res-tiempo').textContent = hrsReal + ' hrs';
+    const kmRealEl = document.getElementById('res-km-real');
+    if (kmRealEl) kmRealEl.textContent = kmReal + ' km reales';
+
+    // Actualizar hora fin real
+    const finReal = new Date(Date.now() + minReal * 60000);
+    const hh = finReal.getHours() % 12 || 12;
+    const mm = String(finReal.getMinutes()).padStart(2, '0');
+    document.getElementById('res-fin').textContent = `${hh}:${mm} ${finReal.getHours() >= 12 ? 'PM' : 'AM'}`;
+
+    // Guardar en rutaBuild para navegación
+    rutaBuild.kmTotal   = kmReal;
+    rutaBuild.tiempoMin = minReal;
+  });
 }
 
 // ══════════════════════════════════════════════════════════════════
 //  INICIAR RUTA
 // ══════════════════════════════════════════════════════════════════
 function iniciarRuta() {
-  state.rutaActual = { ...rutaBuild };
+  state.rutaActual = { ...rutaBuild, final: rutaBuild.final || loadBase().final };
   state.paradaActual = 0;
   saveState();
   showScreen('screen-nav');
@@ -2328,11 +2490,22 @@ function avanzarYAbrir(idx, ruta, msg) {
     trazarRutaCompleta();
     setTimeout(() => recalcularRuta(), 400);
   } else {
+    // ── Todas las paradas completadas → navegar a la BASE ────────────
     actualizarNavPanel();
     renderListaNav();
-    hablar('¡Felicidades! Ruta completada.');
-    showToast('🎉 ¡Ruta completada!');
-    setTimeout(() => finalizarRuta(), 2500);
+    hablar('¡Ruta completada! Regresando a la base.');
+    showToast('🎉 ¡Ruta completada! Iniciando regreso a base...');
+
+    // Navegar a la base si existe
+    const base = ruta.final || rutaBuild.final || loadBase().final;
+    if (base?.lat) {
+      setTimeout(() => {
+        // Trazar ruta de regreso a la base
+        recalcularRutaABase(base);
+      }, 1000);
+    } else {
+      setTimeout(() => finalizarRuta(), 2500);
+    }
   }
 }
 
@@ -2354,6 +2527,79 @@ function deshacerAccion() {
     }
   }
   showToast('Nada que deshacer');
+}
+
+async function recalcularRutaABase(base) {
+  // Mostrar marcador de base en el mapa
+  if (gmap && googleMapsReady) {
+    if (window._gmBaseMarker) window._gmBaseMarker.setMap(null);
+    window._gmBaseMarker = new google.maps.Marker({
+      position: { lat: base.lat, lng: base.lng },
+      map: gmap,
+      icon: {
+        path: google.maps.SymbolPath.CIRCLE,
+        scale: 14,
+        fillColor: '#ff9100',
+        fillOpacity: 1,
+        strokeColor: '#fff',
+        strokeWeight: 2,
+      },
+      title: '🏁 Base: ' + (base.nombre || ''),
+      zIndex: 999,
+    });
+    // Label en panel
+    document.getElementById('nav-calle').textContent = '🏁 Regreso a base';
+    document.getElementById('nav-sub').textContent   = base.nombre || 'Punto de retorno';
+    document.getElementById('nav-destino-nombre').textContent = base.nombre || 'Base';
+  }
+
+  // Calcular ruta a la base
+  let lat = null, lng = null;
+  if (gmap && gmNavMarker) {
+    lat = gmNavMarker.getPosition().lat();
+    lng = gmNavMarker.getPosition().lng();
+  } else if (navGPSMarker) {
+    lat = navGPSMarker.getLatLng().lat;
+    lng = navGPSMarker.getLatLng().lng;
+  }
+
+  if (lat !== null) {
+    // Ruta a la base usando OSRM o Google
+    try {
+      const url = `https://router.project-osrm.org/route/v1/driving/${lng},${lat};${base.lng},${base.lat}?overview=full&geometries=geojson&steps=true`;
+      const r = await fetch(url);
+      const d = await r.json();
+      if (d.routes?.[0]) {
+        const km  = (d.routes[0].distance / 1000).toFixed(1);
+        const min = Math.round(d.routes[0].duration / 60);
+        showToast(`🏁 Regreso: ${km} km · ~${min} min`);
+        hablar(`Regresando a la base. ${km} kilómetros.`);
+        // Dibujar ruta al mapa Leaflet si no hay Google
+        if (mapNav && !gmap) {
+          if (navRouteLayer) navRouteLayer.remove();
+          const coords = d.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+          navRouteLayer = L.polyline(coords, { color: '#ff9100', weight: 5, opacity: .85 }).addTo(mapNav);
+          mapNav.fitBounds(navRouteLayer.getBounds(), { padding: [60, 60] });
+        }
+      }
+    } catch(e) { console.warn('Ruta a base:', e); }
+  }
+
+  // Mostrar botón para finalizar
+  mostrarBotonFinalizarRuta(base);
+}
+
+function mostrarBotonFinalizarRuta(base) {
+  // Agregar botón temporal en el panel para confirmar llegada a base
+  const panel = document.getElementById('nav-panel-inner');
+  if (!panel) { finalizarRuta(); return; }
+
+  // Cambiar el área de botones por "llegué a la base"
+  const tmpBtn = document.createElement('button');
+  tmpBtn.style.cssText = 'padding:14px;border-radius:13px;border:2px solid rgba(255,145,0,.6);background:rgba(255,145,0,.15);color:var(--orange);font-size:15px;font-weight:800;cursor:pointer;width:100%;font-family:var(--sans);';
+  tmpBtn.textContent = '🏁 Llegué a la base — Finalizar ruta';
+  tmpBtn.onclick = () => finalizarRuta();
+  panel.appendChild(tmpBtn);
 }
 
 function finalizarRuta() {
