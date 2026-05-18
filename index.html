@@ -274,37 +274,60 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
   <!-- MAPA -->
   <div id="paradas-map" style="height:260px;flex-shrink:0;"></div>
 
-  <!-- BUSCADOR -->
-  <div style="padding:10px 12px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;position:relative;">
-    <div class="search-wrap">
-      <input class="input" id="paradas-search" placeholder="🔍 Buscar dirección, Plus Code o toca el mapa..." oninput="buscarParada(this.value)" style="padding-right:40px;">
-      <div id="search-results-parada" class="search-results-box" style="position:absolute;left:0;right:0;z-index:500;"></div>
-    </div>
-    <!-- PASO 1: Plus Code -->
-    <div style="display:flex;gap:8px;margin-top:8px;">
+  <!-- PLUS CODE -->
+  <div style="padding:10px 12px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;">
+    <!-- Input Plus Code + botones -->
+    <div style="display:flex;gap:8px;">
       <input class="input" id="paradas-pluscode"
         placeholder="Plus Code · ej: GP7F+JX5 Naucalpan de Juárez, Estado de México"
-        style="flex:1;font-size:13px;font-family:var(--mono);">
-      <button onclick="resolverPlusCodeUI()" style="width:auto;padding:8px 14px;flex-shrink:0;border-radius:10px;border:1.5px solid var(--accent);background:rgba(0,212,255,.12);color:var(--accent);font-size:13px;font-weight:700;cursor:pointer;">Buscar</button>
-      <button onclick="mostrarPegadoMasivo()" style="width:auto;padding:8px 10px;flex-shrink:0;border-radius:10px;border:1.5px solid rgba(255,145,0,.4);background:rgba(255,145,0,.1);color:var(--orange);font-size:12px;font-weight:700;cursor:pointer;">📋</button>
+        style="flex:1;font-size:13px;font-family:var(--mono);"
+        onkeydown="if(event.key==='Enter')resolverPlusCodeUI()">
+      <button onclick="resolverPlusCodeUI()"
+        style="padding:10px 16px;border-radius:10px;border:1.5px solid var(--accent);background:rgba(0,212,255,.15);color:var(--accent);font-size:14px;font-weight:800;cursor:pointer;flex-shrink:0;">
+        Buscar
+      </button>
+      <button onclick="mostrarPegadoMasivo()"
+        style="padding:10px 12px;border-radius:10px;border:1.5px solid rgba(255,145,0,.4);background:rgba(255,145,0,.1);color:var(--orange);font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;">
+        📋
+      </button>
     </div>
-    <!-- PASO 2 y 3: confirmar nombre y agregar -->
-    <div id="pc-confirm-box" style="display:none;margin-top:8px;background:var(--surface);border:1.5px solid var(--accent);border-radius:12px;padding:12px 14px;">
-      <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;">📍 Ubicación encontrada</div>
-      <div id="pc-coords-label" style="font-size:12px;color:var(--text3);font-family:var(--mono);margin-bottom:10px;"></div>
-      <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">Nombre / Calle y número</div>
-      <input class="input" id="pc-nombre-input" placeholder="Ej: José Ma. Morelos 6" style="font-size:14px;margin-bottom:10px;">
-      <button onclick="confirmarAgregarPlusCode()" class="btn btn-green" style="padding:11px;">＋ Agregar parada</button>
+
+    <!-- Estado: cargando -->
+    <div id="pc-loading" style="display:none;margin-top:8px;font-size:12px;color:var(--text3);text-align:center;padding:6px;">
+      🔍 Resolviendo Plus Code...
     </div>
-    <div id="pc-loading" style="display:none;margin-top:8px;font-size:12px;color:var(--text3);text-align:center;padding:8px;">🔍 Resolviendo Plus Code...</div>
-    <div id="pc-error" style="display:none;margin-top:8px;font-size:12px;color:var(--red);text-align:center;padding:8px;"></div>
+
+    <!-- Estado: error -->
+    <div id="pc-error" style="display:none;margin-top:8px;font-size:12px;color:var(--red);padding:8px;background:rgba(255,82,82,.08);border-radius:8px;border:1px solid rgba(255,82,82,.25);"></div>
+
+    <!-- Estado: ubicación encontrada → nombre + número -->
+    <div id="pc-confirm-box" style="display:none;margin-top:10px;background:var(--surface);border:1.5px solid var(--accent);border-radius:12px;padding:12px 14px;">
+      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
+        <div style="font-size:18px;">📍</div>
+        <div>
+          <div id="pc-calle-label" style="font-size:13px;font-weight:700;color:var(--text);"></div>
+          <div id="pc-coords-label" style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:1px;"></div>
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">Nombre completo de la parada</div>
+      <div style="display:flex;gap:8px;">
+        <input class="input" id="pc-nombre-input"
+          placeholder="Ej: José Ma. Morelos 6"
+          style="flex:1;font-size:14px;"
+          onkeydown="if(event.key==='Enter')confirmarAgregarPlusCode()">
+        <button onclick="confirmarAgregarPlusCode()"
+          style="padding:10px 16px;border-radius:10px;border:none;background:var(--green);color:#000;font-size:14px;font-weight:800;cursor:pointer;flex-shrink:0;white-space:nowrap;">
+          ＋ Agregar
+        </button>
+      </div>
+    </div>
   </div>
 
   <!-- LISTA PARADAS -->
   <div class="scroll" id="paradas-list-wrap" style="flex:1;">
     <div id="paradas-list"></div>
     <div id="paradas-empty" style="padding:24px;text-align:center;color:var(--text3);font-size:13px;">
-      Toca el mapa o busca una dirección para agregar paradas
+      Pega un Plus Code arriba o toca el mapa para agregar paradas
     </div>
   </div>
 
@@ -936,7 +959,6 @@ function buscarParada(q) {
   if (!q || q.trim().length < 3) { ocultarBox(box); return; }
   searchTimers['parada'] = setTimeout(() => geocode(q.trim(), box, (lat, lng, nombre) => {
     agregarParada(lat, lng, nombre);
-    document.getElementById('paradas-search').value = '';
     ocultarBox(box);
   }), 600);
 }
@@ -1340,78 +1362,76 @@ let _pcCoordsTemp = null;
 
 async function resolverPlusCodeUI() {
   const raw = document.getElementById('paradas-pluscode').value.trim();
-  if (!raw) { showToast('Pega un Plus Code primero'); return; }
+  if (!raw) { showToast('Pega un Plus Code'); return; }
 
+  // Resetear UI
   document.getElementById('pc-confirm-box').style.display = 'none';
   document.getElementById('pc-error').style.display       = 'none';
   document.getElementById('pc-loading').style.display     = 'block';
   _pcCoordsTemp = null;
 
   try {
-    let result = null;
+    // Parsear la línea: extraer plusCode + ciudad + nombre de calle
+    const parsed = parsearLineaPlusCode(raw);
+    if (!parsed) throw new Error('Formato inválido');
+    const { plusCode, ciudad, nombre } = parsed;
 
-    // ── Google Geocoding: resolver Plus Code ─────────────────────────
-    if (googleMapsReady && gmGeocoder) {
-      const parsed = parsearLineaPlusCode(raw);
-      // Google entiende Plus Codes directamente: 'GP7F+JX5 Naucalpan de Juárez'
-      const query = parsed
-        ? parsed.plusCode + ' ' + parsed.ciudad
-        : raw;
-      result = await new Promise(resolve => {
-        gmGeocoder.geocode(
-          { address: query, region: 'MX', language: 'es' },
-          async (res, status) => {
-            if (status !== 'OK' || !res[0]) {
-              console.warn('Google Geocoding:', status, query);
-              resolve(null); return;
-            }
-            const addr   = res[0].address_components || [];
-            const street = addr.find(c => c.types.includes('route'))?.long_name || '';
-            const num    = addr.find(c => c.types.includes('street_number'))?.long_name || '';
-            const lat    = res[0].geometry.location.lat();
-            const lng    = res[0].geometry.location.lng();
-            // Nombre: lo que escribió el usuario > calle Google > formatted_address
-            const nombreFinal = (parsed?.nombre && parsed.nombre !== parsed.plusCode)
-              ? parsed.nombre
-              : ([street, num].filter(Boolean).join(' ') || res[0].formatted_address.split(',')[0]);
-            resolve({ lat, lng, nombre: nombreFinal });
-          }
-        );
-      });
-    }
+    // Query: "GP7F+JX5 Naucalpan de Juárez, Estado de México"
+    const query = plusCode + (ciudad ? ' ' + ciudad : '');
 
-    // ── Fallback: OLC + Nominatim ─────────────────────────────────────
-    if (!result) {
-      result = await resolverPlusCode(raw);
+    // ── Google Geocoding REST API ─────────────────────────────────────
+    const url = 'https://maps.googleapis.com/maps/api/geocode/json' +
+      '?address=' + encodeURIComponent(query) +
+      '&region=MX&language=es&key=AIzaSyAGsOfVDl73CXEVPSb1UUXbreVJC-GmBcY';
+
+    const resp = await fetch(url);
+    const data = await resp.json();
+
+    console.log('[PlusCode] Query:', query);
+    console.log('[PlusCode] Status:', data.status);
+    if (data.results?.[0]) console.log('[PlusCode] Result:', data.results[0].formatted_address, data.results[0].geometry.location);
+
+    let lat, lng, calleGoogle = '';
+
+    if (data.status === 'OK' && data.results[0]) {
+      lat = data.results[0].geometry.location.lat;
+      lng = data.results[0].geometry.location.lng;
+      const addr = data.results[0].address_components || [];
+      const street = addr.find(c => c.types.includes('route'))?.long_name || '';
+      const num    = addr.find(c => c.types.includes('street_number'))?.long_name || '';
+      calleGoogle  = [street, num].filter(Boolean).join(' ');
+    } else {
+      // Fallback OLC + Nominatim
+      console.warn('[PlusCode] Google falló, usando OLC+Nominatim');
+      const r = await resolverPlusCode(raw);
+      if (!r) throw new Error('No se pudo resolver el Plus Code. Verifica que sea correcto.');
+      lat = r.lat; lng = r.lng; calleGoogle = r.nombre || '';
     }
 
     document.getElementById('pc-loading').style.display = 'none';
+    _pcCoordsTemp = { lat, lng };
 
-    if (!result) {
-      document.getElementById('pc-error').textContent = '⚠️ No se encontró la ubicación. Verifica el Plus Code.';
-      document.getElementById('pc-error').style.display = 'block';
-      return;
-    }
+    // Mostrar calle encontrada por Google
+    const calleEl = document.getElementById('pc-calle-label');
+    if (calleEl) calleEl.textContent = calleGoogle || '(calle no identificada)';
+    document.getElementById('pc-coords-label').textContent = lat.toFixed(6) + ', ' + lng.toFixed(6);
 
-    _pcCoordsTemp = { lat: result.lat, lng: result.lng };
-    const coordsStr = result.lat.toFixed(6) + ', ' + result.lng.toFixed(6);
-    const coloniaStr = result.colonia ? ' · ' + result.colonia : '';
-    document.getElementById('pc-coords-label').textContent = coordsStr + coloniaStr;
-    // Pre-llenar nombre: calle de Google o nombre del Plus Code
-    // Nombre: primero lo que viene después del Plus Code, si no la calle de reverse geocode
-    const parsedRaw = parsearLineaPlusCode(raw);
-    const nombreSugerido = parsedRaw?.nombre || result.nombre || '';
+    // Pre-llenar nombre: si el usuario puso texto extra (nombre de calle) úsalo, si no la calle de Google
+    const nombreSugerido = (nombre && nombre !== plusCode) ? nombre : calleGoogle;
     document.getElementById('pc-nombre-input').value = nombreSugerido;
     document.getElementById('pc-confirm-box').style.display = 'block';
 
-    // Mostrar en mapa
-    if (mapParadas) mapParadas.setView([result.lat, result.lng], 16);
-    setTimeout(() => document.getElementById('pc-nombre-input')?.focus(), 150);
+    // Centrar mapa en la ubicación
+    if (mapParadas) mapParadas.setView([lat, lng], 17);
+
+    // Foco en el campo de nombre para que el usuario complete si falta
+    setTimeout(() => document.getElementById('pc-nombre-input')?.focus(), 200);
 
   } catch(e) {
     document.getElementById('pc-loading').style.display = 'none';
-    document.getElementById('pc-error').textContent = '⚠️ Error: ' + e.message;
+    document.getElementById('pc-error').textContent = '⚠️ ' + e.message;
     document.getElementById('pc-error').style.display = 'block';
+    console.error('[PlusCode] Error:', e);
   }
 }
 
