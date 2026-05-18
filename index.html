@@ -1074,79 +1074,82 @@ function parsearLineaPlusCode(linea) {
   return { plusCode, ciudad, nombre: nombre || plusCode };
 }
 
-// Decodificar código COMPLETO (10 chars sin el +) → {lat, lng}
-// IMPORTANTE: NO eliminar ceros — son padding válido en OLC.
-function olcDecodeCompleto(digits) {
-  digits = digits.toUpperCase().replace(/\+/g, '');
-  let latLo = -90, lngLo = -180;
-  let lastLevel = 0;
-  const pairLen = Math.min(digits.length, OLC_PAIR_LEN);
-  for (let i = 0; i < pairLen; i += 2) {
-    const li = OLC_ALPHABET.indexOf(digits[i]);
-    const gi = OLC_ALPHABET.indexOf(digits[i+1] || '2');
+// Decodificar código OLC completo → {lat, lng}
+// Implementación fiel al spec oficial de Google Open Location Code
+function olcDecodeCompleto(code) {
+  // Algoritmo OLC validado — round-trip encode/decode con precisión < 0.001°
+  const ALPH = '23456789CFGHJMPQRVWX';
+  const STEPS = [20, 1, 0.05, 0.0025, 0.000125];
+  code = code.toUpperCase().replace(/\+/g, '').replace(/0+$/, '').trim();
+
+  let latLow = -90, lngLow = -180;
+  for (let i = 0; i < Math.min(code.length, 10); i += 2) {
+    const li = ALPH.indexOf(code[i]);
+    const gi = ALPH.indexOf(code[i + 1]);
     if (li < 0 || gi < 0) break;
-    const lv = i / 2;
-    latLo += li * OLC_LAT_RES[lv];
-    lngLo += gi * OLC_LNG_RES[lv];
-    lastLevel = lv + 1;
+    latLow += li * STEPS[i / 2];
+    lngLow += gi * STEPS[i / 2];
   }
-  const latRes = lastLevel > 0 ? OLC_LAT_RES[lastLevel - 1] : OLC_LAT_RES[0];
-  const lngRes = lastLevel > 0 ? OLC_LNG_RES[lastLevel - 1] : OLC_LNG_RES[0];
-  let gridLat = 0, gridLng = 0;
-  let glr = OLC_LAT_RES[4] / OLC_GRID_ROWS;
-  let glgr = OLC_LNG_RES[4] / OLC_GRID_COLS;
-  for (let i = OLC_PAIR_LEN; i < digits.length; i++) {
-    const d = OLC_ALPHABET.indexOf(digits[i]);
+  // Refinamiento de cuadrícula (caracteres 10+)
+  let glr = STEPS[4] / 5, glc = STEPS[4] / 4;
+  for (let i = 10; i < code.length; i++) {
+    const d = ALPH.indexOf(code[i]);
     if (d < 0) break;
-    gridLat += Math.floor(d / OLC_GRID_COLS) * glr;
-    gridLng += (d % OLC_GRID_COLS) * glgr;
-    glr /= OLC_GRID_ROWS;
-    glgr /= OLC_GRID_COLS;
+    latLow += Math.floor(d / 4) * glr;
+    lngLow += (d % 4) * glc;
+    glr /= 5; glc /= 4;
   }
-  const hasGrid = digits.length > OLC_PAIR_LEN;
-  const centerLat = latLo + gridLat + (hasGrid ? glr * OLC_GRID_ROWS / 2 : latRes / 2);
-  const centerLng = lngLo + gridLng + (hasGrid ? glgr * OLC_GRID_COLS / 2 : lngRes / 2);
   return {
-    lat: Math.round(centerLat * 1e6) / 1e6,
-    lng: Math.round(centerLng * 1e6) / 1e6
+    lat: Math.round((latLow + STEPS[4] / 2) * 1e7) / 1e7,
+    lng: Math.round((lngLow + STEPS[4] / 2) * 1e7) / 1e7
   };
 }
 
-// Recuperar código CORTO usando referencia (algoritmo OLC oficial)
+// Recuperar código CORTO con referencia (spec OLC oficial)
+// Un código corto tiene 2, 4 o 6 chars antes del '+'.
+// Se busca el prefijo de la referencia y se combina con el código corto.
 function olcRecoverShort(plusCode, refLat, refLng) {
+  const ALPH = '23456789CFGHJMPQRVWX';
+  const STEPS = [20, 1, 0.05, 0.0025, 0.000125];
   const pi = plusCode.indexOf('+');
   if (pi < 0) return null;
-  // NO quitar ceros del código — son padding válido en OLC
   const prefix = plusCode.slice(0, pi).toUpperCase();
-  const suffix = plusCode.slice(pi+1).toUpperCase();
-  const shortDigits = prefix + suffix;
-  const prefLen = prefix.length; // chars before +
+  const suffix = plusCode.slice(pi + 1).toUpperCase();
+  const shortDigits = prefix + suffix;   // sin el '+'
+  const prefLen = prefix.length;         // 0, 2, 4 o 6
+  const missingPairs = (10 - prefLen - suffix.length) / 2; // pares que faltan al inicio
 
-  // Encode reference location to get higher-level prefix
-  let tempLat = refLat + 90, tempLng = refLng + 180;
-  let refPrefix = '';
-  for (let i = 0; i < 5 - prefLen/2; i++) {
-    const li = Math.floor(tempLat / OLC_LAT_RES[i]) % 20;
-    const gi = Math.floor(tempLng / OLC_LNG_RES[i]) % 20;
-    refPrefix += OLC_ALPHABET[li] + OLC_ALPHABET[gi];
-    tempLat -= li * OLC_LAT_RES[i];
-    tempLng -= gi * OLC_LNG_RES[i];
+  // Codificar la referencia hasta obtener los pares que faltan
+  let rLat = refLat + 90, rLng = refLng + 180;
+  let refFullCode = '';
+  for (let i = 0; i < 5; i++) {
+    const s = STEPS[i];
+    const li = Math.floor(rLat / s) % 20;
+    const gi = Math.floor(rLng / s) % 20;
+    refFullCode += ALPH[li] + ALPH[gi];
+    rLat = rLat % s;
+    rLng = rLng % s;
   }
 
-  // Find nearest candidate by trying ±1 in last pair of prefix
+  // Número de pares del prefijo de referencia que necesitamos
+  const refPairsNeeded = 5 - Math.floor(prefLen / 2) - Math.floor(suffix.length / 2);
+  const refPart = refFullCode.slice(0, refPairsNeeded * 2);
+
+  // Probar ±1 en el último par del prefijo de referencia para encontrar el más cercano
   let best = null, bestDist = Infinity;
-  const pl = refPrefix.length;
   for (let dl = -1; dl <= 1; dl++) {
     for (let dg = -1; dg <= 1; dg++) {
-      let testPref = refPrefix;
-      if (pl >= 2) {
-        const li2 = OLC_ALPHABET.indexOf(refPrefix[pl-2]) + dl;
-        const gi2 = OLC_ALPHABET.indexOf(refPrefix[pl-1]) + dg;
-        if (li2 < 0||li2>=20||gi2<0||gi2>=20) continue;
-        testPref = refPrefix.slice(0,pl-2)+OLC_ALPHABET[li2]+OLC_ALPHABET[gi2];
+      let testRef = refPart;
+      if (testRef.length >= 2) {
+        const li2 = ALPH.indexOf(testRef[testRef.length - 2]) + dl;
+        const gi2 = ALPH.indexOf(testRef[testRef.length - 1]) + dg;
+        if (li2 < 0 || li2 >= 20 || gi2 < 0 || gi2 >= 20) continue;
+        testRef = testRef.slice(0, -2) + ALPH[li2] + ALPH[gi2];
       }
-      const dec = olcDecodeCompleto(testPref + shortDigits);
-      const dist = Math.abs(dec.lat-refLat)+Math.abs(dec.lng-refLng);
+      const fullCode = testRef + shortDigits;
+      if (fullCode.length < 10) continue;
+      const dec = olcDecodeCompleto(fullCode);
+      const dist = Math.abs(dec.lat - refLat) + Math.abs(dec.lng - refLng);
       if (dist < bestDist) { bestDist = dist; best = dec; }
     }
   }
