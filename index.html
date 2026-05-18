@@ -1034,6 +1034,8 @@ const OLC_ALPHABET    = '23456789CFGHJMPQRVWX';
 const OLC_PAIR_LEN    = 10;
 const OLC_GRID_COLS   = 4;
 const OLC_GRID_ROWS   = 5;
+// Las resoluciones por nivel son iguales para lat y lng en los pares,
+// pero la longitud tiene un rango de 360° vs 180° de latitud.
 const OLC_LAT_RES     = [20.0, 1.0, 0.05, 0.0025, 0.000125];
 const OLC_LNG_RES     = [20.0, 1.0, 0.05, 0.0025, 0.000125];
 
@@ -1073,28 +1075,40 @@ function parsearLineaPlusCode(linea) {
 }
 
 // Decodificar código COMPLETO (10 chars sin el +) → {lat, lng}
+// IMPORTANTE: NO eliminar ceros — son padding válido en OLC.
 function olcDecodeCompleto(digits) {
-  digits = digits.toUpperCase().replace(/0/g, '');
+  digits = digits.toUpperCase().replace(/\+/g, '');
   let latLo = -90, lngLo = -180;
-  for (let i = 0; i < Math.min(digits.length, OLC_PAIR_LEN); i += 2) {
+  let lastLevel = 0;
+  const pairLen = Math.min(digits.length, OLC_PAIR_LEN);
+  for (let i = 0; i < pairLen; i += 2) {
     const li = OLC_ALPHABET.indexOf(digits[i]);
     const gi = OLC_ALPHABET.indexOf(digits[i+1] || '2');
     if (li < 0 || gi < 0) break;
-    latLo += li * OLC_LAT_RES[i/2];
-    lngLo += gi * OLC_LNG_RES[i/2];
+    const lv = i / 2;
+    latLo += li * OLC_LAT_RES[lv];
+    lngLo += gi * OLC_LNG_RES[lv];
+    lastLevel = lv + 1;
   }
+  const latRes = lastLevel > 0 ? OLC_LAT_RES[lastLevel - 1] : OLC_LAT_RES[0];
+  const lngRes = lastLevel > 0 ? OLC_LNG_RES[lastLevel - 1] : OLC_LNG_RES[0];
   let gridLat = 0, gridLng = 0;
-  let glr = OLC_LAT_RES[4]/OLC_GRID_ROWS, glgr = OLC_LNG_RES[4]/OLC_GRID_COLS;
+  let glr = OLC_LAT_RES[4] / OLC_GRID_ROWS;
+  let glgr = OLC_LNG_RES[4] / OLC_GRID_COLS;
   for (let i = OLC_PAIR_LEN; i < digits.length; i++) {
     const d = OLC_ALPHABET.indexOf(digits[i]);
     if (d < 0) break;
-    gridLat += Math.floor(d/OLC_GRID_COLS)*glr;
-    gridLng += (d%OLC_GRID_COLS)*glgr;
-    glr /= OLC_GRID_ROWS; glgr /= OLC_GRID_COLS;
+    gridLat += Math.floor(d / OLC_GRID_COLS) * glr;
+    gridLng += (d % OLC_GRID_COLS) * glgr;
+    glr /= OLC_GRID_ROWS;
+    glgr /= OLC_GRID_COLS;
   }
+  const hasGrid = digits.length > OLC_PAIR_LEN;
+  const centerLat = latLo + gridLat + (hasGrid ? glr * OLC_GRID_ROWS / 2 : latRes / 2);
+  const centerLng = lngLo + gridLng + (hasGrid ? glgr * OLC_GRID_COLS / 2 : lngRes / 2);
   return {
-    lat: Math.round((latLo + gridLat + OLC_LAT_RES[4]/2)*1e5)/1e5,
-    lng: Math.round((lngLo + gridLng + OLC_LNG_RES[4]/2)*1e5)/1e5
+    lat: Math.round(centerLat * 1e6) / 1e6,
+    lng: Math.round(centerLng * 1e6) / 1e6
   };
 }
 
@@ -1102,8 +1116,9 @@ function olcDecodeCompleto(digits) {
 function olcRecoverShort(plusCode, refLat, refLng) {
   const pi = plusCode.indexOf('+');
   if (pi < 0) return null;
-  const prefix = plusCode.slice(0, pi).toUpperCase().replace(/0/g,'');
-  const suffix = plusCode.slice(pi+1).toUpperCase().replace(/0/g,'');
+  // NO quitar ceros del código — son padding válido en OLC
+  const prefix = plusCode.slice(0, pi).toUpperCase();
+  const suffix = plusCode.slice(pi+1).toUpperCase();
   const shortDigits = prefix + suffix;
   const prefLen = prefix.length; // chars before +
 
@@ -1144,11 +1159,12 @@ async function resolverPlusCode(input) {
   if (!parsed) return null;
   const { plusCode, ciudad, nombre } = parsed;
   const pi = plusCode.indexOf('+');
-  const prefix = plusCode.slice(0, pi).replace(/0/g,'');
+  // Usar la longitud real del prefijo (sin quitar ceros)
+  const prefixLen = pi; // chars antes del '+'
 
   // ── Código COMPLETO (8+ chars antes del +) ────────────────────
-  if (prefix.length >= 8) {
-    const digits = prefix + plusCode.slice(pi+1).replace(/0/g,'');
+  if (prefixLen >= 8) {
+    const digits = plusCode.replace(/\+/g, '');
     const coords = olcDecodeCompleto(digits);
     // Reverse geocode para obtener nombre de calle
     const rev = await nominatimReverse(coords.lat, coords.lng);
@@ -1755,11 +1771,13 @@ async function resolverPlusCodeGoogle(input) {
   if (!parsed) return null;
   const { plusCode, ciudad, nombre } = parsed;
   const pi = plusCode.indexOf('+');
-  const prefix = plusCode.slice(0, pi).replace(/0/g,'');
+  // Longitud del prefijo SIN quitar ceros — los ceros son padding válido
+  const prefixLen = pi; // chars antes del '+'
 
-  // Código completo: decodificar localmente (preciso)
-  if (prefix.length >= 8) {
-    const digits = prefix + plusCode.slice(pi+1).replace(/0/g,'');
+  // Código completo: prefijo de 8 chars (ej. 76C22VF6+GG)
+  if (prefixLen >= 8) {
+    // Quitar solo el '+' para decodificar, NO los ceros
+    const digits = plusCode.replace(/\+/g, '');
     const coords = olcDecodeCompleto(digits);
     return { lat: coords.lat, lng: coords.lng, nombre };
   }
