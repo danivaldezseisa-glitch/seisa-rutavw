@@ -233,27 +233,37 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
     </div>
 
     <div class="card">
-      <div class="label" style="margin-bottom:10px;">📍 Punto de inicio</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div class="label" style="margin:0;">📍 Punto de inicio</div>
+        <div id="cr-inicio-borrar" style="display:none;align-items:center;gap:6px;">
+          <span style="font-size:11px;color:var(--green);font-weight:600;" id="cr-inicio-label"></span>
+          <button onclick="clearBase('inicio')" style="background:none;border:none;color:var(--text3);font-size:16px;cursor:pointer;padding:2px;" title="Cambiar">✕</button>
+        </div>
+      </div>
       <div style="display:flex;gap:8px;">
         <div class="search-wrap" style="flex:1;">
           <input class="input" id="cr-inicio" placeholder="Buscar dirección o Plus Code..." oninput="buscarLugar('inicio',this.value)">
           <div id="search-results-inicio" class="search-results-box"></div>
         </div>
-        <button onclick="usarGPS('inicio')" title="Usar mi ubicación actual" style="width:44px;height:44px;flex-shrink:0;border-radius:10px;border:1.5px solid var(--border);background:var(--surface2);color:var(--accent);font-size:20px;cursor:pointer;">◎</button>
+        <button onclick="usarGPS('inicio')" title="Usar GPS actual" style="width:44px;height:44px;flex-shrink:0;border-radius:10px;border:1.5px solid var(--border);background:var(--surface2);color:var(--accent);font-size:20px;cursor:pointer;">◎</button>
       </div>
-      <div id="cr-inicio-label" style="font-size:11px;color:var(--green);margin-top:6px;display:none;"></div>
     </div>
 
     <div class="card">
-      <div class="label" style="margin-bottom:10px;">🏁 Punto final (base de regreso)</div>
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+        <div class="label" style="margin:0;">🏁 Punto final</div>
+        <div id="cr-final-borrar" style="display:none;align-items:center;gap:6px;">
+          <span style="font-size:11px;color:var(--green);font-weight:600;" id="cr-final-label"></span>
+          <button onclick="clearBase('final')" style="background:none;border:none;color:var(--text3);font-size:16px;cursor:pointer;padding:2px;" title="Cambiar">✕</button>
+        </div>
+      </div>
       <div style="display:flex;gap:8px;">
         <div class="search-wrap" style="flex:1;">
           <input class="input" id="cr-final" placeholder="Buscar dirección o Plus Code..." oninput="buscarLugar('final',this.value)">
           <div id="search-results-final" class="search-results-box"></div>
         </div>
-        <button onclick="usarGPS('final')" title="Usar mi ubicación actual" style="width:44px;height:44px;flex-shrink:0;border-radius:10px;border:1.5px solid var(--border);background:var(--surface2);color:var(--accent);font-size:20px;cursor:pointer;">◎</button>
+        <button onclick="usarGPS('final')" title="Usar GPS actual" style="width:44px;height:44px;flex-shrink:0;border-radius:10px;border:1.5px solid var(--border);background:var(--surface2);color:var(--accent);font-size:20px;cursor:pointer;">◎</button>
       </div>
-      <div id="cr-final-label" style="font-size:11px;color:var(--green);margin-top:6px;display:none;"></div>
     </div>
 
     <button class="btn btn-accent" onclick="irACargarParadas()">
@@ -830,6 +840,51 @@ let rutaBuild = {
   paradas: []  // [{id, nombre, lat, lng, hecha, fallida, horaAccion}]
 };
 
+// ── Persistencia de punto de inicio y final ──────────────────────
+const BASE_KEY = 'seisa_base_v1'; // {inicio:{lat,lng,nombre}, final:{lat,lng,nombre}}
+
+function loadBase() {
+  try { return JSON.parse(localStorage.getItem(BASE_KEY)) || {}; } catch(e) { return {}; }
+}
+function saveBase() {
+  try {
+    localStorage.setItem(BASE_KEY, JSON.stringify({
+      inicio: rutaBuild.inicio,
+      final:  rutaBuild.final,
+    }));
+  } catch(e) {}
+}
+function clearBase(tipo) {
+  if (tipo === 'inicio') rutaBuild.inicio = null;
+  else                   rutaBuild.final  = null;
+  saveBase();
+  renderBaseUI();
+}
+function renderBaseUI() {
+  // Inicio
+  const ini = rutaBuild.inicio;
+  const iniInput = document.getElementById('cr-inicio');
+  const iniLabel = document.getElementById('cr-inicio-label');
+  const iniBorrar = document.getElementById('cr-inicio-borrar');
+  if (iniInput) iniInput.value = ini ? ini.nombre : '';
+  if (iniLabel) {
+    if (ini) { iniLabel.textContent = '✓ ' + ini.nombre; iniLabel.style.display = 'block'; }
+    else      { iniLabel.style.display = 'none'; }
+  }
+  if (iniBorrar) iniBorrar.style.display = ini ? 'flex' : 'none';
+  // Final
+  const fin = rutaBuild.final;
+  const finInput = document.getElementById('cr-final');
+  const finLabel = document.getElementById('cr-final-label');
+  const finBorrar = document.getElementById('cr-final-borrar');
+  if (finInput) finInput.value = fin ? fin.nombre : '';
+  if (finLabel) {
+    if (fin) { finLabel.textContent = '✓ ' + fin.nombre; finLabel.style.display = 'block'; }
+    else      { finLabel.style.display = 'none'; }
+  }
+  if (finBorrar) finBorrar.style.display = fin ? 'flex' : 'none';
+}
+
 // Mapas
 let mapParadas = null;
 let mapNav     = null;
@@ -848,10 +903,16 @@ function showScreen(id) {
   const target = document.getElementById(id);
   if (target) {
     target.classList.remove('hidden');
-    // Inicializar mapas cuando se muestran
     if (id === 'screen-paradas') initMapaParadas();
     if (id === 'screen-nav')     initMapaNav();
+    if (id === 'screen-crear')   { cargarBase(); renderBaseUI(); }
   }
+}
+
+function cargarBase() {
+  const base = loadBase();
+  if (base.inicio) rutaBuild.inicio = base.inicio;
+  if (base.final)  rutaBuild.final  = base.final;
 }
 
 function closeModal(id) {
@@ -948,16 +1009,11 @@ function buscarLugar(tipo, q) {
   const box = document.getElementById('search-results-' + tipo);
   if (!q || q.trim().length < 3) { ocultarBox(box); return; }
   searchTimers[tipo] = setTimeout(() => geocode(q.trim(), box, (lat, lng, nombre) => {
-    if (tipo === 'inicio') {
-      rutaBuild.inicio = { lat, lng, nombre };
-      document.getElementById('cr-inicio-label').textContent = '✓ ' + nombre;
-      document.getElementById('cr-inicio-label').style.display = 'block';
-    } else {
-      rutaBuild.final = { lat, lng, nombre };
-      document.getElementById('cr-final-label').textContent = '✓ ' + nombre;
-      document.getElementById('cr-final-label').style.display = 'block';
-    }
-    box.style.display = 'none';
+    if (tipo === 'inicio') rutaBuild.inicio = { lat, lng, nombre };
+    else                   rutaBuild.final  = { lat, lng, nombre };
+    saveBase();
+    renderBaseUI();
+    ocultarBox(box);
   }), 500);
 }
 
@@ -1737,13 +1793,13 @@ function onGooglePlaceSelected(tipo, lat, lng, nombre) {
   switch(tipo) {
     case 'inicio':
       rutaBuild.inicio = { lat, lng, nombre };
-      const liEl = document.getElementById('cr-inicio-label');
-      if (liEl) { liEl.textContent = '✓ ' + nombre; liEl.style.display = 'block'; }
+      saveBase();
+      renderBaseUI();
       break;
     case 'final':
       rutaBuild.final = { lat, lng, nombre };
-      const lfEl = document.getElementById('cr-final-label');
-      if (lfEl) { lfEl.textContent = '✓ ' + nombre; lfEl.style.display = 'block'; }
+      saveBase();
+      renderBaseUI();
       break;
     case 'parada':
       agregarParada(lat, lng, nombre);
@@ -2379,17 +2435,11 @@ function usarGPS(tipo) {
     const data = await reverseGeocode(lat, lng, `${lat.toFixed(5)},${lng.toFixed(5)}`);
     if (tipo === 'inicio') {
       rutaBuild.inicio = { lat, lng, nombre: data.nombre };
-      const el = document.getElementById('cr-inicio');
-      const lb = document.getElementById('cr-inicio-label');
-      if (el) el.value = data.nombre;
-      if (lb) { lb.textContent = '◎ ' + data.nombre; lb.style.display = 'block'; }
     } else {
       rutaBuild.final = { lat, lng, nombre: data.nombre };
-      const el = document.getElementById('cr-final');
-      const lb = document.getElementById('cr-final-label');
-      if (el) el.value = data.nombre;
-      if (lb) { lb.textContent = '◎ ' + data.nombre; lb.style.display = 'block'; }
     }
+    saveBase();
+    renderBaseUI();
     showToast('✅ Ubicación GPS capturada');
   }, () => showToast('⚠️ No se pudo obtener el GPS'), { enableHighAccuracy: true, timeout: 8000 });
 }
@@ -2607,6 +2657,9 @@ async function procesarMasivo() {
       if (!loadGHConfig()) mostrarConfigGH();
     }, 1500);
   }
+
+  // Cargar inicio/final guardados
+  cargarBase();
 
   renderHome();
 })();
