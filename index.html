@@ -222,10 +222,11 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
       <div class="toggle-row">
         <div>
           <div style="font-size:14px;font-weight:600;">🛣️ Evitar peajes</div>
+          <div style="font-size:11px;color:var(--text3);margin-top:2px;" id="peajes-status">Desactivado — usa autopistas</div>
           <div style="font-size:12px;color:var(--text3);margin-top:2px;">Usar rutas sin casetas</div>
         </div>
         <label class="toggle">
-          <input type="checkbox" id="cr-peajes">
+          <input type="checkbox" id="cr-peajes" onchange="document.getElementById('peajes-status').textContent=this.checked?'Activado — evita casetas':'Desactivado — usa autopistas'">
           <span class="toggle-slider"></span>
         </label>
       </div>
@@ -332,6 +333,13 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
   </div>
 
   <!-- BOTÓN OPTIMIZAR -->
+  <!-- Banner re-optimizar (aparece cuando se edita una parada) -->
+  <div id="banner-reoptimizar" style="display:none;padding:8px 12px;background:rgba(255,145,0,.12);border-bottom:1px solid rgba(255,145,0,.3);flex-shrink:0;display:none;">
+    <div style="display:flex;align-items:center;gap:10px;">
+      <div style="font-size:12px;color:var(--orange);flex:1;">⚠️ Una parada fue modificada</div>
+      <button onclick="optimizarRuta()" style="padding:6px 14px;border-radius:8px;border:none;background:var(--orange);color:#000;font-size:12px;font-weight:800;cursor:pointer;">⚡ Re-optimizar</button>
+    </div>
+  </div>
   <div style="padding:12px 16px calc(env(safe-area-inset-bottom,0px)+12px);background:var(--bg2);border-top:1px solid var(--border);flex-shrink:0;">
     <button class="btn btn-green" onclick="optimizarRuta()" id="btn-optimizar" disabled>
       ⚡ Optimizar Ruta
@@ -913,7 +921,7 @@ function showHistorial() {
 function irACargarParadas() {
   const nombre = document.getElementById('cr-nombre').value.trim();
   const fecha  = document.getElementById('cr-fecha').value;
-  const peajes = !document.getElementById('cr-peajes').checked;
+  const peajes = document.getElementById('cr-peajes').checked; // true = evitar peajes
 
   if (!nombre) { showToast('Escribe un nombre para la ruta'); return; }
   if (!fecha)  { showToast('Selecciona la fecha'); return; }
@@ -1435,19 +1443,23 @@ async function resolverPlusCodeUI() {
   }
 }
 
+function mostrarBotonReoptimizar() {
+  const banner = document.getElementById('banner-reoptimizar');
+  if (banner) banner.style.display = 'block';
+}
+
 function confirmarAgregarPlusCode() {
   if (!_pcCoordsTemp) { showToast('Primero resuelve el Plus Code'); return; }
-  const nombre = document.getElementById('pc-nombre-input').value.trim();
-  if (!nombre) {
-    showToast('Escribe el nombre o número de calle');
-    document.getElementById('pc-nombre-input').focus();
-    return;
-  }
+  // El nombre es opcional — el usuario puede dejarlo vacío y editarlo después
+  const nombre = document.getElementById('pc-nombre-input').value.trim()
+    || document.getElementById('pc-calle-label')?.textContent?.trim()
+    || ('Parada ' + (rutaBuild.paradas.length + 1));
   agregarParada(_pcCoordsTemp.lat, _pcCoordsTemp.lng, nombre);
   _pcCoordsTemp = null;
-  document.getElementById('paradas-pluscode').value   = '';
-  document.getElementById('pc-confirm-box').style.display = 'none';
-  document.getElementById('pc-error').style.display       = 'none';
+  document.getElementById('paradas-pluscode').value        = '';
+  document.getElementById('pc-confirm-box').style.display  = 'none';
+  document.getElementById('pc-error').style.display        = 'none';
+  document.getElementById('pc-nombre-input').value         = '';
 }
 
 // Legacy (por si algún código lo llama)
@@ -1523,6 +1535,8 @@ function eliminarParada(id) {
 function optimizarRuta() {
   if (!rutaBuild.paradas.length) return;
   showToast('⚡ Optimizando...');
+  const banner = document.getElementById('banner-reoptimizar');
+  if (banner) banner.style.display = 'none';
 
   // Nearest neighbor desde el punto de inicio
   let sinVisitar = [...rutaBuild.paradas];
@@ -2481,17 +2495,16 @@ function confirmarEditarParada() {
   closeModal('modal-editar-parada');
 
   if (pb) {
-    // Estamos en pantalla de paradas → re-optimizar
     actualizarMapaParadas();
     renderParadasList();
     if (rutaBuild.paradas.length > 1) {
-      showToast('✅ Parada actualizada — re-optimizando...');
-      setTimeout(() => optimizarRuta(), 400);
+      // Mostrar botón de re-optimizar en lugar de hacerlo automático
+      showToast('✅ Parada actualizada');
+      mostrarBotonReoptimizar();
     } else {
       showToast('✅ Parada actualizada');
     }
   } else if (pa) {
-    // Estamos en navegación → actualizar mapa y ruta
     actualizarNavPanel();
     trazarRutaCompleta();
     renderListaNav();
