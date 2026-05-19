@@ -2258,56 +2258,16 @@ function iniciarRuta() {
 // ══════════════════════════════════════════════════════════════════
 
 function initMapaNav() {
-  if (googleMapsReady && window.google?.maps) {
-    // ── Google Maps ───────────────────────────────────────────────
-    const gmapEl = document.getElementById('gmap-container');
-    const leafEl = document.getElementById('nav-map');
-    if (gmapEl) gmapEl.style.display = 'block';
-    if (leafEl) leafEl.style.display = 'none';
+  // Siempre Leaflet para el navegador (sin dependencia de API key)
+  const gmapEl = document.getElementById('gmap-container');
+  const leafEl = document.getElementById('nav-map');
+  if (gmapEl) gmapEl.style.display = 'none';
+  if (leafEl) leafEl.style.display = 'block';
 
-    if (gmap) {
-      setTimeout(() => google.maps.event.trigger(gmap, 'resize'), 100);
-      return;
-    }
-
-    gmap = new google.maps.Map(gmapEl, {
-      center: { lat: 19.4326, lng: -99.1332 },
-      zoom: 17,
-      mapTypeId: google.maps.MapTypeId.ROADMAP,
-      disableDefaultUI: true,
-      gestureHandling: 'greedy',
-      backgroundColor: '#0a1117',
-      styles: [
-        { elementType:'geometry', stylers:[{color:'#1a2744'}] },
-        { featureType:'road', elementType:'geometry', stylers:[{color:'#2d4a70'}] },
-        { featureType:'road.highway', elementType:'geometry', stylers:[{color:'#1e6091'}] },
-        { featureType:'road', elementType:'labels.text.fill', stylers:[{color:'#8ab4cc'}] },
-        { featureType:'water', elementType:'geometry', stylers:[{color:'#0a1117'}] },
-        { featureType:'poi', stylers:[{visibility:'off'}] },
-        { featureType:'transit', stylers:[{visibility:'off'}] },
-        { elementType:'labels.icon', stylers:[{visibility:'off'}] },
-      ]
-    });
-    gmRenderer = new google.maps.DirectionsRenderer({
-      map: gmap,
-      suppressMarkers: true,
-      polylineOptions: { strokeColor:'#00d4ff', strokeWeight:7, strokeOpacity:0.9 }
-    });
-    gmap.addListener('drag', () => {
-      modoCentrado = false;
-      const btn = document.getElementById('btn-centrar');
-      if (btn) btn.style.color = 'var(--text2)';
-    });
-    setTimeout(() => google.maps.event.trigger(gmap, 'resize'), 200);
-  } else {
-    // ── Leaflet fallback ──────────────────────────────────────────
-    const gmapEl = document.getElementById('gmap-container');
-    const leafEl = document.getElementById('nav-map');
-    if (gmapEl) gmapEl.style.display = 'none';
-    if (leafEl) leafEl.style.display = 'block';
-
-    if (mapNav) { mapNav.invalidateSize(); return; }
-  } // end else Leaflet
+  if (mapNav) {
+    mapNav.invalidateSize();
+    return;
+  }
 
   const centro = state.rutaActual?.paradas[0]
     ? [state.rutaActual.paradas[0].lat, state.rutaActual.paradas[0].lng]
@@ -2319,8 +2279,10 @@ function initMapaNav() {
     zoomSnap: 0.5,
   }).setView(centro, 17);
 
+  // Tiles con dos opciones (failover automático)
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    maxZoom: 20, subdomains: 'abcd'
+    maxZoom: 20, subdomains: 'abcd',
+    errorTileUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
   }).addTo(mapNav);
 
   mapNav.on('dragstart', () => {
@@ -2331,7 +2293,8 @@ function initMapaNav() {
 }
 
 function trazarRutaCompleta() {
-  if (!state.rutaActual || !mapNav) return;
+  if (!state.rutaActual) return;
+  if (!mapNav) { initMapaNav(); return; }
   const ruta = state.rutaActual;
   const idx  = state.paradaActual;
 
@@ -2603,9 +2566,11 @@ async function recalcularRuta(fromLat, fromLng) {
   if (!p) return;
 
   let lat = fromLat, lng = fromLng;
-  if (lat == null && navGPSMarker) {
-    const pos = navGPSMarker.getLatLng();
-    lat = pos.lat; lng = pos.lng;
+  if (lat == null) {
+    // Intentar Leaflet GPS marker
+    if (navGPSMarker) { const pos = navGPSMarker.getLatLng(); lat = pos.lat; lng = pos.lng; }
+    // Intentar Google Maps marker (si disponible)
+    else if (window.gmNavMarker?.getPosition) { lat = gmNavMarker.getPosition().lat(); lng = gmNavMarker.getPosition().lng(); }
   }
 
   if (lat == null) {
@@ -2816,11 +2781,8 @@ function centrarGPS() {
   const btn = document.getElementById('btn-centrar');
   if (btn) btn.style.color = modoCentrado ? 'var(--accent)' : 'var(--text2)';
   if (!modoCentrado) return;
-  if (gmap && gmNavMarker) {
-    gmap.panTo(gmNavMarker.getPosition());
-    gmap.setZoom(17);
-  } else if (mapNav && navGPSMarker) {
-    mapNav.setView(navGPSMarker.getLatLng(), 17, { animate:true });
+  if (mapNav && navGPSMarker) {
+    mapNav.setView(navGPSMarker.getLatLng(), 17, { animate: true });
   }
 }
 
@@ -2828,16 +2790,10 @@ function vistaGeneral() {
   modoCentrado = false;
   const btn = document.getElementById('btn-centrar');
   if (btn) btn.style.color = 'var(--text2)';
-  if (!state.rutaActual?.paradas.length) return;
-  if (gmap) {
-    const bounds = new google.maps.LatLngBounds();
-    state.rutaActual.paradas.forEach(p => bounds.extend({ lat: p.lat, lng: p.lng }));
-    if (gmNavMarker) bounds.extend(gmNavMarker.getPosition());
-    gmap.fitBounds(bounds, 60);
-  } else if (mapNav) {
-    const pts = state.rutaActual.paradas.map(p => [p.lat, p.lng]);
-    mapNav.fitBounds(L.latLngBounds(pts), { padding:[60,80] });
-  }
+  if (!state.rutaActual?.paradas.length || !mapNav) return;
+  const pts = state.rutaActual.paradas.map(p => [p.lat, p.lng]);
+  if (navGPSMarker) pts.push([navGPSMarker.getLatLng().lat, navGPSMarker.getLatLng().lng]);
+  if (pts.length > 0) mapNav.fitBounds(L.latLngBounds(pts), { padding: [60, 80] });
 }
 
 // ── Panel inferior ────────────────────────────────────────────────
