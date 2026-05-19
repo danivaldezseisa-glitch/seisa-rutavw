@@ -1166,13 +1166,18 @@ function continuarRuta() {
   if (!state.rutaActual) return;
   rutaBuild = { ...state.rutaActual };
   showScreen('screen-nav');
-  setTimeout(async () => {
+  const _arrancarContinuar = async () => {
+    if (!mapNav) {
+      initMapaNav();
+      await new Promise(r => setTimeout(r, 400));
+    }
     actualizarNavPanel();
     renderListaNav();
     trazarRutaCompleta();
     iniciarGPS();
     await recalcularRuta();
-  }, 500);
+  };
+  setTimeout(_arrancarContinuar, 600);
 }
 
 function verRuta(id) {
@@ -2240,17 +2245,21 @@ function iniciarRuta() {
   state.paradaActual = 0;
   saveState();
   showScreen('screen-nav');
-  setTimeout(async () => {
+  // Esperar a que el mapa esté completamente inicializado
+  const _arrancarNav = async () => {
+    if (!mapNav) {
+      initMapaNav();
+      await new Promise(r => setTimeout(r, 400));
+    }
     actualizarNavPanel();
     renderListaNav();
     trazarRutaCompleta();
     iniciarGPS();
-    // Anunciar primera parada
     const p = state.rutaActual?.paradas[0];
     if (p) hablar('Ruta iniciada. Dirigiéndose a ' + p.nombre);
-    // Calcular ruta OSRM
     await recalcularRuta();
-  }, 500);
+  };
+  setTimeout(_arrancarNav, 600);
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -2460,68 +2469,129 @@ let vozActiva     = true;
 let modoCentrado  = true;
 
 function iniciarGPS() {
-  if (!navigator.geolocation) { showToast('GPS no disponible'); return; }
-  if (navGPSWatch) navigator.geolocation.clearWatch(navGPSWatch);
+  if (!navigator.geolocation) {
+    showToast('GPS no disponible en este dispositivo');
+    return;
+  }
 
-  let ultimaPos = null;
+  // Limpiar watch anterior
+  if (navGPSWatch != null) {
+    navigator.geolocation.clearWatch(navGPSWatch);
+    navGPSWatch = null;
+  }
+
+  let ultimaPos     = null;
   let ultimoHeading = 0;
+  let recalcCooldown = 0; // evitar recalcular muy seguido
 
-  navGPSWatch = navigator.geolocation.watchPosition(pos => {
-    const { latitude: lat, longitude: lng, heading, speed, accuracy } = pos.coords;
+  function onPos(pos) {
+    const { latitude: lat, longitude: lng } = pos.coords;
+    const heading = pos.coords.heading;
+    const speed   = pos.coords.speed;
+    const accuracy= pos.coords.accuracy;
 
-    // ── Velocímetro ──
-    const vel = speed != null ? Math.round(speed * 3.6) : null;
-    const velEl = document.getElementById('nav-velocimetro');
-    if (vel != null && vel >= 0) {
-      velEl.style.display = 'block';
-      document.getElementById('nav-vel-num').textContent = vel;
-      // Color según velocidad
-      const velNum = document.getElementById('nav-vel-num');
-      velNum.style.color = vel > 80 ? '#ff5252' : vel > 50 ? '#ff9100' : '#fff';
+    // ── Asegurar que el mapa existe ──────────────────────────────
+    if (!mapNav) {
+      initMapaNav();
+      // Si aún no está listo, reintentar en el próximo tick
+      if (!mapNav) return;
     }
 
-    // ── Marcador GPS (flecha) ──
-    const h = (heading != null && speed > 0.5) ? heading : ultimoHeading;
-    if (heading != null && speed > 0.5) ultimoHeading = heading;
+    // ── Velocímetro ─────────────────────────────────────────────
+    const vel = (speed != null && speed >= 0) ? Math.round(speed * 3.6) : null;
+    const velEl  = document.getElementById('nav-velocimetro');
+    const velNum = document.getElementById('nav-vel-num');
+    if (velEl && vel != null) {
+      velEl.style.display = 'block';
+      if (velNum) {
+        velNum.textContent = vel;
+        velNum.style.color = vel > 80 ? '#ff5252' : vel > 50 ? '#ff9100' : '#fff';
+      }
+    }
 
+    // ── Dirección de marcha ──────────────────────────────────────
+    const enMovimiento = speed != null && speed > 0.5;
+    const h = (heading != null && enMovimiento) ? heading : ultimoHeading;
+    if (heading != null && enMovimiento) ultimoHeading = heading;
+
+    // ── Marcador GPS ─────────────────────────────────────────────
     if (!navGPSMarker) {
       navGPSMarker = L.marker([lat, lng], {
-        icon: crearIconoGPS(h), zIndexOffset: 2000
+        icon:         crearIconoGPS(h),
+        zIndexOffset: 2000,
+        interactive:  false,
       }).addTo(mapNav);
     } else {
       navGPSMarker.setLatLng([lat, lng]);
       navGPSMarker.setIcon(crearIconoGPS(h));
     }
 
-    // ── Centrar mapa orientado hacia donde vas ──
+    // ── Centrar mapa ─────────────────────────────────────────────
     if (modoCentrado && mapNav) {
-      // Mapa ligeramente adelantado en la dirección de marcha
-      if (speed > 1) {
-        const offsetDist = 0.0006; // ~67m hacia adelante en el mapa
-        const rad = h * Math.PI / 180;
-        const clat = lat + offsetDist * Math.cos(rad);
-        const clng = lng + offsetDist * Math.sin(rad) / Math.cos(lat * Math.PI / 180);
-        mapNav.setView([clat, clng], mapNav.getZoom() || 17, { animate: true, duration: 0.8 });
+      // Si va a ≥5 km/h, adelantar el centro hacia la dirección de marcha
+      if (enMovimiento && speed > 1.4 && h != null) {
+        const avance = 0.0005; // ~55m adelante
+        const rad    = h * Math.PI / 180;
+        const clat   = lat + avance * Math.cos(rad);
+        const clng   = lng + avance * Math.sin(rad) / Math.cos(lat * Math.PI / 180);
+        mapNav.setView([clat, clng], 17, { animate: true, duration: 0.6, noMoveStart: true });
       } else {
-        mapNav.setView([lat, lng], mapNav.getZoom() || 17, { animate: true, duration: 0.5 });
+        mapNav.setView([lat, lng], 17, { animate: true, duration: 0.4, noMoveStart: true });
       }
     }
 
-    // ── Progreso sobre la ruta ──
-    if (navRuta?.steps?.length) actualizarPasoActual(lat, lng);
+    // ── Actualizar instrucciones de giro ─────────────────────────
+    if (navRuta?.steps?.length) {
+      actualizarPasoActual(lat, lng);
+    }
 
-    // ── Recálculo automático si se desvió >60m ──
-    if (ultimaPos && navRuta) {
+    // ── Recálculo automático (máx 1 vez cada 15s) ────────────────
+    const ahora = Date.now();
+    if (ultimaPos && navRuta && ahora - recalcCooldown > 15000) {
       const distRuta = distanciaAPolilineaMasCercana(lat, lng);
-      if (distRuta > 0.06) { // >60m de la ruta trazada
+      if (distRuta > 0.06) { // >60m desviado
+        recalcCooldown = ahora;
         recalcularRuta(lat, lng);
       }
     }
+
     ultimaPos = { lat, lng };
-  }, err => {
-    console.warn('GPS:', err.message);
-    document.getElementById('nav-sub').textContent = '⚠️ GPS: ' + err.message;
-  }, { enableHighAccuracy: true, maximumAge: 1500, timeout: 15000 });
+  }
+
+  function onError(err) {
+    const msgs = {
+      1: 'Permiso de GPS denegado',
+      2: 'GPS no disponible',
+      3: 'Tiempo de espera GPS agotado',
+    };
+    const msg = msgs[err.code] || 'Error GPS';
+    console.warn('GPS error:', err.code, err.message);
+    const subEl = document.getElementById('nav-sub');
+    if (subEl) subEl.textContent = '⚠️ ' + msg;
+    showToast('⚠️ ' + msg);
+
+    // Si fue timeout, reintentar automáticamente
+    if (err.code === 3) {
+      setTimeout(() => iniciarGPS(), 3000);
+    }
+  }
+
+  navGPSWatch = navigator.geolocation.watchPosition(
+    onPos,
+    onError,
+    {
+      enableHighAccuracy: true,
+      maximumAge:         0,     // siempre posición fresca
+      timeout:            10000, // 10s antes de error
+    }
+  );
+
+  // Obtener posición inmediata también (watchPosition puede tardar)
+  navigator.geolocation.getCurrentPosition(onPos, onError, {
+    enableHighAccuracy: true,
+    timeout: 8000,
+    maximumAge: 0,
+  });
 }
 
 // Distancia del punto actual a la polilínea de ruta (en km)
@@ -2540,13 +2610,26 @@ function distanciaAPolilineaMasCercana(lat, lng) {
 function crearIconoGPS(heading) {
   const h = heading || 0;
   return L.divIcon({
-    html: `<div style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;transform:rotate(${h}deg);transform-origin:50% 50%;">
-      <svg viewBox="0 0 40 40" width="40" height="40">
-        <circle cx="20" cy="20" r="14" fill="rgba(0,212,255,.2)" stroke="rgba(0,212,255,.5)" stroke-width="1.5"/>
-        <polygon points="20,5 27,30 20,25 13,30" fill="#00d4ff" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>
+    html: `<div style="
+      width:36px;height:36px;
+      display:flex;align-items:center;justify-content:center;
+      filter:drop-shadow(0 0 8px rgba(0,212,255,.8));
+    ">
+      <svg viewBox="0 0 36 36" width="36" height="36">
+        <!-- Círculo de fondo -->
+        <circle cx="18" cy="18" r="17" fill="rgba(0,212,255,0.15)" stroke="#00d4ff" stroke-width="1.5"/>
+        <!-- Flecha de dirección -->
+        <g transform="rotate(${h}, 18, 18)">
+          <polygon points="18,4 26,30 18,24 10,30" fill="#00d4ff" opacity="0.95"/>
+          <polygon points="18,4 26,30 18,24 10,30" fill="white" opacity="0.25"/>
+        </g>
+        <!-- Punto central -->
+        <circle cx="18" cy="18" r="3" fill="white"/>
       </svg>
     </div>`,
-    className: '', iconSize: [40, 40], iconAnchor: [20, 20]
+    className: '',
+    iconSize: [36, 36],
+    iconAnchor: [18, 18],
   });
 }
 
@@ -3053,7 +3136,19 @@ function finalizarRuta() {
 }
 
 function salirNavegacion() {
-  if (navGPSWatch) { navigator.geolocation.clearWatch(navGPSWatch); navGPSWatch = null; }
+  // Detener GPS
+  if (navGPSWatch != null) {
+    navigator.geolocation.clearWatch(navGPSWatch);
+    navGPSWatch = null;
+  }
+  // Limpiar marcadores y mapa para que se reinicialice al volver
+  if (navGPSMarker && mapNav) { navGPSMarker.remove(); }
+  if (navRouteLayer && mapNav) { navRouteLayer.remove(); }
+  navGPSMarker  = null;
+  navRouteLayer = null;
+  navRuta       = null;
+  // Destruir el mapa Leaflet para que se recree limpio la próxima vez
+  if (mapNav) { mapNav.remove(); mapNav = null; }
   showScreen('screen-home');
   renderHome();
 }
