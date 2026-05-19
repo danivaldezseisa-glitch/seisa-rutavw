@@ -157,8 +157,30 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
 @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.5} }
 @keyframes scanLine { 0%{top:0}50%{top:calc(100% - 2px)}100%{top:0} }
 </style>
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-touch-fullscreen" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" id="pwa-manifest">
+<script>
+// Generar manifest PWA dinámicamente
+const manifest = {
+  name: "SEISA Rutas",
+  short_name: "SEISA",
+  start_url: window.location.href,
+  display: "standalone",
+  background_color: "#0a1628",
+  theme_color: "#0a1628",
+  orientation: "portrait",
+  icons: [{
+    src: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230a1628'/><text y='.9em' font-size='80' x='10'>🚛</text></svg>",
+    sizes: "192x192", type: "image/svg+xml"
+  }]
+};
+const blob = new Blob([JSON.stringify(manifest)], {type:'application/json'});
+document.getElementById('pwa-manifest').href = URL.createObjectURL(blob);
+</script>
 </head>
-<body>
+<body style="overscroll-behavior:none;">
 
 <!-- ════════════════════════════════
      SCREEN 1: HOME
@@ -367,7 +389,7 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
   </div>
 
   <!-- MAPA RUTA COMPLETA -->
-  <div id="res-map" style="height:260px;flex-shrink:0;position:relative;background:var(--surface);">
+  <div id="res-map" style="height:260px;min-height:260px;flex-shrink:0;position:relative;background:var(--surface2);border-bottom:1px solid var(--border);">
     <div id="res-map-loading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text3);z-index:10;background:var(--surface);">
       🗺️ Trazando ruta...
     </div>
@@ -744,6 +766,23 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
 <!-- TOAST -->
 <div id="toast"></div>
 
+<!-- Banner: Agregar a pantalla de inicio -->
+<div id="pwa-banner" style="
+  display:none;position:fixed;bottom:0;left:0;right:0;z-index:99999;
+  background:var(--surface);border-top:1px solid var(--border);
+  padding:12px 16px;
+  display:none;align-items:center;gap:10px;
+">
+  <div style="flex:1;">
+    <div style="font-size:13px;font-weight:700;">Instalar SEISA Rutas</div>
+    <div style="font-size:11px;color:var(--text3);margin-top:2px;">Agregar a pantalla de inicio para pantalla completa</div>
+  </div>
+  <button id="pwa-install-btn" style="padding:8px 14px;border-radius:8px;border:none;background:var(--accent);color:#000;font-size:13px;font-weight:700;cursor:pointer;">
+    Instalar
+  </button>
+  <button onclick="document.getElementById('pwa-banner').style.display='none'" style="background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;padding:4px;">✕</button>
+</div>
+
 <!-- SCREEN: HISTORIAL -->
 <div class="screen hidden" id="screen-historial">
   <div class="topbar">
@@ -1074,7 +1113,7 @@ function showScreen(id) {
     if (id === 'screen-nav')       initMapaNav();
     if (id === 'screen-crear')     { cargarBase(); renderBaseUI(); }
     if (id === 'screen-historial') renderHistorial();
-    if (id === 'screen-resumen' && resMap) { resMap = null; resDirectionsRenderer = null; }
+    if (id === 'screen-resumen') { resMap = null; resDirectionsRenderer = null; } // siempre reiniciar
     if (id !== 'screen-detalle-ruta') detalleMap = null;
   }
 }
@@ -2053,7 +2092,21 @@ function renderResumen() {
   }
 
   // Trazar ruta en el mapa
-  setTimeout(() => trazarRutaResumen(), 300);
+  // Esperar a que Google Maps esté listo y el DOM tenga dimensiones
+  const _waitAndTrace = (tries) => {
+    if (!googleMapsReady || !window.google?.maps) {
+      if (tries > 0) setTimeout(() => _waitAndTrace(tries - 1), 400);
+      else console.warn('Google Maps no disponible para resumen');
+      return;
+    }
+    const mapEl = document.getElementById('res-map');
+    if (!mapEl || mapEl.offsetHeight < 10) {
+      if (tries > 0) setTimeout(() => _waitAndTrace(tries - 1), 300);
+      return;
+    }
+    trazarRutaResumen();
+  };
+  setTimeout(() => _waitAndTrace(10), 200);
 }
 
 let resMap = null;
@@ -2095,8 +2148,10 @@ async function trazarRutaResumen() {
     resDirectionsRenderer = new google.maps.DirectionsRenderer({
       map: resMap,
       suppressMarkers: true,
-      polylineOptions: { strokeColor: '#00d4ff', strokeWeight: 5, strokeOpacity: 0.9 },
+      polylineOptions: { strokeColor: '#00d4ff', strokeWeight: 6, strokeOpacity: 0.95 },
     });
+    // Trigger resize para que Google Maps calcule dimensiones
+    setTimeout(() => google.maps.event.trigger(resMap, 'resize'), 100);
   }
 
   // Agregar marcadores numerados
@@ -2203,11 +2258,56 @@ function iniciarRuta() {
 // ══════════════════════════════════════════════════════════════════
 
 function initMapaNav() {
-  // Siempre usar Leaflet — independiente de Google Maps
-  document.getElementById('gmap-container') && (document.getElementById('gmap-container').style.display = 'none');
-  document.getElementById('nav-map').style.display = 'block';
+  if (googleMapsReady && window.google?.maps) {
+    // ── Google Maps ───────────────────────────────────────────────
+    const gmapEl = document.getElementById('gmap-container');
+    const leafEl = document.getElementById('nav-map');
+    if (gmapEl) gmapEl.style.display = 'block';
+    if (leafEl) leafEl.style.display = 'none';
 
-  if (mapNav) { mapNav.invalidateSize(); return; }
+    if (gmap) {
+      setTimeout(() => google.maps.event.trigger(gmap, 'resize'), 100);
+      return;
+    }
+
+    gmap = new google.maps.Map(gmapEl, {
+      center: { lat: 19.4326, lng: -99.1332 },
+      zoom: 17,
+      mapTypeId: google.maps.MapTypeId.ROADMAP,
+      disableDefaultUI: true,
+      gestureHandling: 'greedy',
+      backgroundColor: '#0a1117',
+      styles: [
+        { elementType:'geometry', stylers:[{color:'#1a2744'}] },
+        { featureType:'road', elementType:'geometry', stylers:[{color:'#2d4a70'}] },
+        { featureType:'road.highway', elementType:'geometry', stylers:[{color:'#1e6091'}] },
+        { featureType:'road', elementType:'labels.text.fill', stylers:[{color:'#8ab4cc'}] },
+        { featureType:'water', elementType:'geometry', stylers:[{color:'#0a1117'}] },
+        { featureType:'poi', stylers:[{visibility:'off'}] },
+        { featureType:'transit', stylers:[{visibility:'off'}] },
+        { elementType:'labels.icon', stylers:[{visibility:'off'}] },
+      ]
+    });
+    gmRenderer = new google.maps.DirectionsRenderer({
+      map: gmap,
+      suppressMarkers: true,
+      polylineOptions: { strokeColor:'#00d4ff', strokeWeight:7, strokeOpacity:0.9 }
+    });
+    gmap.addListener('drag', () => {
+      modoCentrado = false;
+      const btn = document.getElementById('btn-centrar');
+      if (btn) btn.style.color = 'var(--text2)';
+    });
+    setTimeout(() => google.maps.event.trigger(gmap, 'resize'), 200);
+  } else {
+    // ── Leaflet fallback ──────────────────────────────────────────
+    const gmapEl = document.getElementById('gmap-container');
+    const leafEl = document.getElementById('nav-map');
+    if (gmapEl) gmapEl.style.display = 'none';
+    if (leafEl) leafEl.style.display = 'block';
+
+    if (mapNav) { mapNav.invalidateSize(); return; }
+  } // end else Leaflet
 
   const centro = state.rutaActual?.paradas[0]
     ? [state.rutaActual.paradas[0].lat, state.rutaActual.paradas[0].lng]
@@ -3311,6 +3411,37 @@ async function procesarMasivo() {
   cargarBase();
 
   renderHome();
+
+  // ── PWA: capturar evento de instalación ───────────────────────
+  let deferredInstall = null;
+  window.addEventListener('beforeinstallprompt', e => {
+    e.preventDefault();
+    deferredInstall = e;
+    const banner = document.getElementById('pwa-banner');
+    if (banner) banner.style.display = 'flex';
+  });
+  const installBtn = document.getElementById('pwa-install-btn');
+  if (installBtn) {
+    installBtn.onclick = async () => {
+      if (!deferredInstall) return;
+      deferredInstall.prompt();
+      const { outcome } = await deferredInstall.userChoice;
+      deferredInstall = null;
+      document.getElementById('pwa-banner').style.display = 'none';
+    };
+  }
+  window.addEventListener('appinstalled', () => {
+    document.getElementById('pwa-banner').style.display = 'none';
+    showToast('✅ App instalada en pantalla de inicio');
+  });
+
+  // iOS: mostrar instrucciones si no está instalada
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+  const isStandalone = window.matchMedia('(display-mode: standalone)').matches
+    || window.navigator.standalone;
+  if (isIOS && !isStandalone) {
+    setTimeout(() => showToast('💡 Toca Compartir → Agregar a inicio para pantalla completa'), 3000);
+  }
 })();
 </script>
 </body>
