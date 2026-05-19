@@ -656,11 +656,24 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
 <div class="screen hidden" id="screen-detalle-ruta">
   <div class="topbar">
     <button class="topbar-back" onclick="showScreen('screen-historial')">←</button>
-    <h2 id="detalle-titulo">Ruta</h2>
+    <div style="flex:1;min-width:0;">
+      <div id="detalle-titulo" style="font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Ruta</div>
+      <div id="detalle-fecha" style="font-size:11px;color:var(--text3);margin-top:1px;"></div>
+    </div>
   </div>
-  <div id="detalle-map" style="height:200px;flex-shrink:0;background:var(--surface);"></div>
-  <div id="detalle-metricas" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--border);flex-shrink:0;"></div>
-  <div class="scroll" id="detalle-paradas-list" style="flex:1;"></div>
+
+  <div class="scroll" style="flex:1;">
+    <!-- Métricas -->
+    <div id="detalle-metricas" style="display:grid;grid-template-columns:repeat(4,1fr);background:var(--bg2);border-bottom:1px solid var(--border);"></div>
+
+    <!-- Mapa (lazy, solo si tiene coords) -->
+    <div id="detalle-map-wrap" style="display:none;height:200px;position:relative;background:var(--surface);border-bottom:1px solid var(--border);">
+      <div id="detalle-map" style="position:absolute;inset:0;"></div>
+    </div>
+
+    <!-- Lista paradas -->
+    <div style="padding:8px 0;" id="detalle-paradas-list"></div>
+  </div>
 </div>
 
 <!-- MODAL: CONFIG GITHUB -->
@@ -1078,96 +1091,151 @@ function confirmarBorrarHistorial() {
 let detalleMap = null;
 
 function verDetalleRuta(ruta) {
-  document.getElementById('detalle-titulo').textContent = ruta.nombre || 'Detalle';
+  // Título y fecha
+  const tEl = document.getElementById('detalle-titulo');
+  const fEl = document.getElementById('detalle-fecha');
+  if (tEl) tEl.textContent = ruta.nombre || 'Ruta sin nombre';
+  if (fEl) {
+    const fecha = ruta.fecha || (ruta.fechaFin ? ruta.fechaFin.slice(0,10) : '');
+    const fin   = ruta.fechaFin ? ' · Fin: ' + new Date(ruta.fechaFin).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}) : '';
+    fEl.textContent = fecha + fin;
+  }
 
   // Métricas
   const entregadas = (ruta.paradas||[]).filter(p => p.hecha && !p.fallida).length;
   const fallidas   = (ruta.paradas||[]).filter(p => p.fallida).length;
+  const pendientes = (ruta.paradas||[]).filter(p => !p.hecha && !p.fallida).length;
   const total      = (ruta.paradas||[]).length;
+  const pct        = total ? Math.round(entregadas/total*100) : 0;
+
   const metEl = document.getElementById('detalle-metricas');
-  metEl.innerHTML = `
-    <div style="padding:12px;background:var(--surface);text-align:center;">
-      <div style="font-size:22px;font-weight:800;color:var(--green);font-family:var(--mono);">${entregadas}</div>
-      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;margin-top:2px;">Entregadas</div>
-    </div>
-    <div style="padding:12px;background:var(--surface);text-align:center;">
-      <div style="font-size:22px;font-weight:800;color:var(--red);font-family:var(--mono);">${fallidas}</div>
-      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;margin-top:2px;">Fallidas</div>
-    </div>
-    <div style="padding:12px;background:var(--surface);text-align:center;">
-      <div style="font-size:22px;font-weight:800;color:var(--accent);font-family:var(--mono);">${ruta.kmTotal||'—'}</div>
-      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;margin-top:2px;">km</div>
+  const metrica = (val, lbl, color) =>
+    `<div style="padding:12px 6px;text-align:center;border-right:1px solid var(--border);">
+      <div style="font-size:22px;font-weight:800;color:${color};font-family:var(--mono);">${val}</div>
+      <div style="font-size:9px;color:var(--text3);text-transform:uppercase;margin-top:2px;letter-spacing:.05em;">${lbl}</div>
+    </div>`;
+  metEl.innerHTML =
+    metrica(entregadas, 'Entregadas', 'var(--green)') +
+    metrica(fallidas,   'Fallidas',   'var(--red)')   +
+    metrica(pendientes, 'Pendientes', 'var(--text3)') +
+    `<div style="padding:12px 6px;text-align:center;">
+      <div style="font-size:22px;font-weight:800;color:var(--accent);font-family:var(--mono);">${pct}%</div>
+      <div style="font-size:9px;color:var(--text3);text-transform:uppercase;margin-top:2px;letter-spacing:.05em;">Efectividad</div>
     </div>`;
 
-  // Lista de paradas con hora de entrega/rechazo
+  // Lista de paradas
   const lista = document.getElementById('detalle-paradas-list');
   lista.innerHTML = '';
   const paradas = ruta.paradas || [];
   if (!paradas.length) {
-    lista.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text3);font-size:13px;">Sin paradas registradas</div>';
+    lista.innerHTML = '<div style="padding:32px;text-align:center;color:var(--text3);font-size:13px;">Sin paradas registradas</div>';
   }
-  paradas.forEach((p, i) => {
-    const entregada = p.hecha && !p.fallida;
-    const fallida   = p.fallida;
-    const color = entregada ? 'var(--green)' : fallida ? 'var(--red)' : 'var(--text3)';
-    const icono = entregada ? '✓' : fallida ? '✗' : '—';
-    const bg    = entregada ? 'rgba(0,230,118,.08)' : fallida ? 'rgba(255,82,82,.08)' : 'transparent';
-    const div = document.createElement('div');
-    div.style.cssText = `padding:12px 16px;border-bottom:1px solid var(--border);background:${bg};display:flex;align-items:center;gap:12px;`;
-    div.innerHTML = `
-      <div style="width:28px;height:28px;border-radius:50%;background:${bg};border:2px solid ${color};color:${color};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;">${icono}</div>
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
-        <div style="display:flex;align-items:center;gap:8px;margin-top:3px;">
-          ${p.horaAccion ? `<span style="font-size:12px;color:${color};font-weight:700;">${entregada?'Entregada':'Fallida'} · ${p.horaAccion}</span>` : '<span style="font-size:11px;color:var(--text3);">Sin acción registrada</span>'}
-        </div>
-      </div>
-      <div style="font-size:11px;color:var(--text3);flex-shrink:0;">#${i+1}</div>`;
-    div.querySelector('div > div').textContent = p.nombre || ('Parada ' + (i+1));
-    lista.appendChild(div);
+
+  // Agrupar: primero entregadas, luego fallidas, luego pendientes
+  const grupos = [
+    { titulo: '✓ Entregadas',       items: paradas.filter(p => p.hecha && !p.fallida), color: 'var(--green)', bg: 'rgba(0,230,118,.07)' },
+    { titulo: '✗ Fallidas / Rechazadas', items: paradas.filter(p => p.fallida),       color: 'var(--red)',   bg: 'rgba(255,82,82,.07)'  },
+    { titulo: '— Pendientes',        items: paradas.filter(p => !p.hecha && !p.fallida), color: 'var(--text3)', bg: 'transparent' },
+  ];
+
+  grupos.forEach(grupo => {
+    if (!grupo.items.length) return;
+    // Header del grupo
+    const hdr = document.createElement('div');
+    hdr.style.cssText = `padding:8px 16px 5px;font-size:11px;font-weight:700;color:${grupo.color};text-transform:uppercase;letter-spacing:.07em;background:var(--bg2);border-bottom:1px solid var(--border);`;
+    hdr.textContent = `${grupo.titulo} (${grupo.items.length})`;
+    lista.appendChild(hdr);
+
+    grupo.items.forEach(p => {
+      const originalIdx = paradas.indexOf(p);
+      const entregada = p.hecha && !p.fallida;
+      const fallida   = p.fallida;
+      const icono     = entregada ? '✓' : fallida ? '✗' : String(originalIdx + 1);
+
+      const div = document.createElement('div');
+      div.style.cssText = `padding:13px 16px;border-bottom:1px solid var(--border);background:${grupo.bg};display:flex;align-items:center;gap:12px;`;
+
+      // Badge
+      const badge = document.createElement('div');
+      badge.style.cssText = `width:32px;height:32px;border-radius:50%;border:2px solid ${grupo.color};color:${grupo.color};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0;background:${grupo.bg};`;
+      badge.textContent = icono;
+
+      // Info
+      const info = document.createElement('div');
+      info.style.cssText = 'flex:1;min-width:0;';
+
+      const nombre = document.createElement('div');
+      nombre.style.cssText = 'font-size:14px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+      nombre.textContent = p.nombre || ('Parada ' + (originalIdx + 1));
+
+      const hora = document.createElement('div');
+      hora.style.cssText = `font-size:12px;margin-top:3px;font-weight:${p.horaAccion ? '700' : '400'};color:${p.horaAccion ? grupo.color : 'var(--text3)'};`;
+      hora.textContent = p.horaAccion
+        ? (entregada ? 'Entregada a las ' : 'Fallida a las ') + p.horaAccion
+        : 'Sin acción';
+
+      info.appendChild(nombre);
+      info.appendChild(hora);
+
+      // Número
+      const num = document.createElement('div');
+      num.style.cssText = 'font-size:11px;color:var(--text3);flex-shrink:0;';
+      num.textContent = '#' + (originalIdx + 1);
+
+      div.appendChild(badge);
+      div.appendChild(info);
+      div.appendChild(num);
+      lista.appendChild(div);
+    });
   });
 
   showScreen('screen-detalle-ruta');
 
   // Mapa del detalle
-  setTimeout(() => {
-    const puntos = paradas.filter(p => p.lat);
-    if (!puntos.length || !googleMapsReady) return;
-    if (!detalleMap) {
-      detalleMap = new google.maps.Map(document.getElementById('detalle-map'), {
-        center: { lat: puntos[0].lat, lng: puntos[0].lng },
+  const mapWrap = document.getElementById('detalle-map-wrap');
+  const puntosMapa = paradas.filter(p => p.lat && p.lng);
+  if (mapWrap && puntosMapa.length && googleMapsReady) {
+    mapWrap.style.display = 'block';
+    setTimeout(() => {
+      const mapEl = document.getElementById('detalle-map');
+      detalleMap = new google.maps.Map(mapEl, {
+        center: { lat: puntosMapa[0].lat, lng: puntosMapa[0].lng },
         zoom: 12,
         disableDefaultUI: true,
-        gestureHandling: 'none',
+        gestureHandling: 'cooperative',
         styles: [
           { elementType:'geometry', stylers:[{color:'#1a2744'}] },
           { featureType:'road', elementType:'geometry', stylers:[{color:'#2d4a70'}] },
+          { featureType:'road.highway', elementType:'geometry', stylers:[{color:'#1e6091'}] },
           { featureType:'water', elementType:'geometry', stylers:[{color:'#0a1628'}] },
           { featureType:'poi', stylers:[{visibility:'off'}] },
           { elementType:'labels.text.fill', stylers:[{color:'#7a9fc0'}] },
           { elementType:'labels.icon', stylers:[{visibility:'off'}] },
         ]
       });
-    }
-    const bounds = new google.maps.LatLngBounds();
-    puntos.forEach((p, i) => {
-      const entregada = p.hecha && !p.fallida;
-      const fallida   = p.fallida;
-      const color = entregada ? '#00e676' : fallida ? '#ff5252' : '#8a9caa';
-      new google.maps.Marker({
-        position: { lat: p.lat, lng: p.lng },
-        map: detalleMap,
-        icon: {
-          path: google.maps.SymbolPath.CIRCLE,
-          scale: 7, fillColor: color, fillOpacity: 1,
-          strokeColor: '#fff', strokeWeight: 1.5,
-        },
-        label: { text: String(i+1), color:'#000', fontSize:'9px', fontWeight:'800' },
+      const bounds = new google.maps.LatLngBounds();
+      puntosMapa.forEach((p, i) => {
+        const entregada = p.hecha && !p.fallida;
+        const fallida   = p.fallida;
+        const fillColor = entregada ? '#00e676' : fallida ? '#ff5252' : '#607d8b';
+        new google.maps.Marker({
+          position: { lat: p.lat, lng: p.lng },
+          map: detalleMap,
+          icon: {
+            path: google.maps.SymbolPath.CIRCLE,
+            scale: 9, fillColor, fillOpacity: 1,
+            strokeColor: '#fff', strokeWeight: 2,
+          },
+          label: { text: String(i+1), color:'#000', fontSize:'9px', fontWeight:'800' },
+          zIndex: entregada ? 5 : fallida ? 4 : 3,
+        });
+        bounds.extend({ lat: p.lat, lng: p.lng });
       });
-      bounds.extend({ lat: p.lat, lng: p.lng });
-    });
-    detalleMap.fitBounds(bounds, 30);
-  }, 350);
+      detalleMap.fitBounds(bounds, { top:20, right:20, bottom:20, left:20 });
+    }, 300);
+  } else if (mapWrap) {
+    mapWrap.style.display = 'none';
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════
