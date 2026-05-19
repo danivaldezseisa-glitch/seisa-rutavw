@@ -642,6 +642,27 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
 <!-- TOAST -->
 <div id="toast"></div>
 
+<!-- SCREEN: HISTORIAL -->
+<div class="screen hidden" id="screen-historial">
+  <div class="topbar">
+    <button class="topbar-back" onclick="showScreen('screen-home')">←</button>
+    <h2>📋 Historial</h2>
+    <button onclick="confirmarBorrarHistorial()" style="background:none;border:none;color:var(--text3);font-size:12px;cursor:pointer;padding:4px 8px;">Borrar todo</button>
+  </div>
+  <div class="scroll" id="historial-list" style="padding:12px 16px;display:flex;flex-direction:column;gap:10px;"></div>
+</div>
+
+<!-- SCREEN: DETALLE RUTA -->
+<div class="screen hidden" id="screen-detalle-ruta">
+  <div class="topbar">
+    <button class="topbar-back" onclick="showScreen('screen-historial')">←</button>
+    <h2 id="detalle-titulo">Ruta</h2>
+  </div>
+  <div id="detalle-map" style="height:200px;flex-shrink:0;background:var(--surface);"></div>
+  <div id="detalle-metricas" style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:1px;background:var(--border);flex-shrink:0;"></div>
+  <div class="scroll" id="detalle-paradas-list" style="flex:1;"></div>
+</div>
+
 <!-- MODAL: CONFIG GITHUB -->
 <div class="modal-overlay hidden" id="modal-github">
   <div class="modal-sheet">
@@ -908,15 +929,38 @@ let editUbData    = null; // {lat,lng,nombre} para edición temporal
 // ══════════════════════════════════════════════════════════════════
 //  NAVEGACIÓN DE PANTALLAS
 // ══════════════════════════════════════════════════════════════════
+// Pantalla actual para navegar atrás
+let currentScreen = 'screen-home';
+const BACK_MAP = {
+  'screen-crear':        'screen-home',
+  'screen-paradas':      'screen-crear',
+  'screen-resumen':      'screen-paradas',
+  'screen-historial':    'screen-home',
+  'screen-detalle-ruta': 'screen-historial',
+};
+
+function navegarAtras() {
+  // En navegación: confirmar salida
+  if (currentScreen === 'screen-nav') {
+    if (confirm('¿Salir de la navegación? La ruta se guarda.')) salirNavegacion();
+    return;
+  }
+  const prev = BACK_MAP[currentScreen];
+  if (prev) showScreen(prev);
+}
+
 function showScreen(id) {
   document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
   const target = document.getElementById(id);
   if (target) {
     target.classList.remove('hidden');
-    if (id === 'screen-paradas') initMapaParadas();
+    currentScreen = id;
+    if (id === 'screen-paradas')   initMapaParadas();
+    if (id === 'screen-nav')       initMapaNav();
+    if (id === 'screen-crear')     { cargarBase(); renderBaseUI(); }
+    if (id === 'screen-historial') renderHistorial();
     if (id === 'screen-resumen' && resMap) { resMap = null; resDirectionsRenderer = null; }
-    if (id === 'screen-nav')     initMapaNav();
-    if (id === 'screen-crear')   { cargarBase(); renderBaseUI(); }
+    if (id !== 'screen-detalle-ruta') detalleMap = null;
   }
 }
 
@@ -979,12 +1023,151 @@ function continuarRuta() {
 
 function verRuta(id) {
   const r = state.rutas.find(x => x.id === id);
-  if (!r) return;
-  showToast(`${r.nombre} · ${r.paradas.filter(p=>p.hecha).length}/${r.paradas.length} entregadas`);
+  if (r) verDetalleRuta(r);
 }
 
 function showHistorial() {
-  showToast('Historial próximamente');
+  renderHistorial();
+  showScreen('screen-historial');
+}
+
+function renderHistorial() {
+  const lista = document.getElementById('historial-list');
+  const rutas = (state.rutas || []).slice().reverse();
+  if (!rutas.length) {
+    lista.innerHTML = '<div style="text-align:center;color:var(--text3);font-size:13px;padding:40px 16px;">No hay rutas anteriores</div>';
+    return;
+  }
+  lista.innerHTML = '';
+  rutas.forEach((ruta, i) => {
+    const entregadas = (ruta.paradas||[]).filter(p => p.hecha && !p.fallida).length;
+    const fallidas   = (ruta.paradas||[]).filter(p => p.fallida).length;
+    const total      = (ruta.paradas||[]).length;
+    const fecha      = ruta.fecha || (ruta.fechaFin ? ruta.fechaFin.slice(0,10) : '—');
+    const pct        = total ? Math.round(entregadas/total*100) : 0;
+    const card = document.createElement('div');
+    card.className = 'ruta-card';
+    card.style.cursor = 'pointer';
+    card.innerHTML = `
+      <div class="ruta-card-icon" style="background:rgba(0,212,255,.1);border-color:rgba(0,212,255,.2);">🗺️</div>
+      <div class="ruta-card-info" style="flex:1;min-width:0;">
+        <div class="ruta-card-name"></div>
+        <div class="ruta-card-sub">${fecha} · ${total} paradas</div>
+        <div style="display:flex;gap:8px;margin-top:4px;">
+          <span style="font-size:11px;color:var(--green);font-weight:700;">✓ ${entregadas}</span>
+          <span style="font-size:11px;color:var(--red);font-weight:700;">✗ ${fallidas}</span>
+          <span style="font-size:11px;color:var(--text3);">${pct}% efectividad</span>
+        </div>
+      </div>
+      <div style="font-size:18px;color:var(--text3);">›</div>`;
+    card.querySelector('.ruta-card-name').textContent = ruta.nombre || 'Ruta sin nombre';
+    card.onclick = () => verDetalleRuta(ruta);
+    lista.appendChild(card);
+  });
+}
+
+function confirmarBorrarHistorial() {
+  if (!confirm('¿Borrar todo el historial?')) return;
+  state.rutas = [];
+  saveState();
+  renderHistorial();
+  renderHome();
+  showToast('Historial borrado');
+}
+
+let detalleMap = null;
+
+function verDetalleRuta(ruta) {
+  document.getElementById('detalle-titulo').textContent = ruta.nombre || 'Detalle';
+
+  // Métricas
+  const entregadas = (ruta.paradas||[]).filter(p => p.hecha && !p.fallida).length;
+  const fallidas   = (ruta.paradas||[]).filter(p => p.fallida).length;
+  const total      = (ruta.paradas||[]).length;
+  const metEl = document.getElementById('detalle-metricas');
+  metEl.innerHTML = `
+    <div style="padding:12px;background:var(--surface);text-align:center;">
+      <div style="font-size:22px;font-weight:800;color:var(--green);font-family:var(--mono);">${entregadas}</div>
+      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;margin-top:2px;">Entregadas</div>
+    </div>
+    <div style="padding:12px;background:var(--surface);text-align:center;">
+      <div style="font-size:22px;font-weight:800;color:var(--red);font-family:var(--mono);">${fallidas}</div>
+      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;margin-top:2px;">Fallidas</div>
+    </div>
+    <div style="padding:12px;background:var(--surface);text-align:center;">
+      <div style="font-size:22px;font-weight:800;color:var(--accent);font-family:var(--mono);">${ruta.kmTotal||'—'}</div>
+      <div style="font-size:10px;color:var(--text3);text-transform:uppercase;margin-top:2px;">km</div>
+    </div>`;
+
+  // Lista de paradas con hora de entrega/rechazo
+  const lista = document.getElementById('detalle-paradas-list');
+  lista.innerHTML = '';
+  const paradas = ruta.paradas || [];
+  if (!paradas.length) {
+    lista.innerHTML = '<div style="padding:20px;text-align:center;color:var(--text3);font-size:13px;">Sin paradas registradas</div>';
+  }
+  paradas.forEach((p, i) => {
+    const entregada = p.hecha && !p.fallida;
+    const fallida   = p.fallida;
+    const color = entregada ? 'var(--green)' : fallida ? 'var(--red)' : 'var(--text3)';
+    const icono = entregada ? '✓' : fallida ? '✗' : '—';
+    const bg    = entregada ? 'rgba(0,230,118,.08)' : fallida ? 'rgba(255,82,82,.08)' : 'transparent';
+    const div = document.createElement('div');
+    div.style.cssText = `padding:12px 16px;border-bottom:1px solid var(--border);background:${bg};display:flex;align-items:center;gap:12px;`;
+    div.innerHTML = `
+      <div style="width:28px;height:28px;border-radius:50%;background:${bg};border:2px solid ${color};color:${color};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;">${icono}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+        <div style="display:flex;align-items:center;gap:8px;margin-top:3px;">
+          ${p.horaAccion ? `<span style="font-size:12px;color:${color};font-weight:700;">${entregada?'Entregada':'Fallida'} · ${p.horaAccion}</span>` : '<span style="font-size:11px;color:var(--text3);">Sin acción registrada</span>'}
+        </div>
+      </div>
+      <div style="font-size:11px;color:var(--text3);flex-shrink:0;">#${i+1}</div>`;
+    div.querySelector('div > div').textContent = p.nombre || ('Parada ' + (i+1));
+    lista.appendChild(div);
+  });
+
+  showScreen('screen-detalle-ruta');
+
+  // Mapa del detalle
+  setTimeout(() => {
+    const puntos = paradas.filter(p => p.lat);
+    if (!puntos.length || !googleMapsReady) return;
+    if (!detalleMap) {
+      detalleMap = new google.maps.Map(document.getElementById('detalle-map'), {
+        center: { lat: puntos[0].lat, lng: puntos[0].lng },
+        zoom: 12,
+        disableDefaultUI: true,
+        gestureHandling: 'none',
+        styles: [
+          { elementType:'geometry', stylers:[{color:'#1a2744'}] },
+          { featureType:'road', elementType:'geometry', stylers:[{color:'#2d4a70'}] },
+          { featureType:'water', elementType:'geometry', stylers:[{color:'#0a1628'}] },
+          { featureType:'poi', stylers:[{visibility:'off'}] },
+          { elementType:'labels.text.fill', stylers:[{color:'#7a9fc0'}] },
+          { elementType:'labels.icon', stylers:[{visibility:'off'}] },
+        ]
+      });
+    }
+    const bounds = new google.maps.LatLngBounds();
+    puntos.forEach((p, i) => {
+      const entregada = p.hecha && !p.fallida;
+      const fallida   = p.fallida;
+      const color = entregada ? '#00e676' : fallida ? '#ff5252' : '#8a9caa';
+      new google.maps.Marker({
+        position: { lat: p.lat, lng: p.lng },
+        map: detalleMap,
+        icon: {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 7, fillColor: color, fillOpacity: 1,
+          strokeColor: '#fff', strokeWeight: 1.5,
+        },
+        label: { text: String(i+1), color:'#000', fontSize:'9px', fontWeight:'800' },
+      });
+      bounds.extend({ lat: p.lat, lng: p.lng });
+    });
+    detalleMap.fitBounds(bounds, 30);
+  }, 350);
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -2884,12 +3067,34 @@ async function procesarMasivo() {
   const mm = String(hoy.getMonth()+1).padStart(2,'0');
   document.getElementById('cr-fecha').value = `${hoy.getFullYear()}-${mm}-${dd}`;
 
-  // Botón atrás físico
+  // ── Botón físico atrás ───────────────────────────────────────────
   history.replaceState({ s: 'screen-home' }, '');
   history.pushState({ s: 'screen-home' }, '');
   window.addEventListener('popstate', () => {
+    navegarAtras();
     history.pushState({ s: 'screen-home' }, '');
   });
+
+  // ── Swipe horizontal para navegar ───────────────────────────────
+  let swipeStartX = 0, swipeStartY = 0, swipeStartTime = 0;
+
+  document.addEventListener('touchstart', e => {
+    swipeStartX    = e.touches[0].clientX;
+    swipeStartY    = e.touches[0].clientY;
+    swipeStartTime = Date.now();
+  }, { passive: true });
+
+  document.addEventListener('touchend', e => {
+    const dx   = e.changedTouches[0].clientX - swipeStartX;
+    const dy   = e.changedTouches[0].clientY - swipeStartY;
+    const dt   = Date.now() - swipeStartTime;
+    const absX = Math.abs(dx), absY = Math.abs(dy);
+
+    // Swipe hacia la derecha (deslizar desde borde izquierdo = atrás)
+    if (dx > 60 && absX > absY * 1.5 && dt < 400 && swipeStartX < 40) {
+      navegarAtras();
+    }
+  }, { passive: true });
 
   // Cargar config GitHub y sincronizar al inicio
   ghConfig = loadGHConfig();
