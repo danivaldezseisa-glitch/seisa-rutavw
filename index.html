@@ -111,9 +111,9 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
   background: linear-gradient(180deg,rgba(10,22,40,.92) 0%,transparent 100%);
   padding: max(14px, env(safe-area-inset-top)) 14px 20px;
 }
-.nav-metric { text-align: center; padding: 0 4px; }
-.nav-metric-val { font-size: 19px; font-weight: 800; font-family: var(--mono); line-height: 1; }
-.nav-metric-lbl { font-size: 9px; color: var(--text3); text-transform: uppercase; letter-spacing: .06em; margin-top: 3px; }
+.nav-metric { text-align: center; }
+.nav-metric-val { font-size: 22px; font-weight: 800; font-family: var(--mono); line-height: 1; }
+.nav-metric-lbl { font-size: 9px; color: var(--text3); text-transform: uppercase; letter-spacing: .06em; margin-top: 2px; }
 .nav-divider { width: 1px; height: 36px; background: var(--border); }
 
 /* Google Maps container */
@@ -138,7 +138,7 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
 
 /* ── FLOATING BTNS ── */
 #nav-float-btns { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); z-index: 100; display: flex; flex-direction: column; gap: 8px; }
-.nav-float-btn { width: 46px; height: 46px; border-radius: 50%; border: 1px solid rgba(255,255,255,.1); background: rgba(6,14,28,.92); backdrop-filter: blur(10px); box-shadow: 0 3px 14px rgba(0,0,0,.6); color: var(--text2); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; -webkit-tap-highlight-color:transparent; }
+.nav-float-btn { width: 44px; height: 44px; border-radius: 50%; border: none; background: rgba(13,27,42,.9); backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,.5); color: var(--text2); font-size: 18px; cursor: pointer; display: flex; align-items: center; justify-content: center; }
 
 /* ── MODAL ── */
 .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.7); z-index: 9000; display: flex; align-items: flex-end; }
@@ -157,30 +157,8 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
 @keyframes pulse { 0%,100%{opacity:1}50%{opacity:.5} }
 @keyframes scanLine { 0%{top:0}50%{top:calc(100% - 2px)}100%{top:0} }
 </style>
-<meta name="mobile-web-app-capable" content="yes">
-<meta name="apple-touch-fullscreen" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<link rel="manifest" id="pwa-manifest">
-<script>
-// Generar manifest PWA dinámicamente
-const manifest = {
-  name: "SEISA Rutas",
-  short_name: "SEISA",
-  start_url: window.location.href,
-  display: "standalone",
-  background_color: "#0a1628",
-  theme_color: "#0a1628",
-  orientation: "portrait",
-  icons: [{
-    src: "data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='20' fill='%230a1628'/><text y='.9em' font-size='80' x='10'>🚛</text></svg>",
-    sizes: "192x192", type: "image/svg+xml"
-  }]
-};
-const blob = new Blob([JSON.stringify(manifest)], {type:'application/json'});
-document.getElementById('pwa-manifest').href = URL.createObjectURL(blob);
-</script>
 </head>
-<body style="overscroll-behavior:none;">
+<body>
 
 <!-- ════════════════════════════════
      SCREEN 1: HOME
@@ -244,48 +222,37 @@ document.getElementById('pwa-manifest').href = URL.createObjectURL(blob);
       <div class="toggle-row">
         <div>
           <div style="font-size:14px;font-weight:600;">🛣️ Evitar peajes</div>
-          <div style="font-size:11px;color:var(--text3);margin-top:2px;" id="peajes-status">Desactivado — usa autopistas</div>
           <div style="font-size:12px;color:var(--text3);margin-top:2px;">Usar rutas sin casetas</div>
         </div>
         <label class="toggle">
-          <input type="checkbox" id="cr-peajes" onchange="document.getElementById('peajes-status').textContent=this.checked?'Activado — evita casetas':'Desactivado — usa autopistas'">
+          <input type="checkbox" id="cr-peajes">
           <span class="toggle-slider"></span>
         </label>
       </div>
     </div>
 
     <div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-        <div class="label" style="margin:0;">📍 Punto de inicio</div>
-        <div id="cr-inicio-borrar" style="display:none;align-items:center;gap:6px;">
-          <span style="font-size:11px;color:var(--green);font-weight:600;" id="cr-inicio-label"></span>
-          <button onclick="clearBase('inicio')" style="background:none;border:none;color:var(--text3);font-size:16px;cursor:pointer;padding:2px;" title="Cambiar">✕</button>
-        </div>
-      </div>
+      <div class="label" style="margin-bottom:10px;">📍 Punto de inicio</div>
       <div style="display:flex;gap:8px;">
         <div class="search-wrap" style="flex:1;">
           <input class="input" id="cr-inicio" placeholder="Buscar dirección o Plus Code..." oninput="buscarLugar('inicio',this.value)">
           <div id="search-results-inicio" class="search-results-box"></div>
         </div>
-        <button onclick="usarGPS('inicio')" title="Usar GPS actual" style="width:44px;height:44px;flex-shrink:0;border-radius:10px;border:1.5px solid var(--border);background:var(--surface2);color:var(--accent);font-size:20px;cursor:pointer;">◎</button>
+        <button onclick="usarGPS('inicio')" title="Usar mi ubicación actual" style="width:44px;height:44px;flex-shrink:0;border-radius:10px;border:1.5px solid var(--border);background:var(--surface2);color:var(--accent);font-size:20px;cursor:pointer;">◎</button>
       </div>
+      <div id="cr-inicio-label" style="font-size:11px;color:var(--green);margin-top:6px;display:none;"></div>
     </div>
 
     <div class="card">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-        <div class="label" style="margin:0;">🏁 Punto final</div>
-        <div id="cr-final-borrar" style="display:none;align-items:center;gap:6px;">
-          <span style="font-size:11px;color:var(--green);font-weight:600;" id="cr-final-label"></span>
-          <button onclick="clearBase('final')" style="background:none;border:none;color:var(--text3);font-size:16px;cursor:pointer;padding:2px;" title="Cambiar">✕</button>
-        </div>
-      </div>
+      <div class="label" style="margin-bottom:10px;">🏁 Punto final (base de regreso)</div>
       <div style="display:flex;gap:8px;">
         <div class="search-wrap" style="flex:1;">
           <input class="input" id="cr-final" placeholder="Buscar dirección o Plus Code..." oninput="buscarLugar('final',this.value)">
           <div id="search-results-final" class="search-results-box"></div>
         </div>
-        <button onclick="usarGPS('final')" title="Usar GPS actual" style="width:44px;height:44px;flex-shrink:0;border-radius:10px;border:1.5px solid var(--border);background:var(--surface2);color:var(--accent);font-size:20px;cursor:pointer;">◎</button>
+        <button onclick="usarGPS('final')" title="Usar mi ubicación actual" style="width:44px;height:44px;flex-shrink:0;border-radius:10px;border:1.5px solid var(--border);background:var(--surface2);color:var(--accent);font-size:20px;cursor:pointer;">◎</button>
       </div>
+      <div id="cr-final-label" style="font-size:11px;color:var(--green);margin-top:6px;display:none;"></div>
     </div>
 
     <button class="btn btn-accent" onclick="irACargarParadas()">
@@ -307,71 +274,41 @@ document.getElementById('pwa-manifest').href = URL.createObjectURL(blob);
   <!-- MAPA -->
   <div id="paradas-map" style="height:260px;flex-shrink:0;"></div>
 
-  <!-- PLUS CODE -->
-  <div style="padding:10px 12px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;">
-    <!-- Input Plus Code + botones -->
-    <div style="display:flex;gap:8px;">
+  <!-- BUSCADOR -->
+  <div style="padding:10px 12px;background:var(--bg2);border-bottom:1px solid var(--border);flex-shrink:0;position:relative;">
+    <div class="search-wrap">
+      <input class="input" id="paradas-search" placeholder="🔍 Buscar dirección, Plus Code o toca el mapa..." oninput="buscarParada(this.value)" style="padding-right:40px;">
+      <div id="search-results-parada" class="search-results-box" style="position:absolute;left:0;right:0;z-index:500;"></div>
+    </div>
+    <!-- PASO 1: Plus Code -->
+    <div style="display:flex;gap:8px;margin-top:8px;">
       <input class="input" id="paradas-pluscode"
         placeholder="Plus Code · ej: GP7F+JX5 Naucalpan de Juárez, Estado de México"
-        style="flex:1;font-size:13px;font-family:var(--mono);"
-        onkeydown="if(event.key==='Enter')resolverPlusCodeUI()">
-      <button onclick="resolverPlusCodeUI()"
-        style="padding:10px 16px;border-radius:10px;border:1.5px solid var(--accent);background:rgba(0,212,255,.15);color:var(--accent);font-size:14px;font-weight:800;cursor:pointer;flex-shrink:0;">
-        Buscar
-      </button>
-      <button onclick="mostrarPegadoMasivo()"
-        style="padding:10px 12px;border-radius:10px;border:1.5px solid rgba(255,145,0,.4);background:rgba(255,145,0,.1);color:var(--orange);font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;">
-        📋
-      </button>
+        style="flex:1;font-size:13px;font-family:var(--mono);">
+      <button onclick="resolverPlusCodeUI()" style="width:auto;padding:8px 14px;flex-shrink:0;border-radius:10px;border:1.5px solid var(--accent);background:rgba(0,212,255,.12);color:var(--accent);font-size:13px;font-weight:700;cursor:pointer;">Buscar</button>
+      <button onclick="mostrarPegadoMasivo()" style="width:auto;padding:8px 10px;flex-shrink:0;border-radius:10px;border:1.5px solid rgba(255,145,0,.4);background:rgba(255,145,0,.1);color:var(--orange);font-size:12px;font-weight:700;cursor:pointer;">📋</button>
     </div>
-
-    <!-- Estado: cargando -->
-    <div id="pc-loading" style="display:none;margin-top:8px;font-size:12px;color:var(--text3);text-align:center;padding:6px;">
-      🔍 Resolviendo Plus Code...
+    <!-- PASO 2 y 3: confirmar nombre y agregar -->
+    <div id="pc-confirm-box" style="display:none;margin-top:8px;background:var(--surface);border:1.5px solid var(--accent);border-radius:12px;padding:12px 14px;">
+      <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:6px;">📍 Ubicación encontrada</div>
+      <div id="pc-coords-label" style="font-size:12px;color:var(--text3);font-family:var(--mono);margin-bottom:10px;"></div>
+      <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">Nombre / Calle y número</div>
+      <input class="input" id="pc-nombre-input" placeholder="Ej: José Ma. Morelos 6" style="font-size:14px;margin-bottom:10px;">
+      <button onclick="confirmarAgregarPlusCode()" class="btn btn-green" style="padding:11px;">＋ Agregar parada</button>
     </div>
-
-    <!-- Estado: error -->
-    <div id="pc-error" style="display:none;margin-top:8px;font-size:12px;color:var(--red);padding:8px;background:rgba(255,82,82,.08);border-radius:8px;border:1px solid rgba(255,82,82,.25);"></div>
-
-    <!-- Estado: ubicación encontrada → nombre + número -->
-    <div id="pc-confirm-box" style="display:none;margin-top:10px;background:var(--surface);border:1.5px solid var(--accent);border-radius:12px;padding:12px 14px;">
-      <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;">
-        <div style="font-size:18px;">📍</div>
-        <div>
-          <div id="pc-calle-label" style="font-size:13px;font-weight:700;color:var(--text);"></div>
-          <div id="pc-coords-label" style="font-size:11px;color:var(--text3);font-family:var(--mono);margin-top:1px;"></div>
-        </div>
-      </div>
-      <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">Nombre completo de la parada</div>
-      <div style="display:flex;gap:8px;">
-        <input class="input" id="pc-nombre-input"
-          placeholder="Ej: José Ma. Morelos 6"
-          style="flex:1;font-size:14px;"
-          onkeydown="if(event.key==='Enter')confirmarAgregarPlusCode()">
-        <button onclick="confirmarAgregarPlusCode()"
-          style="padding:10px 16px;border-radius:10px;border:none;background:var(--green);color:#000;font-size:14px;font-weight:800;cursor:pointer;flex-shrink:0;white-space:nowrap;">
-          ＋ Agregar
-        </button>
-      </div>
-    </div>
+    <div id="pc-loading" style="display:none;margin-top:8px;font-size:12px;color:var(--text3);text-align:center;padding:8px;">🔍 Resolviendo Plus Code...</div>
+    <div id="pc-error" style="display:none;margin-top:8px;font-size:12px;color:var(--red);text-align:center;padding:8px;"></div>
   </div>
 
   <!-- LISTA PARADAS -->
   <div class="scroll" id="paradas-list-wrap" style="flex:1;">
     <div id="paradas-list"></div>
     <div id="paradas-empty" style="padding:24px;text-align:center;color:var(--text3);font-size:13px;">
-      Pega un Plus Code arriba o toca el mapa para agregar paradas
+      Toca el mapa o busca una dirección para agregar paradas
     </div>
   </div>
 
   <!-- BOTÓN OPTIMIZAR -->
-  <!-- Banner re-optimizar (aparece cuando se edita una parada) -->
-  <div id="banner-reoptimizar" style="display:none;padding:8px 12px;background:rgba(255,145,0,.12);border-bottom:1px solid rgba(255,145,0,.3);flex-shrink:0;display:none;">
-    <div style="display:flex;align-items:center;gap:10px;">
-      <div style="font-size:12px;color:var(--orange);flex:1;">⚠️ Una parada fue modificada</div>
-      <button onclick="optimizarRuta()" style="padding:6px 14px;border-radius:8px;border:none;background:var(--orange);color:#000;font-size:12px;font-weight:800;cursor:pointer;">⚡ Re-optimizar</button>
-    </div>
-  </div>
   <div style="padding:12px 16px calc(env(safe-area-inset-bottom,0px)+12px);background:var(--bg2);border-top:1px solid var(--border);flex-shrink:0;">
     <button class="btn btn-green" onclick="optimizarRuta()" id="btn-optimizar" disabled>
       ⚡ Optimizar Ruta
@@ -385,39 +322,41 @@ document.getElementById('pwa-manifest').href = URL.createObjectURL(blob);
 <div class="screen hidden" id="screen-resumen">
   <div class="topbar">
     <button class="topbar-back" onclick="showScreen('screen-paradas')">←</button>
-    <h2>📊 Resumen de Ruta</h2>
+    <h2>📊 Resumen</h2>
+    <span id="res-paradas-count" style="font-size:12px;color:var(--accent);font-weight:700;"></span>
   </div>
 
-  <!-- MAPA RUTA COMPLETA -->
-  <div id="res-map" style="height:260px;min-height:260px;flex-shrink:0;position:relative;background:var(--surface2);border-bottom:1px solid var(--border);">
-    <div id="res-map-loading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text3);z-index:10;background:var(--surface);">
-      🗺️ Trazando ruta...
+  <!-- Mapa ruta completa -->
+  <div id="res-map" style="height:240px;min-height:240px;flex-shrink:0;position:relative;background:var(--surface2);border-bottom:1px solid var(--border);">
+    <div id="res-map-loading" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;z-index:10;background:var(--surface);">
+      <div style="font-size:28px;">🗺️</div>
+      <div style="font-size:13px;color:var(--text3);">Trazando ruta...</div>
     </div>
   </div>
 
   <div class="scroll" style="padding:12px 16px;display:flex;flex-direction:column;gap:10px;">
 
     <!-- Métricas -->
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:8px;">
-      <div class="card" style="padding:10px;text-align:center;">
-        <div style="font-size:20px;font-weight:800;color:var(--accent);font-family:var(--mono);" id="res-km">—</div>
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
+      <div class="card" style="padding:10px 4px;text-align:center;">
+        <div style="font-size:18px;font-weight:800;color:var(--accent);font-family:var(--mono);" id="res-km">—</div>
         <div style="font-size:9px;color:var(--text3);text-transform:uppercase;margin-top:2px;">km</div>
       </div>
-      <div class="card" style="padding:10px;text-align:center;">
-        <div style="font-size:20px;font-weight:800;color:var(--green);font-family:var(--mono);" id="res-paradas">—</div>
+      <div class="card" style="padding:10px 4px;text-align:center;">
+        <div style="font-size:18px;font-weight:800;color:var(--green);font-family:var(--mono);" id="res-paradas">—</div>
         <div style="font-size:9px;color:var(--text3);text-transform:uppercase;margin-top:2px;">paradas</div>
       </div>
-      <div class="card" style="padding:10px;text-align:center;">
-        <div style="font-size:20px;font-weight:800;color:var(--yellow);font-family:var(--mono);" id="res-tiempo">—</div>
-        <div style="font-size:9px;color:var(--text3);text-transform:uppercase;margin-top:2px;">hrs</div>
+      <div class="card" style="padding:10px 4px;text-align:center;">
+        <div style="font-size:18px;font-weight:800;color:var(--yellow);font-family:var(--mono);" id="res-tiempo">—</div>
+        <div style="font-size:9px;color:var(--text3);text-transform:uppercase;margin-top:2px;">hrs trab.</div>
       </div>
-      <div class="card" style="padding:10px;text-align:center;">
-        <div style="font-size:16px;font-weight:800;color:var(--orange);font-family:var(--mono);" id="res-fin">—</div>
-        <div style="font-size:9px;color:var(--text3);text-transform:uppercase;margin-top:2px;">fin</div>
+      <div class="card" style="padding:10px 4px;text-align:center;">
+        <div style="font-size:14px;font-weight:800;color:var(--orange);font-family:var(--mono);" id="res-fin">—</div>
+        <div style="font-size:9px;color:var(--text3);text-transform:uppercase;margin-top:2px;">hora fin</div>
       </div>
     </div>
 
-    <!-- Lista paradas -->
+    <!-- Lista con ETAs -->
     <div class="card" style="padding:0;overflow:hidden;">
       <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;display:flex;justify-content:space-between;">
         <span>Orden optimizado</span>
@@ -426,269 +365,61 @@ document.getElementById('pwa-manifest').href = URL.createObjectURL(blob);
       <div id="res-orden-list"></div>
     </div>
 
-    <!-- Botones -->
-    <button class="btn btn-green" onclick="iniciarRuta()" style="font-size:17px;padding:18px;">
-      🚀 Iniciar Ruta
+    <!-- Botón principal: abrir Google Maps con toda la ruta -->
+    <button class="btn btn-green" onclick="iniciarRutaGoogleMaps()" style="font-size:17px;padding:18px;gap:10px;">
+      <span style="font-size:20px;">🚀</span> Iniciar en Google Maps
     </button>
-    <button class="btn btn-ghost" onclick="showScreen('screen-paradas')">
-      ← Editar paradas
-    </button>
+    <button class="btn btn-ghost" onclick="showScreen('screen-paradas')">← Editar paradas</button>
   </div>
 </div>
 
+
+
 <!-- ════════════════════════════════
-     SCREEN 5: NAVEGADOR GPS
+     SCREEN: SEGUIMIENTO DE RUTA
 ════════════════════════════════ -->
-<div class="screen hidden" id="screen-nav" style="background:#0a1117;overflow:hidden;">
+<div class="screen hidden" id="screen-seguimiento">
+  <div class="topbar">
+    <button class="topbar-back" onclick="showScreen('screen-resumen')">←</button>
+    <h2>📦 Seguimiento</h2>
+    <button onclick="abrirGoogleMaps()" style="width:auto;padding:6px 10px;font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--green);cursor:pointer;font-weight:700;">🗺️ Abrir</button>
+  </div>
+  <div class="scroll" style="padding:12px 16px;display:flex;flex-direction:column;gap:10px;">
 
-  <!-- ══ MAPA FULL SCREEN ══ -->
-  <div id="nav-map" style="position:absolute;inset:0;z-index:1;"></div>
-  <div id="gmap-container" style="position:absolute;inset:0;z-index:1;display:none;"></div>
-
-  <!-- ══ PANEL SUPERIOR: INSTRUCCIÓN (estilo Waze/Spoke) ══ -->
-  <div id="nav-instruccion" style="
-    position:absolute;top:0;left:0;right:0;z-index:100;
-    display:none;
-  ">
-    <!-- Barra de instrucción principal -->
-    <div style="
-      background:rgba(6,14,28,.97);
-      padding:max(14px,env(safe-area-inset-top)) 14px 12px;
-      border-bottom:2px solid rgba(0,212,255,.2);
-      box-shadow:0 4px 24px rgba(0,0,0,.6);
-    ">
-      <div style="display:flex;align-items:center;gap:12px;">
-
-        <!-- Botón atrás -->
-        <button onclick="salirNavegacion()" style="
-          width:38px;height:38px;border-radius:50%;border:none;
-          background:rgba(255,255,255,.08);color:#fff;font-size:18px;
-          cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;
-        ">←</button>
-
-        <!-- Ícono de giro -->
-        <div style="
-          width:64px;height:64px;border-radius:16px;
-          background:rgba(0,212,255,.12);border:2px solid rgba(0,212,255,.35);
-          display:flex;align-items:center;justify-content:center;
-          flex-shrink:0;
-        ">
-          <svg id="nav-giro-svg" viewBox="0 0 48 48" width="44" height="44" fill="white"></svg>
-        </div>
-
-        <!-- Distancia + calle -->
-        <div style="flex:1;min-width:0;">
-          <div id="nav-dist-prox" style="
-            font-size:36px;font-weight:900;color:#fff;
-            font-family:var(--mono);line-height:1;letter-spacing:-1px;
-          ">—</div>
-          <div id="nav-calle" style="
-            font-size:14px;font-weight:600;
-            color:rgba(255,255,255,.7);
-            margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-          "></div>
-        </div>
-
-        <!-- Voz -->
-        <button onclick="toggleVoz()" id="btn-voz" style="
-          width:38px;height:38px;border-radius:50%;border:none;
-          background:rgba(0,212,255,.12);color:var(--accent);
-          font-size:18px;cursor:pointer;flex-shrink:0;
-        ">🔊</button>
+    <!-- Progreso -->
+    <div class="card" style="padding:14px 16px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <span style="font-size:12px;color:var(--text3);">Progreso de entrega</span>
+        <span id="seg-pct" style="font-size:12px;font-weight:700;color:var(--accent);">0%</span>
       </div>
-
-      <!-- Barra de destino actual -->
-      <div style="
-        margin-top:10px;
-        background:rgba(0,212,255,.06);
-        border:1px solid rgba(0,212,255,.15);
-        border-radius:10px;
-        padding:8px 12px;
-        display:flex;justify-content:space-between;align-items:center;
-        gap:10px;
-      ">
-        <div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1;">
-          <div style="width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);flex-shrink:0;"></div>
-          <div id="nav-destino-nombre" style="
-            font-size:13px;font-weight:600;
-            color:rgba(255,255,255,.9);
-            white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
-          "></div>
-        </div>
-        <div style="text-align:right;flex-shrink:0;">
-          <div id="nav-dist-total" style="font-size:15px;font-weight:800;color:var(--accent);font-family:var(--mono);"></div>
-          <div id="nav-tiempo-restante" style="font-size:10px;color:rgba(255,255,255,.4);margin-top:1px;"></div>
-        </div>
+      <div style="height:6px;background:var(--surface2);border-radius:6px;overflow:hidden;">
+        <div id="seg-bar" style="height:100%;background:linear-gradient(90deg,var(--accent),var(--green));border-radius:6px;width:0%;transition:width .4s;"></div>
+      </div>
+      <div style="display:flex;gap:12px;margin-top:10px;">
+        <span id="seg-entregadas" style="font-size:12px;color:var(--green);font-weight:700;">✓ 0 entregadas</span>
+        <span id="seg-fallidas"   style="font-size:12px;color:var(--red);font-weight:700;">✗ 0 fallidas</span>
+        <span id="seg-pendientes" style="font-size:12px;color:var(--text3);">— 0 pendientes</span>
       </div>
     </div>
-  </div>
 
-  <!-- Topbar simple (antes de calcular ruta) -->
-  <div id="nav-topbar-simple" style="
-    position:absolute;top:0;left:0;right:0;z-index:100;
-    background:rgba(6,14,28,.96);
-    padding:max(14px,env(safe-area-inset-top)) 14px 12px;
-    display:flex;align-items:center;gap:10px;
-    border-bottom:1px solid rgba(0,212,255,.12);
-  ">
-    <button onclick="salirNavegacion()" style="width:36px;height:36px;border-radius:50%;border:none;background:rgba(255,255,255,.08);color:#fff;font-size:18px;cursor:pointer;flex-shrink:0;">←</button>
-    <div id="nav-sub" style="flex:1;font-size:13px;color:var(--text2);">📡 Obteniendo GPS...</div>
-    <button onclick="toggleListaNav()" style="width:36px;height:36px;border-radius:50%;border:none;background:rgba(255,255,255,.08);color:#fff;font-size:18px;cursor:pointer;flex-shrink:0;">☰</button>
-  </div>
+    <!-- Botón re-abrir Google Maps (con paradas pendientes) -->
+    <button class="btn btn-accent" onclick="abrirGoogleMaps()" style="font-size:14px;">
+      🗺️ Continuar en Google Maps (paradas pendientes)
+    </button>
 
-  <!-- ══ VELOCÍMETRO ══ -->
-  <div id="nav-velocimetro" style="
-    position:absolute;left:12px;z-index:100;display:none;
-    bottom:calc(env(safe-area-inset-bottom,0px) + 270px);
-  ">
-    <div style="
-      width:58px;height:58px;border-radius:50%;
-      background:rgba(6,14,28,.97);
-      border:2.5px solid rgba(255,255,255,.15);
-      display:flex;flex-direction:column;align-items:center;justify-content:center;
-      box-shadow:0 2px 12px rgba(0,0,0,.5);
-    ">
-      <div id="nav-vel-num" style="font-size:20px;font-weight:900;font-family:var(--mono);color:#fff;line-height:1;">0</div>
-      <div style="font-size:8px;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:.04em;">km/h</div>
+    <!-- Lista de paradas con estado -->
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;">
+        Lista de paradas
+      </div>
+      <div id="seg-paradas-list"></div>
     </div>
+
+    <!-- Botón finalizar -->
+    <button class="btn btn-ghost" onclick="finalizarRuta()" style="color:var(--red);border-color:rgba(255,82,82,.3);">
+      🏁 Finalizar y guardar ruta
+    </button>
   </div>
-
-  <!-- ══ BOTONES FLOTANTES DERECHA ══ -->
-  <div style="position:absolute;right:12px;z-index:100;display:flex;flex-direction:column;gap:9px;bottom:calc(env(safe-area-inset-bottom,0px) + 270px);">
-    <button class="nav-float-btn" onclick="centrarGPS()" id="btn-centrar" title="Centrar" style="color:var(--accent);">◎</button>
-    <button class="nav-float-btn" onclick="vistaGeneral()" title="Vista general">⊞</button>
-    <button class="nav-float-btn" onclick="toggleListaNav()" title="Lista">☰</button>
-    <button class="nav-float-btn" onclick="editarUbicacion()" style="color:var(--yellow);" title="Editar ubicación">✏️</button>
-  </div>
-
-  <!-- ══ PANEL INFERIOR ══ -->
-  <div id="nav-panel" style="
-    position:absolute;bottom:0;left:0;right:0;z-index:100;
-  ">
-    <div style="
-      background:rgba(6,14,28,.98);
-      border-top:1.5px solid rgba(0,212,255,.15);
-      border-radius:22px 22px 0 0;
-      padding:16px 14px calc(env(safe-area-inset-bottom,0px) + 14px);
-      box-shadow:0 -8px 40px rgba(0,0,0,.7);
-      display:flex;flex-direction:column;gap:12px;
-    ">
-
-      <!-- Progreso visual -->
-      <div style="display:flex;align-items:center;gap:10px;">
-        <div style="
-          flex:1;height:4px;border-radius:4px;
-          background:rgba(255,255,255,.08);
-          overflow:hidden;
-        ">
-          <div id="nav-progress-bar" style="
-            height:100%;background:linear-gradient(90deg,var(--accent),var(--green));
-            border-radius:4px;transition:width .5s ease;width:0%;
-          "></div>
-        </div>
-        <div id="nav-progreso" style="font-size:12px;font-weight:700;color:var(--green);font-family:var(--mono);flex-shrink:0;">0/0</div>
-      </div>
-
-      <!-- Métricas en fila -->
-      <div style="display:grid;grid-template-columns:1fr 1px 1fr 1px 1fr;align-items:center;">
-        <div class="nav-metric">
-          <div class="nav-metric-val" id="nav-km" style="color:var(--accent);">—</div>
-          <div class="nav-metric-lbl">km ruta</div>
-        </div>
-        <div style="width:1px;height:28px;background:rgba(255,255,255,.08);"></div>
-        <div class="nav-metric">
-          <div class="nav-metric-val" id="nav-eta" style="color:var(--yellow);">—</div>
-          <div class="nav-metric-lbl">hora fin</div>
-        </div>
-        <div style="width:1px;height:28px;background:rgba(255,255,255,.08);"></div>
-        <div class="nav-metric">
-          <div class="nav-metric-val" id="nav-paradas-rest" style="color:var(--text2);">—</div>
-          <div class="nav-metric-lbl">pendientes</div>
-        </div>
-      </div>
-
-      <div style="height:1px;background:rgba(255,255,255,.06);"></div>
-
-      <!-- ══ BOTONES PRINCIPALES ══ -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <button onclick="marcarEntregada()" style="
-          padding:18px 8px;
-          border-radius:16px;
-          border:2px solid rgba(0,230,118,.45);
-          background:linear-gradient(135deg,rgba(0,230,118,.18),rgba(0,200,100,.08));
-          color:var(--green);
-          font-size:16px;font-weight:800;
-          cursor:pointer;font-family:var(--sans);
-          display:flex;align-items:center;justify-content:center;gap:6px;
-          box-shadow:0 0 20px rgba(0,230,118,.12);
-          transition:all .15s;
-          -webkit-tap-highlight-color:transparent;
-        ">
-          <span style="font-size:20px;">✓</span> Entregada
-        </button>
-        <button onclick="marcarFallida()" style="
-          padding:18px 8px;
-          border-radius:16px;
-          border:2px solid rgba(255,82,82,.4);
-          background:linear-gradient(135deg,rgba(255,82,82,.18),rgba(220,50,50,.08));
-          color:var(--red);
-          font-size:16px;font-weight:800;
-          cursor:pointer;font-family:var(--sans);
-          display:flex;align-items:center;justify-content:center;gap:6px;
-          box-shadow:0 0 20px rgba(255,82,82,.1);
-          -webkit-tap-highlight-color:transparent;
-        ">
-          <span style="font-size:20px;">✗</span> Fallida
-        </button>
-      </div>
-
-      <!-- Botones secundarios -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-        <button onclick="recalcularRuta()" style="
-          padding:11px;border-radius:12px;
-          border:1px solid rgba(0,212,255,.2);
-          background:rgba(0,212,255,.05);
-          color:var(--accent);font-size:12px;font-weight:700;
-          cursor:pointer;font-family:var(--sans);
-          display:flex;align-items:center;justify-content:center;gap:5px;
-        ">🔄 Recalcular</button>
-        <button onclick="deshacerAccion()" style="
-          padding:11px;border-radius:12px;
-          border:1px solid rgba(255,215,64,.2);
-          background:rgba(255,215,64,.05);
-          color:var(--yellow);font-size:12px;font-weight:700;
-          cursor:pointer;font-family:var(--sans);
-          display:flex;align-items:center;justify-content:center;gap:5px;
-        ">↩ Deshacer</button>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- ══ LISTA PARADAS OVERLAY ══ -->
-  <div id="nav-lista-overlay" class="hidden" style="
-    position:absolute;inset:0;z-index:200;
-    background:var(--bg);
-    display:flex;flex-direction:column;
-    transition:transform .3s cubic-bezier(.4,0,.2,1);
-  ">
-    <div style="
-      display:flex;align-items:center;gap:10px;
-      padding:max(14px,env(safe-area-inset-top)) 16px 12px;
-      background:var(--bg2);
-      border-bottom:1px solid var(--border);
-    ">
-      <button onclick="toggleListaNav()" style="
-        width:36px;height:36px;border-radius:50%;border:none;
-        background:var(--surface2);color:var(--text2);
-        font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;
-      ">←</button>
-      <div style="font-size:15px;font-weight:700;flex:1;">Lista de paradas</div>
-      <div id="nav-lista-resumen" style="font-size:12px;color:var(--text3);"></div>
-    </div>
-    <div class="scroll" id="nav-lista-items"></div>
-  </div>
-
 </div>
 
 <!-- ════════════════════════════════
@@ -765,57 +496,6 @@ document.getElementById('pwa-manifest').href = URL.createObjectURL(blob);
 
 <!-- TOAST -->
 <div id="toast"></div>
-
-<!-- Banner: Agregar a pantalla de inicio -->
-<div id="pwa-banner" style="
-  display:none;position:fixed;bottom:0;left:0;right:0;z-index:99999;
-  background:var(--surface);border-top:1px solid var(--border);
-  padding:12px 16px;
-  display:none;align-items:center;gap:10px;
-">
-  <div style="flex:1;">
-    <div style="font-size:13px;font-weight:700;">Instalar SEISA Rutas</div>
-    <div style="font-size:11px;color:var(--text3);margin-top:2px;">Agregar a pantalla de inicio para pantalla completa</div>
-  </div>
-  <button id="pwa-install-btn" style="padding:8px 14px;border-radius:8px;border:none;background:var(--accent);color:#000;font-size:13px;font-weight:700;cursor:pointer;">
-    Instalar
-  </button>
-  <button onclick="document.getElementById('pwa-banner').style.display='none'" style="background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;padding:4px;">✕</button>
-</div>
-
-<!-- SCREEN: HISTORIAL -->
-<div class="screen hidden" id="screen-historial">
-  <div class="topbar">
-    <button class="topbar-back" onclick="showScreen('screen-home')">←</button>
-    <h2>📋 Historial</h2>
-    <button onclick="confirmarBorrarHistorial()" style="background:none;border:none;color:var(--text3);font-size:12px;cursor:pointer;padding:4px 8px;">Borrar todo</button>
-  </div>
-  <div class="scroll" id="historial-list" style="padding:12px 16px;display:flex;flex-direction:column;gap:10px;"></div>
-</div>
-
-<!-- SCREEN: DETALLE RUTA -->
-<div class="screen hidden" id="screen-detalle-ruta">
-  <div class="topbar">
-    <button class="topbar-back" onclick="showScreen('screen-historial')">←</button>
-    <div style="flex:1;min-width:0;">
-      <div id="detalle-titulo" style="font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">Ruta</div>
-      <div id="detalle-fecha" style="font-size:11px;color:var(--text3);margin-top:1px;"></div>
-    </div>
-  </div>
-
-  <div class="scroll" style="flex:1;">
-    <!-- Métricas -->
-    <div id="detalle-metricas" style="display:grid;grid-template-columns:repeat(4,1fr);background:var(--bg2);border-bottom:1px solid var(--border);"></div>
-
-    <!-- Mapa (lazy, solo si tiene coords) -->
-    <div id="detalle-map-wrap" style="display:none;height:200px;position:relative;background:var(--surface);border-bottom:1px solid var(--border);">
-      <div id="detalle-map" style="position:absolute;inset:0;"></div>
-    </div>
-
-    <!-- Lista paradas -->
-    <div style="padding:8px 0;" id="detalle-paradas-list"></div>
-  </div>
-</div>
 
 <!-- MODAL: CONFIG GITHUB -->
 <div class="modal-overlay hidden" id="modal-github">
@@ -1025,51 +705,6 @@ let rutaBuild = {
   paradas: []  // [{id, nombre, lat, lng, hecha, fallida, horaAccion}]
 };
 
-// ── Persistencia de punto de inicio y final ──────────────────────
-const BASE_KEY = 'seisa_base_v1'; // {inicio:{lat,lng,nombre}, final:{lat,lng,nombre}}
-
-function loadBase() {
-  try { return JSON.parse(localStorage.getItem(BASE_KEY)) || {}; } catch(e) { return {}; }
-}
-function saveBase() {
-  try {
-    localStorage.setItem(BASE_KEY, JSON.stringify({
-      inicio: rutaBuild.inicio,
-      final:  rutaBuild.final,
-    }));
-  } catch(e) {}
-}
-function clearBase(tipo) {
-  if (tipo === 'inicio') rutaBuild.inicio = null;
-  else                   rutaBuild.final  = null;
-  saveBase();
-  renderBaseUI();
-}
-function renderBaseUI() {
-  // Inicio
-  const ini = rutaBuild.inicio;
-  const iniInput = document.getElementById('cr-inicio');
-  const iniLabel = document.getElementById('cr-inicio-label');
-  const iniBorrar = document.getElementById('cr-inicio-borrar');
-  if (iniInput) iniInput.value = ini ? ini.nombre : '';
-  if (iniLabel) {
-    if (ini) { iniLabel.textContent = '✓ ' + ini.nombre; iniLabel.style.display = 'block'; }
-    else      { iniLabel.style.display = 'none'; }
-  }
-  if (iniBorrar) iniBorrar.style.display = ini ? 'flex' : 'none';
-  // Final
-  const fin = rutaBuild.final;
-  const finInput = document.getElementById('cr-final');
-  const finLabel = document.getElementById('cr-final-label');
-  const finBorrar = document.getElementById('cr-final-borrar');
-  if (finInput) finInput.value = fin ? fin.nombre : '';
-  if (finLabel) {
-    if (fin) { finLabel.textContent = '✓ ' + fin.nombre; finLabel.style.display = 'block'; }
-    else      { finLabel.style.display = 'none'; }
-  }
-  if (finBorrar) finBorrar.style.display = fin ? 'flex' : 'none';
-}
-
 // Mapas
 let mapParadas = null;
 let mapNav     = null;
@@ -1083,22 +718,17 @@ let editUbData    = null; // {lat,lng,nombre} para edición temporal
 // ══════════════════════════════════════════════════════════════════
 //  NAVEGACIÓN DE PANTALLAS
 // ══════════════════════════════════════════════════════════════════
-// Pantalla actual para navegar atrás
 let currentScreen = 'screen-home';
 const BACK_MAP = {
   'screen-crear':        'screen-home',
   'screen-paradas':      'screen-crear',
   'screen-resumen':      'screen-paradas',
+  'screen-seguimiento':  'screen-resumen',
   'screen-historial':    'screen-home',
   'screen-detalle-ruta': 'screen-historial',
 };
 
 function navegarAtras() {
-  // En navegación: confirmar salida
-  if (currentScreen === 'screen-nav') {
-    if (confirm('¿Salir de la navegación? La ruta se guarda.')) salirNavegacion();
-    return;
-  }
   const prev = BACK_MAP[currentScreen];
   if (prev) showScreen(prev);
 }
@@ -1109,19 +739,10 @@ function showScreen(id) {
   if (target) {
     target.classList.remove('hidden');
     currentScreen = id;
-    if (id === 'screen-paradas')   initMapaParadas();
-    if (id === 'screen-nav')       initMapaNav();
-    if (id === 'screen-crear')     { cargarBase(); renderBaseUI(); }
-    if (id === 'screen-historial') renderHistorial();
-    if (id === 'screen-resumen') { resMap = null; resDirectionsRenderer = null; } // siempre reiniciar
-    if (id !== 'screen-detalle-ruta') detalleMap = null;
+    if (id === 'screen-paradas')    initMapaParadas();
+    if (id === 'screen-seguimiento') renderSeguimiento();
+    if (id === 'screen-historial')   renderHistorial();
   }
-}
-
-function cargarBase() {
-  const base = loadBase();
-  if (base.inicio) rutaBuild.inicio = base.inicio;
-  if (base.final)  rutaBuild.final  = base.final;
 }
 
 function closeModal(id) {
@@ -1166,222 +787,23 @@ function continuarRuta() {
   if (!state.rutaActual) return;
   rutaBuild = { ...state.rutaActual };
   showScreen('screen-nav');
-  const _arrancarContinuar = async () => {
-    if (!mapNav) {
-      initMapaNav();
-      await new Promise(r => setTimeout(r, 400));
-    }
+  setTimeout(async () => {
     actualizarNavPanel();
     renderListaNav();
     trazarRutaCompleta();
     iniciarGPS();
     await recalcularRuta();
-  };
-  setTimeout(_arrancarContinuar, 600);
+  }, 500);
 }
 
 function verRuta(id) {
   const r = state.rutas.find(x => x.id === id);
-  if (r) verDetalleRuta(r);
+  if (!r) return;
+  showToast(`${r.nombre} · ${r.paradas.filter(p=>p.hecha).length}/${r.paradas.length} entregadas`);
 }
 
 function showHistorial() {
-  renderHistorial();
-  showScreen('screen-historial');
-}
-
-function renderHistorial() {
-  const lista = document.getElementById('historial-list');
-  const rutas = (state.rutas || []).slice().reverse();
-  if (!rutas.length) {
-    lista.innerHTML = '<div style="text-align:center;color:var(--text3);font-size:13px;padding:40px 16px;">No hay rutas anteriores</div>';
-    return;
-  }
-  lista.innerHTML = '';
-  rutas.forEach((ruta, i) => {
-    const entregadas = (ruta.paradas||[]).filter(p => p.hecha && !p.fallida).length;
-    const fallidas   = (ruta.paradas||[]).filter(p => p.fallida).length;
-    const total      = (ruta.paradas||[]).length;
-    const fecha      = ruta.fecha || (ruta.fechaFin ? ruta.fechaFin.slice(0,10) : '—');
-    const pct        = total ? Math.round(entregadas/total*100) : 0;
-    const card = document.createElement('div');
-    card.className = 'ruta-card';
-    card.style.cursor = 'pointer';
-    card.innerHTML = `
-      <div class="ruta-card-icon" style="background:rgba(0,212,255,.1);border-color:rgba(0,212,255,.2);">🗺️</div>
-      <div class="ruta-card-info" style="flex:1;min-width:0;">
-        <div class="ruta-card-name"></div>
-        <div class="ruta-card-sub">${fecha} · ${total} paradas</div>
-        <div style="display:flex;gap:8px;margin-top:4px;">
-          <span style="font-size:11px;color:var(--green);font-weight:700;">✓ ${entregadas}</span>
-          <span style="font-size:11px;color:var(--red);font-weight:700;">✗ ${fallidas}</span>
-          <span style="font-size:11px;color:var(--text3);">${pct}% efectividad</span>
-        </div>
-      </div>
-      <div style="font-size:18px;color:var(--text3);">›</div>`;
-    card.querySelector('.ruta-card-name').textContent = ruta.nombre || 'Ruta sin nombre';
-    card.onclick = () => verDetalleRuta(ruta);
-    lista.appendChild(card);
-  });
-}
-
-function confirmarBorrarHistorial() {
-  if (!confirm('¿Borrar todo el historial?')) return;
-  state.rutas = [];
-  saveState();
-  renderHistorial();
-  renderHome();
-  showToast('Historial borrado');
-}
-
-let detalleMap = null;
-
-function verDetalleRuta(ruta) {
-  // Título y fecha
-  const tEl = document.getElementById('detalle-titulo');
-  const fEl = document.getElementById('detalle-fecha');
-  if (tEl) tEl.textContent = ruta.nombre || 'Ruta sin nombre';
-  if (fEl) {
-    const fecha = ruta.fecha || (ruta.fechaFin ? ruta.fechaFin.slice(0,10) : '');
-    const fin   = ruta.fechaFin ? ' · Fin: ' + new Date(ruta.fechaFin).toLocaleTimeString('es-MX',{hour:'2-digit',minute:'2-digit'}) : '';
-    fEl.textContent = fecha + fin;
-  }
-
-  // Métricas
-  const entregadas = (ruta.paradas||[]).filter(p => p.hecha && !p.fallida).length;
-  const fallidas   = (ruta.paradas||[]).filter(p => p.fallida).length;
-  const pendientes = (ruta.paradas||[]).filter(p => !p.hecha && !p.fallida).length;
-  const total      = (ruta.paradas||[]).length;
-  const pct        = total ? Math.round(entregadas/total*100) : 0;
-
-  const metEl = document.getElementById('detalle-metricas');
-  const metrica = (val, lbl, color) =>
-    `<div style="padding:12px 6px;text-align:center;border-right:1px solid var(--border);">
-      <div style="font-size:22px;font-weight:800;color:${color};font-family:var(--mono);">${val}</div>
-      <div style="font-size:9px;color:var(--text3);text-transform:uppercase;margin-top:2px;letter-spacing:.05em;">${lbl}</div>
-    </div>`;
-  metEl.innerHTML =
-    metrica(entregadas, 'Entregadas', 'var(--green)') +
-    metrica(fallidas,   'Fallidas',   'var(--red)')   +
-    metrica(pendientes, 'Pendientes', 'var(--text3)') +
-    `<div style="padding:12px 6px;text-align:center;">
-      <div style="font-size:22px;font-weight:800;color:var(--accent);font-family:var(--mono);">${pct}%</div>
-      <div style="font-size:9px;color:var(--text3);text-transform:uppercase;margin-top:2px;letter-spacing:.05em;">Efectividad</div>
-    </div>`;
-
-  // Lista de paradas
-  const lista = document.getElementById('detalle-paradas-list');
-  lista.innerHTML = '';
-  const paradas = ruta.paradas || [];
-  if (!paradas.length) {
-    lista.innerHTML = '<div style="padding:32px;text-align:center;color:var(--text3);font-size:13px;">Sin paradas registradas</div>';
-  }
-
-  // Agrupar: primero entregadas, luego fallidas, luego pendientes
-  const grupos = [
-    { titulo: '✓ Entregadas',       items: paradas.filter(p => p.hecha && !p.fallida), color: 'var(--green)', bg: 'rgba(0,230,118,.07)' },
-    { titulo: '✗ Fallidas / Rechazadas', items: paradas.filter(p => p.fallida),       color: 'var(--red)',   bg: 'rgba(255,82,82,.07)'  },
-    { titulo: '— Pendientes',        items: paradas.filter(p => !p.hecha && !p.fallida), color: 'var(--text3)', bg: 'transparent' },
-  ];
-
-  grupos.forEach(grupo => {
-    if (!grupo.items.length) return;
-    // Header del grupo
-    const hdr = document.createElement('div');
-    hdr.style.cssText = `padding:8px 16px 5px;font-size:11px;font-weight:700;color:${grupo.color};text-transform:uppercase;letter-spacing:.07em;background:var(--bg2);border-bottom:1px solid var(--border);`;
-    hdr.textContent = `${grupo.titulo} (${grupo.items.length})`;
-    lista.appendChild(hdr);
-
-    grupo.items.forEach(p => {
-      const originalIdx = paradas.indexOf(p);
-      const entregada = p.hecha && !p.fallida;
-      const fallida   = p.fallida;
-      const icono     = entregada ? '✓' : fallida ? '✗' : String(originalIdx + 1);
-
-      const div = document.createElement('div');
-      div.style.cssText = `padding:13px 16px;border-bottom:1px solid var(--border);background:${grupo.bg};display:flex;align-items:center;gap:12px;`;
-
-      // Badge
-      const badge = document.createElement('div');
-      badge.style.cssText = `width:32px;height:32px;border-radius:50%;border:2px solid ${grupo.color};color:${grupo.color};display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;flex-shrink:0;background:${grupo.bg};`;
-      badge.textContent = icono;
-
-      // Info
-      const info = document.createElement('div');
-      info.style.cssText = 'flex:1;min-width:0;';
-
-      const nombre = document.createElement('div');
-      nombre.style.cssText = 'font-size:14px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
-      nombre.textContent = p.nombre || ('Parada ' + (originalIdx + 1));
-
-      const hora = document.createElement('div');
-      hora.style.cssText = `font-size:12px;margin-top:3px;font-weight:${p.horaAccion ? '700' : '400'};color:${p.horaAccion ? grupo.color : 'var(--text3)'};`;
-      hora.textContent = p.horaAccion
-        ? (entregada ? 'Entregada a las ' : 'Fallida a las ') + p.horaAccion
-        : 'Sin acción';
-
-      info.appendChild(nombre);
-      info.appendChild(hora);
-
-      // Número
-      const num = document.createElement('div');
-      num.style.cssText = 'font-size:11px;color:var(--text3);flex-shrink:0;';
-      num.textContent = '#' + (originalIdx + 1);
-
-      div.appendChild(badge);
-      div.appendChild(info);
-      div.appendChild(num);
-      lista.appendChild(div);
-    });
-  });
-
-  showScreen('screen-detalle-ruta');
-
-  // Mapa del detalle
-  const mapWrap = document.getElementById('detalle-map-wrap');
-  const puntosMapa = paradas.filter(p => p.lat && p.lng);
-  if (mapWrap && puntosMapa.length && googleMapsReady) {
-    mapWrap.style.display = 'block';
-    setTimeout(() => {
-      const mapEl = document.getElementById('detalle-map');
-      detalleMap = new google.maps.Map(mapEl, {
-        center: { lat: puntosMapa[0].lat, lng: puntosMapa[0].lng },
-        zoom: 12,
-        disableDefaultUI: true,
-        gestureHandling: 'cooperative',
-        styles: [
-          { elementType:'geometry', stylers:[{color:'#1a2744'}] },
-          { featureType:'road', elementType:'geometry', stylers:[{color:'#2d4a70'}] },
-          { featureType:'road.highway', elementType:'geometry', stylers:[{color:'#1e6091'}] },
-          { featureType:'water', elementType:'geometry', stylers:[{color:'#0a1628'}] },
-          { featureType:'poi', stylers:[{visibility:'off'}] },
-          { elementType:'labels.text.fill', stylers:[{color:'#7a9fc0'}] },
-          { elementType:'labels.icon', stylers:[{visibility:'off'}] },
-        ]
-      });
-      const bounds = new google.maps.LatLngBounds();
-      puntosMapa.forEach((p, i) => {
-        const entregada = p.hecha && !p.fallida;
-        const fallida   = p.fallida;
-        const fillColor = entregada ? '#00e676' : fallida ? '#ff5252' : '#607d8b';
-        new google.maps.Marker({
-          position: { lat: p.lat, lng: p.lng },
-          map: detalleMap,
-          icon: {
-            path: google.maps.SymbolPath.CIRCLE,
-            scale: 9, fillColor, fillOpacity: 1,
-            strokeColor: '#fff', strokeWeight: 2,
-          },
-          label: { text: String(i+1), color:'#000', fontSize:'9px', fontWeight:'800' },
-          zIndex: entregada ? 5 : fallida ? 4 : 3,
-        });
-        bounds.extend({ lat: p.lat, lng: p.lng });
-      });
-      detalleMap.fitBounds(bounds, { top:20, right:20, bottom:20, left:20 });
-    }, 300);
-  } else if (mapWrap) {
-    mapWrap.style.display = 'none';
-  }
+  showToast('Historial próximamente');
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -1390,7 +812,7 @@ function verDetalleRuta(ruta) {
 function irACargarParadas() {
   const nombre = document.getElementById('cr-nombre').value.trim();
   const fecha  = document.getElementById('cr-fecha').value;
-  const peajes = document.getElementById('cr-peajes').checked; // true = evitar peajes
+  const peajes = !document.getElementById('cr-peajes').checked;
 
   if (!nombre) { showToast('Escribe un nombre para la ruta'); return; }
   if (!fecha)  { showToast('Selecciona la fecha'); return; }
@@ -1417,11 +839,16 @@ function buscarLugar(tipo, q) {
   const box = document.getElementById('search-results-' + tipo);
   if (!q || q.trim().length < 3) { ocultarBox(box); return; }
   searchTimers[tipo] = setTimeout(() => geocode(q.trim(), box, (lat, lng, nombre) => {
-    if (tipo === 'inicio') rutaBuild.inicio = { lat, lng, nombre };
-    else                   rutaBuild.final  = { lat, lng, nombre };
-    saveBase();
-    renderBaseUI();
-    ocultarBox(box);
+    if (tipo === 'inicio') {
+      rutaBuild.inicio = { lat, lng, nombre };
+      document.getElementById('cr-inicio-label').textContent = '✓ ' + nombre;
+      document.getElementById('cr-inicio-label').style.display = 'block';
+    } else {
+      rutaBuild.final = { lat, lng, nombre };
+      document.getElementById('cr-final-label').textContent = '✓ ' + nombre;
+      document.getElementById('cr-final-label').style.display = 'block';
+    }
+    box.style.display = 'none';
   }), 500);
 }
 
@@ -1431,6 +858,7 @@ function buscarParada(q) {
   if (!q || q.trim().length < 3) { ocultarBox(box); return; }
   searchTimers['parada'] = setTimeout(() => geocode(q.trim(), box, (lat, lng, nombre) => {
     agregarParada(lat, lng, nombre);
+    document.getElementById('paradas-search').value = '';
     ocultarBox(box);
   }), 600);
 }
@@ -1834,96 +1262,94 @@ let _pcCoordsTemp = null;
 
 async function resolverPlusCodeUI() {
   const raw = document.getElementById('paradas-pluscode').value.trim();
-  if (!raw) { showToast('Pega un Plus Code'); return; }
+  if (!raw) { showToast('Pega un Plus Code primero'); return; }
 
-  // Resetear UI
   document.getElementById('pc-confirm-box').style.display = 'none';
   document.getElementById('pc-error').style.display       = 'none';
   document.getElementById('pc-loading').style.display     = 'block';
   _pcCoordsTemp = null;
 
   try {
-    // Parsear la línea: extraer plusCode + ciudad + nombre de calle
-    const parsed = parsearLineaPlusCode(raw);
-    if (!parsed) throw new Error('Formato inválido');
-    const { plusCode, ciudad, nombre } = parsed;
+    let result = null;
 
-    // Query: "GP7F+JX5 Naucalpan de Juárez, Estado de México"
-    const query = plusCode + (ciudad ? ' ' + ciudad : '');
+    // ── Google Geocoding: resolver Plus Code ─────────────────────────
+    if (googleMapsReady && gmGeocoder) {
+      const parsed = parsearLineaPlusCode(raw);
+      // Google entiende Plus Codes directamente: 'GP7F+JX5 Naucalpan de Juárez'
+      const query = parsed
+        ? parsed.plusCode + ' ' + parsed.ciudad
+        : raw;
+      result = await new Promise(resolve => {
+        gmGeocoder.geocode(
+          { address: query, region: 'MX', language: 'es' },
+          async (res, status) => {
+            if (status !== 'OK' || !res[0]) {
+              console.warn('Google Geocoding:', status, query);
+              resolve(null); return;
+            }
+            const addr   = res[0].address_components || [];
+            const street = addr.find(c => c.types.includes('route'))?.long_name || '';
+            const num    = addr.find(c => c.types.includes('street_number'))?.long_name || '';
+            const lat    = res[0].geometry.location.lat();
+            const lng    = res[0].geometry.location.lng();
+            // Nombre: lo que escribió el usuario > calle Google > formatted_address
+            const nombreFinal = (parsed?.nombre && parsed.nombre !== parsed.plusCode)
+              ? parsed.nombre
+              : ([street, num].filter(Boolean).join(' ') || res[0].formatted_address.split(',')[0]);
+            resolve({ lat, lng, nombre: nombreFinal });
+          }
+        );
+      });
+    }
 
-    // ── Google Geocoding REST API ─────────────────────────────────────
-    const url = 'https://maps.googleapis.com/maps/api/geocode/json' +
-      '?address=' + encodeURIComponent(query) +
-      '&region=MX&language=es&key=AIzaSyAGsOfVDl73CXEVPSb1UUXbreVJC-GmBcY';
-
-    const resp = await fetch(url);
-    const data = await resp.json();
-
-    console.log('[PlusCode] Query:', query);
-    console.log('[PlusCode] Status:', data.status);
-    if (data.results?.[0]) console.log('[PlusCode] Result:', data.results[0].formatted_address, data.results[0].geometry.location);
-
-    let lat, lng, calleGoogle = '';
-
-    if (data.status === 'OK' && data.results[0]) {
-      lat = data.results[0].geometry.location.lat;
-      lng = data.results[0].geometry.location.lng;
-      const addr = data.results[0].address_components || [];
-      const street = addr.find(c => c.types.includes('route'))?.long_name || '';
-      const num    = addr.find(c => c.types.includes('street_number'))?.long_name || '';
-      calleGoogle  = [street, num].filter(Boolean).join(' ');
-    } else {
-      // Fallback OLC + Nominatim
-      console.warn('[PlusCode] Google falló, usando OLC+Nominatim');
-      const r = await resolverPlusCode(raw);
-      if (!r) throw new Error('No se pudo resolver el Plus Code. Verifica que sea correcto.');
-      lat = r.lat; lng = r.lng; calleGoogle = r.nombre || '';
+    // ── Fallback: OLC + Nominatim ─────────────────────────────────────
+    if (!result) {
+      result = await resolverPlusCode(raw);
     }
 
     document.getElementById('pc-loading').style.display = 'none';
-    _pcCoordsTemp = { lat, lng };
 
-    // Mostrar calle encontrada por Google
-    const calleEl = document.getElementById('pc-calle-label');
-    if (calleEl) calleEl.textContent = calleGoogle || '(calle no identificada)';
-    document.getElementById('pc-coords-label').textContent = lat.toFixed(6) + ', ' + lng.toFixed(6);
+    if (!result) {
+      document.getElementById('pc-error').textContent = '⚠️ No se encontró la ubicación. Verifica el Plus Code.';
+      document.getElementById('pc-error').style.display = 'block';
+      return;
+    }
 
-    // Pre-llenar nombre: si el usuario puso texto extra (nombre de calle) úsalo, si no la calle de Google
-    const nombreSugerido = (nombre && nombre !== plusCode) ? nombre : calleGoogle;
+    _pcCoordsTemp = { lat: result.lat, lng: result.lng };
+    const coordsStr = result.lat.toFixed(6) + ', ' + result.lng.toFixed(6);
+    const coloniaStr = result.colonia ? ' · ' + result.colonia : '';
+    document.getElementById('pc-coords-label').textContent = coordsStr + coloniaStr;
+    // Pre-llenar nombre: calle de Google o nombre del Plus Code
+    // Nombre: primero lo que viene después del Plus Code, si no la calle de reverse geocode
+    const parsedRaw = parsearLineaPlusCode(raw);
+    const nombreSugerido = parsedRaw?.nombre || result.nombre || '';
     document.getElementById('pc-nombre-input').value = nombreSugerido;
     document.getElementById('pc-confirm-box').style.display = 'block';
 
-    // Centrar mapa en la ubicación
-    if (mapParadas) mapParadas.setView([lat, lng], 17);
-
-    // Foco en el campo de nombre para que el usuario complete si falta
-    setTimeout(() => document.getElementById('pc-nombre-input')?.focus(), 200);
+    // Mostrar en mapa
+    if (mapParadas) mapParadas.setView([result.lat, result.lng], 16);
+    setTimeout(() => document.getElementById('pc-nombre-input')?.focus(), 150);
 
   } catch(e) {
     document.getElementById('pc-loading').style.display = 'none';
-    document.getElementById('pc-error').textContent = '⚠️ ' + e.message;
+    document.getElementById('pc-error').textContent = '⚠️ Error: ' + e.message;
     document.getElementById('pc-error').style.display = 'block';
-    console.error('[PlusCode] Error:', e);
   }
-}
-
-function mostrarBotonReoptimizar() {
-  const banner = document.getElementById('banner-reoptimizar');
-  if (banner) banner.style.display = 'block';
 }
 
 function confirmarAgregarPlusCode() {
   if (!_pcCoordsTemp) { showToast('Primero resuelve el Plus Code'); return; }
-  // El nombre es opcional — el usuario puede dejarlo vacío y editarlo después
-  const nombre = document.getElementById('pc-nombre-input').value.trim()
-    || document.getElementById('pc-calle-label')?.textContent?.trim()
-    || ('Parada ' + (rutaBuild.paradas.length + 1));
+  const nombre = document.getElementById('pc-nombre-input').value.trim();
+  if (!nombre) {
+    showToast('Escribe el nombre o número de calle');
+    document.getElementById('pc-nombre-input').focus();
+    return;
+  }
   agregarParada(_pcCoordsTemp.lat, _pcCoordsTemp.lng, nombre);
   _pcCoordsTemp = null;
-  document.getElementById('paradas-pluscode').value        = '';
-  document.getElementById('pc-confirm-box').style.display  = 'none';
-  document.getElementById('pc-error').style.display        = 'none';
-  document.getElementById('pc-nombre-input').value         = '';
+  document.getElementById('paradas-pluscode').value   = '';
+  document.getElementById('pc-confirm-box').style.display = 'none';
+  document.getElementById('pc-error').style.display       = 'none';
 }
 
 // Legacy (por si algún código lo llama)
@@ -1999,8 +1425,6 @@ function eliminarParada(id) {
 function optimizarRuta() {
   if (!rutaBuild.paradas.length) return;
   showToast('⚡ Optimizando...');
-  const banner = document.getElementById('banner-reoptimizar');
-  if (banner) banner.style.display = 'none';
 
   // Nearest neighbor desde el punto de inicio
   let sinVisitar = [...rutaBuild.paradas];
@@ -2056,31 +1480,50 @@ function distHaversine(lat1, lng1, lat2, lng2) {
 }
 
 function renderResumen() {
-  // Métricas estimadas (se actualizan con datos reales de Google)
-  document.getElementById('res-km').textContent      = rutaBuild.kmTotal + ' km';
+  document.getElementById('res-km').textContent      = (rutaBuild.kmTotal || '—') + ' km';
   document.getElementById('res-paradas').textContent = rutaBuild.paradas.length;
-  document.getElementById('res-tiempo').textContent  = rutaBuild.tiempoHrs + ' hrs';
-  document.getElementById('res-fin').textContent     = rutaBuild.horaFin;
+  document.getElementById('res-tiempo').textContent  = (rutaBuild.tiempoHrs || '—') + ' hrs';
+  document.getElementById('res-fin').textContent     = rutaBuild.horaFin || '—';
+  const countEl = document.getElementById('res-paradas-count');
+  if (countEl) countEl.textContent = rutaBuild.paradas.length + ' paradas';
 
-  // Lista de paradas
   const lista = document.getElementById('res-orden-list');
   lista.innerHTML = '';
+  const ahora = new Date();
+  const MINS_POR_PARADA = 9;
 
   // Inicio
   if (rutaBuild.inicio) {
     const d = document.createElement('div');
     d.className = 'parada-item';
     d.style.cssText = 'background:rgba(0,230,118,.05);border-left:3px solid var(--green);';
-    d.innerHTML = '<div class="parada-num" style="background:rgba(0,230,118,.15);color:var(--green);border:1px solid rgba(0,230,118,.3);">🏠</div><div class="parada-info"><div class="parada-name"></div><div class="parada-sub">Inicio</div></div>';
+    d.innerHTML = '<div class="parada-num" style="background:rgba(0,230,118,.15);color:var(--green);border:1px solid rgba(0,230,118,.3);font-size:14px;">🏠</div>' +
+      '<div class="parada-info"><div class="parada-name"></div><div class="parada-sub" style="color:var(--green);">Inicio · ' + fmtHora(ahora) + '</div></div>';
     d.querySelector('.parada-name').textContent = rutaBuild.inicio.nombre;
     lista.appendChild(d);
   }
 
-  // Paradas
+  // Paradas con ETA estimada
+  let puntosPrev = [rutaBuild.inicio].filter(Boolean);
   rutaBuild.paradas.forEach((p, i) => {
+    puntosPrev.push(p);
+    let distAcum = 0;
+    for (let j = 0; j < puntosPrev.length - 1; j++) {
+      distAcum += distHaversine(puntosPrev[j].lat, puntosPrev[j].lng, puntosPrev[j+1].lat, puntosPrev[j+1].lng);
+    }
+    const minsConduccion = Math.round((distAcum * 1.3 / 30) * 60);
+    const minsTotal = minsConduccion + i * MINS_POR_PARADA;
+    const eta = new Date(ahora.getTime() + minsTotal * 60000);
+
     const d = document.createElement('div');
     d.className = 'parada-item';
-    d.innerHTML = `<div class="parada-num" style="background:rgba(0,212,255,.12);color:var(--accent);border:1px solid rgba(0,212,255,.25);">${i+1}</div><div class="parada-info"><div class="parada-name"></div></div>`;
+    d.style.cssText = p.hecha ? 'opacity:.5;' : p.fallida ? 'opacity:.5;' : '';
+    d.innerHTML = `<div class="parada-num" style="background:rgba(0,212,255,.12);color:var(--accent);border:1px solid rgba(0,212,255,.25);">${i+1}</div>
+      <div class="parada-info" style="flex:1;min-width:0;">
+        <div class="parada-name"></div>
+        <div class="parada-sub">~${MINS_POR_PARADA} min · ETA: ${fmtHora(eta)}</div>
+      </div>
+      <div style="font-size:12px;color:var(--accent);flex-shrink:0;font-family:var(--mono);font-weight:700;">${fmtHora(eta)}</div>`;
     d.querySelector('.parada-name').textContent = p.nombre;
     lista.appendChild(d);
   });
@@ -2091,192 +1534,78 @@ function renderResumen() {
     const d = document.createElement('div');
     d.className = 'parada-item';
     d.style.cssText = 'background:rgba(255,145,0,.05);border-left:3px solid var(--orange);';
-    d.innerHTML = '<div class="parada-num" style="background:rgba(255,145,0,.15);color:var(--orange);border:1px solid rgba(255,145,0,.3);">🏁</div><div class="parada-info"><div class="parada-name"></div><div class="parada-sub">Regreso a base</div></div>';
+    d.innerHTML = '<div class="parada-num" style="background:rgba(255,145,0,.15);color:var(--orange);border:1px solid rgba(255,145,0,.3);font-size:14px;">🏁</div>' +
+      '<div class="parada-info"><div class="parada-name"></div><div class="parada-sub" style="color:var(--orange);">Base · fin ' + (rutaBuild.horaFin || '—') + '</div></div>';
     d.querySelector('.parada-name').textContent = base.nombre;
     lista.appendChild(d);
   }
 
-  // Trazar ruta en el mapa
-  // Esperar a que Google Maps esté listo y el DOM tenga dimensiones
-  const _waitAndTrace = (tries) => {
+  // Trazar mapa (esperar Google Maps)
+  const _wait = (n) => {
     if (!googleMapsReady || !window.google?.maps) {
-      if (tries > 0) setTimeout(() => _waitAndTrace(tries - 1), 400);
-      else console.warn('Google Maps no disponible para resumen');
+      if (n > 0) setTimeout(() => _wait(n-1), 500);
       return;
     }
-    const mapEl = document.getElementById('res-map');
-    if (!mapEl || mapEl.offsetHeight < 10) {
-      if (tries > 0) setTimeout(() => _waitAndTrace(tries - 1), 300);
-      return;
-    }
+    const el = document.getElementById('res-map');
+    if (!el || el.offsetHeight < 10) { if (n > 0) setTimeout(() => _wait(n-1), 300); return; }
     trazarRutaResumen();
   };
-  setTimeout(() => _waitAndTrace(10), 200);
-}
-
-let resMap = null;
-let resDirectionsRenderer = null;
-
-async function trazarRutaResumen() {
-  const loadingEl = document.getElementById('res-map-loading');
-
-  // Construir waypoints: inicio → paradas → final
-  const todos = [
-    rutaBuild.inicio,
-    ...rutaBuild.paradas,
-    rutaBuild.final || loadBase().final
-  ].filter(p => p?.lat);
-
-  if (todos.length < 2) {
-    if (loadingEl) loadingEl.style.display = 'none';
-    return;
-  }
-
-  // ── Inicializar mapa del resumen ─────────────────────────────────
-  if (!resMap) {
-    const centro = todos[0];
-    resMap = new google.maps.Map(document.getElementById('res-map'), {
-      center: { lat: centro.lat, lng: centro.lng },
-      zoom: 11,
-      disableDefaultUI: true,
-      gestureHandling: 'none', // solo vista, no interactivo
-      styles: [
-        { elementType: 'geometry', stylers: [{ color: '#1a2744' }] },
-        { featureType: 'road', elementType: 'geometry', stylers: [{ color: '#2d4a70' }] },
-        { featureType: 'road.highway', elementType: 'geometry', stylers: [{ color: '#1e6091' }] },
-        { featureType: 'water', elementType: 'geometry', stylers: [{ color: '#0a1628' }] },
-        { featureType: 'poi', stylers: [{ visibility: 'off' }] },
-        { elementType: 'labels.text.fill', stylers: [{ color: '#7a9fc0' }] },
-        { elementType: 'labels.icon', stylers: [{ visibility: 'off' }] },
-      ]
-    });
-    resDirectionsRenderer = new google.maps.DirectionsRenderer({
-      map: resMap,
-      suppressMarkers: true,
-      polylineOptions: { strokeColor: '#00d4ff', strokeWeight: 6, strokeOpacity: 0.95 },
-    });
-    // Trigger resize para que Google Maps calcule dimensiones
-    setTimeout(() => google.maps.event.trigger(resMap, 'resize'), 100);
-  }
-
-  // Agregar marcadores numerados
-  todos.forEach((p, i) => {
-    const esInicio = i === 0;
-    const esFinal  = i === todos.length - 1;
-    const label = esInicio ? '🏠' : esFinal ? '🏁' : String(i);
-    const color  = esInicio ? '#00e676' : esFinal ? '#ff9100' : '#00d4ff';
-    new google.maps.Marker({
-      position: { lat: p.lat, lng: p.lng },
-      map: resMap,
-      icon: {
-        path: google.maps.SymbolPath.CIRCLE,
-        scale: esInicio || esFinal ? 10 : 8,
-        fillColor: color, fillOpacity: 1,
-        strokeColor: '#fff', strokeWeight: 2,
-      },
-      label: { text: esInicio ? '1' : esFinal ? String(todos.length) : String(i+1), color: '#000', fontSize: '10px', fontWeight: '800' },
-      zIndex: esFinal || esInicio ? 10 : 5,
-    });
-  });
-
-  // ── Google Directions API: ruta calle por calle ───────────────────
-  // Google permite máx 25 waypoints por request
-  const origen  = todos[0];
-  const destino = todos[todos.length - 1];
-  const waypts  = todos.slice(1, -1).map(p => ({
-    location: new google.maps.LatLng(p.lat, p.lng),
-    stopover: true,
-  }));
-
-  const svc = new google.maps.DirectionsService();
-  svc.route({
-    origin:      new google.maps.LatLng(origen.lat, origen.lng),
-    destination: new google.maps.LatLng(destino.lat, destino.lng),
-    waypoints:   waypts,
-    optimizeWaypoints: false, // ya optimizamos nosotros
-    travelMode:  google.maps.TravelMode.DRIVING,
-    avoidTolls:  !!rutaBuild.peajes,
-    region: 'MX',
-  }, (result, status) => {
-    if (loadingEl) loadingEl.style.display = 'none';
-    if (status !== 'OK') {
-      console.warn('Directions resumen:', status);
-      // Fallback: ajustar bounds al menos
-      const bounds = new google.maps.LatLngBounds();
-      todos.forEach(p => bounds.extend({ lat: p.lat, lng: p.lng }));
-      resMap.fitBounds(bounds, 20);
-      return;
-    }
-    resDirectionsRenderer.setDirections(result);
-
-    // Calcular km y tiempo reales de Google
-    let kmReal = 0, minReal = 0;
-    result.routes[0].legs.forEach(leg => {
-      kmReal  += leg.distance.value / 1000;
-      minReal += leg.duration.value / 60;
-    });
-    kmReal  = Math.round(kmReal * 10) / 10;
-    minReal = Math.round(minReal);
-    const hrsReal = Math.round(minReal / 6) / 10;
-
-    // Actualizar métricas con datos reales
-    document.getElementById('res-km').textContent     = kmReal + ' km';
-    document.getElementById('res-tiempo').textContent = hrsReal + ' hrs';
-    const kmRealEl = document.getElementById('res-km-real');
-    if (kmRealEl) kmRealEl.textContent = kmReal + ' km reales';
-
-    // Actualizar hora fin real
-    const finReal = new Date(Date.now() + minReal * 60000);
-    const hh = finReal.getHours() % 12 || 12;
-    const mm = String(finReal.getMinutes()).padStart(2, '0');
-    document.getElementById('res-fin').textContent = `${hh}:${mm} ${finReal.getHours() >= 12 ? 'PM' : 'AM'}`;
-
-    // Guardar en rutaBuild para navegación
-    rutaBuild.kmTotal   = kmReal;
-    rutaBuild.tiempoMin = minReal;
-  });
+  setTimeout(() => _wait(15), 300);
 }
 
 // ══════════════════════════════════════════════════════════════════
 //  INICIAR RUTA
 // ══════════════════════════════════════════════════════════════════
-function iniciarRuta() {
+function iniciarRuta() { iniciarRutaGoogleMaps(); }
+
+// Abrir Google Maps con ruta completa (inicio → todas las paradas → final)
+function iniciarRutaGoogleMaps() {
   state.rutaActual = { ...rutaBuild, final: rutaBuild.final || loadBase().final };
   state.paradaActual = 0;
   saveState();
-  showScreen('screen-nav');
-  // Esperar a que el mapa esté completamente inicializado
-  const _arrancarNav = async () => {
-    if (!mapNav) {
-      initMapaNav();
-      await new Promise(r => setTimeout(r, 400));
-    }
-    actualizarNavPanel();
-    renderListaNav();
-    trazarRutaCompleta();
-    iniciarGPS();
-    const p = state.rutaActual?.paradas[0];
-    if (p) hablar('Ruta iniciada. Dirigiéndose a ' + p.nombre);
-    await recalcularRuta();
-  };
-  setTimeout(_arrancarNav, 600);
+
+  const ruta = state.rutaActual;
+  const inicio  = ruta.inicio;
+  const fin     = ruta.final;
+  // Solo paradas pendientes (no entregadas ni fallidas)
+  const paradas = (ruta.paradas || []).filter(p => !p.hecha && !p.fallida);
+
+  if (!inicio || !fin) { showToast('Faltan puntos de inicio o final'); return; }
+  if (!paradas.length) { showToast('No hay paradas pendientes'); return; }
+
+  const enc = (p) => encodeURIComponent(p.lat + ',' + p.lng);
+  const MAX_WP = 23; // Google Maps soporta hasta 25 puntos incluyendo origen y destino
+
+  if (paradas.length <= MAX_WP) {
+    const wps = paradas.map(enc).join('/');
+    const url = 'https://www.google.com/maps/dir/' + enc(inicio) + '/' + wps + '/' + enc(fin);
+    window.open(url, '_blank');
+    showToast('🗺️ Abriendo ruta completa en Google Maps...');
+  } else {
+    // Dividir en segmentos si hay más de 23 paradas
+    showToast(paradas.length + ' paradas — abriendo primer segmento...');
+    const seg = paradas.slice(0, MAX_WP);
+    const wps = seg.map(enc).join('/');
+    const url = 'https://www.google.com/maps/dir/' + enc(inicio) + '/' + wps + '/' + enc(paradas[MAX_WP] || fin);
+    window.open(url, '_blank');
+  }
+
+  // Ir a pantalla de seguimiento
+  showScreen('screen-seguimiento');
+  renderSeguimiento();
 }
+
 
 // ══════════════════════════════════════════════════════════════════
 //  MAPA NAVEGACIÓN — Leaflet puro (sin Google Maps, sin API key)
 // ══════════════════════════════════════════════════════════════════
 
 function initMapaNav() {
-  // Siempre Leaflet para el navegador (sin dependencia de API key)
-  const gmapEl = document.getElementById('gmap-container');
-  const leafEl = document.getElementById('nav-map');
-  if (gmapEl) gmapEl.style.display = 'none';
-  if (leafEl) leafEl.style.display = 'block';
+  // Siempre usar Leaflet — independiente de Google Maps
+  document.getElementById('gmap-container') && (document.getElementById('gmap-container').style.display = 'none');
+  document.getElementById('nav-map').style.display = 'block';
 
-  if (mapNav) {
-    mapNav.invalidateSize();
-    return;
-  }
+  if (mapNav) { mapNav.invalidateSize(); return; }
 
   const centro = state.rutaActual?.paradas[0]
     ? [state.rutaActual.paradas[0].lat, state.rutaActual.paradas[0].lng]
@@ -2288,10 +1617,8 @@ function initMapaNav() {
     zoomSnap: 0.5,
   }).setView(centro, 17);
 
-  // Tiles con dos opciones (failover automático)
   L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    maxZoom: 20, subdomains: 'abcd',
-    errorTileUrl: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+    maxZoom: 20, subdomains: 'abcd'
   }).addTo(mapNav);
 
   mapNav.on('dragstart', () => {
@@ -2302,8 +1629,7 @@ function initMapaNav() {
 }
 
 function trazarRutaCompleta() {
-  if (!state.rutaActual) return;
-  if (!mapNav) { initMapaNav(); return; }
+  if (!state.rutaActual || !mapNav) return;
   const ruta = state.rutaActual;
   const idx  = state.paradaActual;
 
@@ -2380,13 +1706,13 @@ function onGooglePlaceSelected(tipo, lat, lng, nombre) {
   switch(tipo) {
     case 'inicio':
       rutaBuild.inicio = { lat, lng, nombre };
-      saveBase();
-      renderBaseUI();
+      const liEl = document.getElementById('cr-inicio-label');
+      if (liEl) { liEl.textContent = '✓ ' + nombre; liEl.style.display = 'block'; }
       break;
     case 'final':
       rutaBuild.final = { lat, lng, nombre };
-      saveBase();
-      renderBaseUI();
+      const lfEl = document.getElementById('cr-final-label');
+      if (lfEl) { lfEl.textContent = '✓ ' + nombre; lfEl.style.display = 'block'; }
       break;
     case 'parada':
       agregarParada(lat, lng, nombre);
@@ -2469,129 +1795,68 @@ let vozActiva     = true;
 let modoCentrado  = true;
 
 function iniciarGPS() {
-  if (!navigator.geolocation) {
-    showToast('GPS no disponible en este dispositivo');
-    return;
-  }
+  if (!navigator.geolocation) { showToast('GPS no disponible'); return; }
+  if (navGPSWatch) navigator.geolocation.clearWatch(navGPSWatch);
 
-  // Limpiar watch anterior
-  if (navGPSWatch != null) {
-    navigator.geolocation.clearWatch(navGPSWatch);
-    navGPSWatch = null;
-  }
-
-  let ultimaPos     = null;
+  let ultimaPos = null;
   let ultimoHeading = 0;
-  let recalcCooldown = 0; // evitar recalcular muy seguido
 
-  function onPos(pos) {
-    const { latitude: lat, longitude: lng } = pos.coords;
-    const heading = pos.coords.heading;
-    const speed   = pos.coords.speed;
-    const accuracy= pos.coords.accuracy;
+  navGPSWatch = navigator.geolocation.watchPosition(pos => {
+    const { latitude: lat, longitude: lng, heading, speed, accuracy } = pos.coords;
 
-    // ── Asegurar que el mapa existe ──────────────────────────────
-    if (!mapNav) {
-      initMapaNav();
-      // Si aún no está listo, reintentar en el próximo tick
-      if (!mapNav) return;
-    }
-
-    // ── Velocímetro ─────────────────────────────────────────────
-    const vel = (speed != null && speed >= 0) ? Math.round(speed * 3.6) : null;
-    const velEl  = document.getElementById('nav-velocimetro');
-    const velNum = document.getElementById('nav-vel-num');
-    if (velEl && vel != null) {
+    // ── Velocímetro ──
+    const vel = speed != null ? Math.round(speed * 3.6) : null;
+    const velEl = document.getElementById('nav-velocimetro');
+    if (vel != null && vel >= 0) {
       velEl.style.display = 'block';
-      if (velNum) {
-        velNum.textContent = vel;
-        velNum.style.color = vel > 80 ? '#ff5252' : vel > 50 ? '#ff9100' : '#fff';
-      }
+      document.getElementById('nav-vel-num').textContent = vel;
+      // Color según velocidad
+      const velNum = document.getElementById('nav-vel-num');
+      velNum.style.color = vel > 80 ? '#ff5252' : vel > 50 ? '#ff9100' : '#fff';
     }
 
-    // ── Dirección de marcha ──────────────────────────────────────
-    const enMovimiento = speed != null && speed > 0.5;
-    const h = (heading != null && enMovimiento) ? heading : ultimoHeading;
-    if (heading != null && enMovimiento) ultimoHeading = heading;
+    // ── Marcador GPS (flecha) ──
+    const h = (heading != null && speed > 0.5) ? heading : ultimoHeading;
+    if (heading != null && speed > 0.5) ultimoHeading = heading;
 
-    // ── Marcador GPS ─────────────────────────────────────────────
     if (!navGPSMarker) {
       navGPSMarker = L.marker([lat, lng], {
-        icon:         crearIconoGPS(h),
-        zIndexOffset: 2000,
-        interactive:  false,
+        icon: crearIconoGPS(h), zIndexOffset: 2000
       }).addTo(mapNav);
     } else {
       navGPSMarker.setLatLng([lat, lng]);
       navGPSMarker.setIcon(crearIconoGPS(h));
     }
 
-    // ── Centrar mapa ─────────────────────────────────────────────
+    // ── Centrar mapa orientado hacia donde vas ──
     if (modoCentrado && mapNav) {
-      // Si va a ≥5 km/h, adelantar el centro hacia la dirección de marcha
-      if (enMovimiento && speed > 1.4 && h != null) {
-        const avance = 0.0005; // ~55m adelante
-        const rad    = h * Math.PI / 180;
-        const clat   = lat + avance * Math.cos(rad);
-        const clng   = lng + avance * Math.sin(rad) / Math.cos(lat * Math.PI / 180);
-        mapNav.setView([clat, clng], 17, { animate: true, duration: 0.6, noMoveStart: true });
+      // Mapa ligeramente adelantado en la dirección de marcha
+      if (speed > 1) {
+        const offsetDist = 0.0006; // ~67m hacia adelante en el mapa
+        const rad = h * Math.PI / 180;
+        const clat = lat + offsetDist * Math.cos(rad);
+        const clng = lng + offsetDist * Math.sin(rad) / Math.cos(lat * Math.PI / 180);
+        mapNav.setView([clat, clng], mapNav.getZoom() || 17, { animate: true, duration: 0.8 });
       } else {
-        mapNav.setView([lat, lng], 17, { animate: true, duration: 0.4, noMoveStart: true });
+        mapNav.setView([lat, lng], mapNav.getZoom() || 17, { animate: true, duration: 0.5 });
       }
     }
 
-    // ── Actualizar instrucciones de giro ─────────────────────────
-    if (navRuta?.steps?.length) {
-      actualizarPasoActual(lat, lng);
-    }
+    // ── Progreso sobre la ruta ──
+    if (navRuta?.steps?.length) actualizarPasoActual(lat, lng);
 
-    // ── Recálculo automático (máx 1 vez cada 15s) ────────────────
-    const ahora = Date.now();
-    if (ultimaPos && navRuta && ahora - recalcCooldown > 15000) {
+    // ── Recálculo automático si se desvió >60m ──
+    if (ultimaPos && navRuta) {
       const distRuta = distanciaAPolilineaMasCercana(lat, lng);
-      if (distRuta > 0.06) { // >60m desviado
-        recalcCooldown = ahora;
+      if (distRuta > 0.06) { // >60m de la ruta trazada
         recalcularRuta(lat, lng);
       }
     }
-
     ultimaPos = { lat, lng };
-  }
-
-  function onError(err) {
-    const msgs = {
-      1: 'Permiso de GPS denegado',
-      2: 'GPS no disponible',
-      3: 'Tiempo de espera GPS agotado',
-    };
-    const msg = msgs[err.code] || 'Error GPS';
-    console.warn('GPS error:', err.code, err.message);
-    const subEl = document.getElementById('nav-sub');
-    if (subEl) subEl.textContent = '⚠️ ' + msg;
-    showToast('⚠️ ' + msg);
-
-    // Si fue timeout, reintentar automáticamente
-    if (err.code === 3) {
-      setTimeout(() => iniciarGPS(), 3000);
-    }
-  }
-
-  navGPSWatch = navigator.geolocation.watchPosition(
-    onPos,
-    onError,
-    {
-      enableHighAccuracy: true,
-      maximumAge:         0,     // siempre posición fresca
-      timeout:            10000, // 10s antes de error
-    }
-  );
-
-  // Obtener posición inmediata también (watchPosition puede tardar)
-  navigator.geolocation.getCurrentPosition(onPos, onError, {
-    enableHighAccuracy: true,
-    timeout: 8000,
-    maximumAge: 0,
-  });
+  }, err => {
+    console.warn('GPS:', err.message);
+    document.getElementById('nav-sub').textContent = '⚠️ GPS: ' + err.message;
+  }, { enableHighAccuracy: true, maximumAge: 1500, timeout: 15000 });
 }
 
 // Distancia del punto actual a la polilínea de ruta (en km)
@@ -2610,26 +1875,13 @@ function distanciaAPolilineaMasCercana(lat, lng) {
 function crearIconoGPS(heading) {
   const h = heading || 0;
   return L.divIcon({
-    html: `<div style="
-      width:36px;height:36px;
-      display:flex;align-items:center;justify-content:center;
-      filter:drop-shadow(0 0 8px rgba(0,212,255,.8));
-    ">
-      <svg viewBox="0 0 36 36" width="36" height="36">
-        <!-- Círculo de fondo -->
-        <circle cx="18" cy="18" r="17" fill="rgba(0,212,255,0.15)" stroke="#00d4ff" stroke-width="1.5"/>
-        <!-- Flecha de dirección -->
-        <g transform="rotate(${h}, 18, 18)">
-          <polygon points="18,4 26,30 18,24 10,30" fill="#00d4ff" opacity="0.95"/>
-          <polygon points="18,4 26,30 18,24 10,30" fill="white" opacity="0.25"/>
-        </g>
-        <!-- Punto central -->
-        <circle cx="18" cy="18" r="3" fill="white"/>
+    html: `<div style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;transform:rotate(${h}deg);transform-origin:50% 50%;">
+      <svg viewBox="0 0 40 40" width="40" height="40">
+        <circle cx="20" cy="20" r="14" fill="rgba(0,212,255,.2)" stroke="rgba(0,212,255,.5)" stroke-width="1.5"/>
+        <polygon points="20,5 27,30 20,25 13,30" fill="#00d4ff" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/>
       </svg>
     </div>`,
-    className: '',
-    iconSize: [36, 36],
-    iconAnchor: [18, 18],
+    className: '', iconSize: [40, 40], iconAnchor: [20, 20]
   });
 }
 
@@ -2649,11 +1901,9 @@ async function recalcularRuta(fromLat, fromLng) {
   if (!p) return;
 
   let lat = fromLat, lng = fromLng;
-  if (lat == null) {
-    // Intentar Leaflet GPS marker
-    if (navGPSMarker) { const pos = navGPSMarker.getLatLng(); lat = pos.lat; lng = pos.lng; }
-    // Intentar Google Maps marker (si disponible)
-    else if (window.gmNavMarker?.getPosition) { lat = gmNavMarker.getPosition().lat(); lng = gmNavMarker.getPosition().lng(); }
+  if (lat == null && navGPSMarker) {
+    const pos = navGPSMarker.getLatLng();
+    lat = pos.lat; lng = pos.lng;
   }
 
   if (lat == null) {
@@ -2864,8 +2114,11 @@ function centrarGPS() {
   const btn = document.getElementById('btn-centrar');
   if (btn) btn.style.color = modoCentrado ? 'var(--accent)' : 'var(--text2)';
   if (!modoCentrado) return;
-  if (mapNav && navGPSMarker) {
-    mapNav.setView(navGPSMarker.getLatLng(), 17, { animate: true });
+  if (gmap && gmNavMarker) {
+    gmap.panTo(gmNavMarker.getPosition());
+    gmap.setZoom(17);
+  } else if (mapNav && navGPSMarker) {
+    mapNav.setView(navGPSMarker.getLatLng(), 17, { animate:true });
   }
 }
 
@@ -2873,47 +2126,33 @@ function vistaGeneral() {
   modoCentrado = false;
   const btn = document.getElementById('btn-centrar');
   if (btn) btn.style.color = 'var(--text2)';
-  if (!state.rutaActual?.paradas.length || !mapNav) return;
-  const pts = state.rutaActual.paradas.map(p => [p.lat, p.lng]);
-  if (navGPSMarker) pts.push([navGPSMarker.getLatLng().lat, navGPSMarker.getLatLng().lng]);
-  if (pts.length > 0) mapNav.fitBounds(L.latLngBounds(pts), { padding: [60, 80] });
+  if (!state.rutaActual?.paradas.length) return;
+  if (gmap) {
+    const bounds = new google.maps.LatLngBounds();
+    state.rutaActual.paradas.forEach(p => bounds.extend({ lat: p.lat, lng: p.lng }));
+    if (gmNavMarker) bounds.extend(gmNavMarker.getPosition());
+    gmap.fitBounds(bounds, 60);
+  } else if (mapNav) {
+    const pts = state.rutaActual.paradas.map(p => [p.lat, p.lng]);
+    mapNav.fitBounds(L.latLngBounds(pts), { padding:[60,80] });
+  }
 }
 
 // ── Panel inferior ────────────────────────────────────────────────
 function actualizarNavPanel() {
   const ruta = state.rutaActual;
   if (!ruta) return;
-  const idx      = state.paradaActual;
-  const total    = ruta.paradas.length;
-  const p        = ruta.paradas[idx];
-  const hechas   = ruta.paradas.filter(x => x.hecha || x.fallida).length;
-  const pendientes = total - hechas;
-  const pct      = total ? Math.round(hechas / total * 100) : 0;
+  const idx    = state.paradaActual;
+  const total  = ruta.paradas.length;
+  const p      = ruta.paradas[idx];
+  const hechas = ruta.paradas.filter(x => x.hecha || x.fallida).length;
 
-  // Topbar simple
-  const subEl = document.getElementById('nav-sub');
-  if (subEl) subEl.textContent = p
+  document.getElementById('nav-sub').textContent = p
     ? `Parada ${idx+1}/${total} · ${p.nombre}`
     : '✅ Ruta completada';
-
-  // Métricas panel
-  const kmEl = document.getElementById('nav-km');
-  if (kmEl) kmEl.textContent = (ruta.kmTotal || '—') + ' km';
-
-  const progEl = document.getElementById('nav-progreso');
-  if (progEl) progEl.textContent = `${hechas}/${total}`;
-
-  const etaEl = document.getElementById('nav-eta');
-  if (etaEl) etaEl.textContent = ruta.horaFin || '—';
-
-  const restEl = document.getElementById('nav-paradas-rest');
-  if (restEl) restEl.textContent = pendientes;
-
-  // Barra de progreso
-  const barEl = document.getElementById('nav-progress-bar');
-  if (barEl) barEl.style.width = pct + '%';
-
-  // Destino nombre
+  document.getElementById('nav-km').textContent      = (ruta.kmTotal || '—') + ' km';
+  document.getElementById('nav-progreso').textContent = `${hechas}/${total}`;
+  document.getElementById('nav-eta').textContent      = ruta.horaFin || '—';
   if (p) {
     const destEl = document.getElementById('nav-destino-nombre');
     if (destEl) destEl.textContent = p.nombre;
@@ -2926,14 +2165,6 @@ function renderListaNav() {
   const idx = state.paradaActual;
   const container = document.getElementById('nav-lista-items');
   container.innerHTML = '';
-
-  // Resumen en header de lista
-  const resEl = document.getElementById('nav-lista-resumen');
-  if (resEl && ruta) {
-    const hechas = ruta.paradas.filter(x => x.hecha && !x.fallida).length;
-    const fallidas = ruta.paradas.filter(x => x.fallida).length;
-    resEl.textContent = `✓${hechas} ✗${fallidas}`;
-  }
   ruta.paradas.forEach((p, i) => {
     let color = 'var(--accent)', bg = 'rgba(0,212,255,.12)', emoji = String(i+1);
     if (p.hecha)   { color='var(--green)'; bg='rgba(0,230,118,.12)'; emoji='✓'; }
@@ -3010,22 +2241,11 @@ function avanzarYAbrir(idx, ruta, msg) {
     trazarRutaCompleta();
     setTimeout(() => recalcularRuta(), 400);
   } else {
-    // ── Todas las paradas completadas → navegar a la BASE ────────────
     actualizarNavPanel();
     renderListaNav();
-    hablar('¡Ruta completada! Regresando a la base.');
-    showToast('🎉 ¡Ruta completada! Iniciando regreso a base...');
-
-    // Navegar a la base si existe
-    const base = ruta.final || rutaBuild.final || loadBase().final;
-    if (base?.lat) {
-      setTimeout(() => {
-        // Trazar ruta de regreso a la base
-        recalcularRutaABase(base);
-      }, 1000);
-    } else {
-      setTimeout(() => finalizarRuta(), 2500);
-    }
+    hablar('¡Felicidades! Ruta completada.');
+    showToast('🎉 ¡Ruta completada!');
+    setTimeout(() => finalizarRuta(), 2500);
   }
 }
 
@@ -3049,77 +2269,178 @@ function deshacerAccion() {
   showToast('Nada que deshacer');
 }
 
-async function recalcularRutaABase(base) {
-  // Mostrar marcador de base en el mapa
-  if (gmap && googleMapsReady) {
-    if (window._gmBaseMarker) window._gmBaseMarker.setMap(null);
-    window._gmBaseMarker = new google.maps.Marker({
-      position: { lat: base.lat, lng: base.lng },
-      map: gmap,
-      icon: {
-        path: google.maps.SymbolPath.CIRCLE,
-        scale: 14,
-        fillColor: '#ff9100',
-        fillOpacity: 1,
-        strokeColor: '#fff',
-        strokeWeight: 2,
-      },
-      title: '🏁 Base: ' + (base.nombre || ''),
-      zIndex: 999,
-    });
-    // Label en panel
-    document.getElementById('nav-calle').textContent = '🏁 Regreso a base';
-    document.getElementById('nav-sub').textContent   = base.nombre || 'Punto de retorno';
-    document.getElementById('nav-destino-nombre').textContent = base.nombre || 'Base';
-  }
+// ── Funciones de seguimiento de ruta ─────────────────────────────
+function renderSeguimiento() {
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+  const total      = ruta.paradas.length;
+  const entregadas = ruta.paradas.filter(p => p.hecha && !p.fallida).length;
+  const fallidas   = ruta.paradas.filter(p => p.fallida).length;
+  const pendientes = total - entregadas - fallidas;
+  const pct        = total ? Math.round((entregadas + fallidas) / total * 100) : 0;
 
-  // Calcular ruta a la base
-  let lat = null, lng = null;
-  if (gmap && gmNavMarker) {
-    lat = gmNavMarker.getPosition().lat();
-    lng = gmNavMarker.getPosition().lng();
-  } else if (navGPSMarker) {
-    lat = navGPSMarker.getLatLng().lat;
-    lng = navGPSMarker.getLatLng().lng;
-  }
+  const barEl = document.getElementById('seg-bar');
+  const pctEl = document.getElementById('seg-pct');
+  if (barEl) barEl.style.width = pct + '%';
+  if (pctEl) pctEl.textContent = pct + '%';
+  const eEl = document.getElementById('seg-entregadas'); if(eEl) eEl.textContent = '✓ ' + entregadas + ' entregadas';
+  const fEl = document.getElementById('seg-fallidas');   if(fEl) fEl.textContent = '✗ ' + fallidas + ' fallidas';
+  const pEl = document.getElementById('seg-pendientes'); if(pEl) pEl.textContent = '— ' + pendientes + ' pendientes';
 
-  if (lat !== null) {
-    // Ruta a la base usando OSRM o Google
-    try {
-      const url = `https://router.project-osrm.org/route/v1/driving/${lng},${lat};${base.lng},${base.lat}?overview=full&geometries=geojson&steps=true`;
-      const r = await fetch(url);
-      const d = await r.json();
-      if (d.routes?.[0]) {
-        const km  = (d.routes[0].distance / 1000).toFixed(1);
-        const min = Math.round(d.routes[0].duration / 60);
-        showToast(`🏁 Regreso: ${km} km · ~${min} min`);
-        hablar(`Regresando a la base. ${km} kilómetros.`);
-        // Dibujar ruta al mapa Leaflet si no hay Google
-        if (mapNav && !gmap) {
-          if (navRouteLayer) navRouteLayer.remove();
-          const coords = d.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
-          navRouteLayer = L.polyline(coords, { color: '#ff9100', weight: 5, opacity: .85 }).addTo(mapNav);
-          mapNav.fitBounds(navRouteLayer.getBounds(), { padding: [60, 60] });
-        }
-      }
-    } catch(e) { console.warn('Ruta a base:', e); }
-  }
-
-  // Mostrar botón para finalizar
-  mostrarBotonFinalizarRuta(base);
+  // Lista de paradas con botones
+  const lista = document.getElementById('seg-paradas-list');
+  if (!lista) return;
+  lista.innerHTML = '';
+  ruta.paradas.forEach((p, i) => {
+    const entregada = p.hecha && !p.fallida;
+    const fallida   = p.fallida;
+    const color = entregada ? 'var(--green)' : fallida ? 'var(--red)' : 'var(--accent)';
+    const icono = entregada ? '✓' : fallida ? '✗' : String(i+1);
+    const div = document.createElement('div');
+    div.style.cssText = 'padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;' +
+      (entregada ? 'background:rgba(0,230,118,.05);' : fallida ? 'background:rgba(255,82,82,.05);' : '');
+    // Badge
+    const badge = document.createElement('div');
+    badge.style.cssText = 'width:30px;height:30px;border-radius:50%;border:2px solid ' + color + ';color:' + color + ';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;';
+    badge.textContent = icono;
+    // Info
+    const info = document.createElement('div');
+    info.style.cssText = 'flex:1;min-width:0;';
+    const nameEl = document.createElement('div');
+    nameEl.style.cssText = 'font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+    nameEl.textContent = p.nombre;
+    const subEl2 = document.createElement('div');
+    subEl2.style.cssText = 'font-size:11px;color:' + (p.horaAccion ? color : 'var(--text3)') + ';margin-top:2px;';
+    subEl2.textContent = p.horaAccion ? (entregada ? '✓ ' : '✗ ') + p.horaAccion : 'Pendiente';
+    info.appendChild(nameEl); info.appendChild(subEl2);
+    // Botones (solo si pendiente)
+    if (!entregada && !fallida) {
+      const btnWrap = document.createElement('div');
+      btnWrap.style.cssText = 'display:flex;gap:5px;flex-shrink:0;';
+      const btnE = document.createElement('button');
+      btnE.style.cssText = 'padding:6px 10px;border-radius:8px;border:1px solid rgba(0,230,118,.4);background:rgba(0,230,118,.1);color:var(--green);font-size:11px;font-weight:700;cursor:pointer;';
+      btnE.textContent = '✓';
+      btnE.onclick = (ev) => { ev.stopPropagation(); marcarEntregadaSeg(i); };
+      const btnF = document.createElement('button');
+      btnF.style.cssText = 'padding:6px 10px;border-radius:8px;border:1px solid rgba(255,82,82,.4);background:rgba(255,82,82,.1);color:var(--red);font-size:11px;font-weight:700;cursor:pointer;';
+      btnF.textContent = '✗';
+      btnF.onclick = (ev) => { ev.stopPropagation(); marcarFallidaSeg(i); };
+      btnWrap.appendChild(btnE); btnWrap.appendChild(btnF);
+      div.appendChild(badge); div.appendChild(info); div.appendChild(btnWrap);
+    } else {
+      const btnEdit = document.createElement('button');
+      btnEdit.style.cssText = 'background:none;border:none;color:var(--text3);font-size:15px;cursor:pointer;padding:4px;flex-shrink:0;';
+      btnEdit.textContent = '↩';
+      btnEdit.title = 'Deshacer';
+      btnEdit.onclick = (ev) => { ev.stopPropagation(); deshacerSeg(i); };
+      div.appendChild(badge); div.appendChild(info); div.appendChild(btnEdit);
+    }
+    lista.appendChild(div);
+  });
 }
 
-function mostrarBotonFinalizarRuta(base) {
-  // Agregar botón temporal en el panel para confirmar llegada a base
-  const panel = document.getElementById('nav-panel-inner');
-  if (!panel) { finalizarRuta(); return; }
+function marcarEntregadaSeg(idx) {
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+  const p = ruta.paradas[idx];
+  if (!p || p.hecha) return;
+  p.hecha = true; p.fallida = false; p.horaAccion = fmtHora(new Date());
+  saveState();
+  renderSeguimiento();
+  showToast('✅ Entregada · ' + p.horaAccion);
+  // Re-abrir Google Maps con paradas restantes
+  const pendientes = ruta.paradas.filter(q => !q.hecha && !q.fallida);
+  if (pendientes.length > 0) {
+    setTimeout(() => abrirGoogleMaps(), 800);
+  } else {
+    showToast('🎉 ¡Todas las paradas completadas!');
+  }
+}
 
-  // Cambiar el área de botones por "llegué a la base"
-  const tmpBtn = document.createElement('button');
-  tmpBtn.style.cssText = 'padding:14px;border-radius:13px;border:2px solid rgba(255,145,0,.6);background:rgba(255,145,0,.15);color:var(--orange);font-size:15px;font-weight:800;cursor:pointer;width:100%;font-family:var(--sans);';
-  tmpBtn.textContent = '🏁 Llegué a la base — Finalizar ruta';
-  tmpBtn.onclick = () => finalizarRuta();
-  panel.appendChild(tmpBtn);
+function marcarFallidaSeg(idx) {
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+  const p = ruta.paradas[idx];
+  if (!p || p.hecha) return;
+  p.hecha = true; p.fallida = true; p.horaAccion = fmtHora(new Date());
+  saveState();
+  renderSeguimiento();
+  showToast('⚠️ Fallida · ' + p.horaAccion);
+  const pendientes = ruta.paradas.filter(q => !q.hecha && !q.fallida);
+  if (pendientes.length > 0) setTimeout(() => abrirGoogleMaps(), 800);
+}
+
+function deshacerSeg(idx) {
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+  const p = ruta.paradas[idx];
+  if (!p) return;
+  p.hecha = false; p.fallida = false; p.horaAccion = null;
+  saveState();
+  renderSeguimiento();
+  showToast('↩ Deshecho · parada ' + (idx+1));
+}
+
+// Abrir Google Maps con las paradas PENDIENTES (ya entregadas/fallidas se saltan)
+function abrirGoogleMaps() {
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+  const inicio  = ruta.inicio;
+  const fin     = ruta.final;
+  const pendientes = ruta.paradas.filter(p => !p.hecha && !p.fallida);
+
+  if (!inicio || !fin) { showToast('Sin puntos de inicio/fin'); return; }
+
+  const enc = (p) => encodeURIComponent(p.lat + ',' + p.lng);
+  const MAX_WP = 23;
+
+  let wpsArr = pendientes.slice(0, MAX_WP);
+  let wps = wpsArr.map(enc).join('/');
+
+  // Si no hay pendientes, abrir solo ruta de regreso a base
+  if (!wpsArr.length) {
+    // Usar posición GPS actual si disponible, si no desde inicio
+    const url = 'https://www.google.com/maps/dir/My+Location/' + enc(fin);
+    window.open(url, '_blank');
+    return;
+  }
+
+  const url = 'https://www.google.com/maps/dir/' + enc(inicio) + '/' + wps + '/' + enc(fin);
+  window.open(url, '_blank');
+  showToast('🗺️ Abriendo ' + wpsArr.length + ' paradas pendientes...');
+}
+
+// Re-optimizar excluyendo entregadas/fallidas
+function reoptimizarPendientes() {
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+  const pendientes = ruta.paradas.filter(p => !p.hecha && !p.fallida);
+  if (!pendientes.length) { showToast('No hay paradas pendientes'); return; }
+
+  // Nearest neighbor desde la última posición (o inicio)
+  const hechas = ruta.paradas.filter(p => p.hecha || p.fallida);
+  let actual = hechas.length ? hechas[hechas.length - 1] : ruta.inicio;
+  let sinVisitar = [...pendientes];
+  let ordenadas = [];
+  while (sinVisitar.length) {
+    let minDist = Infinity, minIdx = 0;
+    sinVisitar.forEach((p, i) => {
+      if (!actual) return;
+      const d = distHaversine(actual.lat, actual.lng, p.lat, p.lng);
+      if (d < minDist) { minDist = d; minIdx = i; }
+    });
+    ordenadas.push(sinVisitar[minIdx]);
+    actual = sinVisitar[minIdx];
+    sinVisitar.splice(minIdx, 1);
+  }
+
+  // Reconstruir paradas: hechas + reordenadas
+  ruta.paradas = [...hechas, ...ordenadas];
+  saveState();
+  renderSeguimiento();
+  showToast('⚡ Ruta re-optimizada con ' + ordenadas.length + ' paradas pendientes');
+  // Abrir Google Maps con el nuevo orden
+  setTimeout(() => abrirGoogleMaps(), 800);
 }
 
 function finalizarRuta() {
@@ -3136,19 +2457,7 @@ function finalizarRuta() {
 }
 
 function salirNavegacion() {
-  // Detener GPS
-  if (navGPSWatch != null) {
-    navigator.geolocation.clearWatch(navGPSWatch);
-    navGPSWatch = null;
-  }
-  // Limpiar marcadores y mapa para que se reinicialice al volver
-  if (navGPSMarker && mapNav) { navGPSMarker.remove(); }
-  if (navRouteLayer && mapNav) { navRouteLayer.remove(); }
-  navGPSMarker  = null;
-  navRouteLayer = null;
-  navRuta       = null;
-  // Destruir el mapa Leaflet para que se recree limpio la próxima vez
-  if (mapNav) { mapNav.remove(); mapNav = null; }
+  if (navGPSWatch) { navigator.geolocation.clearWatch(navGPSWatch); navGPSWatch = null; }
   showScreen('screen-home');
   renderHome();
 }
@@ -3213,11 +2522,17 @@ function usarGPS(tipo) {
     const data = await reverseGeocode(lat, lng, `${lat.toFixed(5)},${lng.toFixed(5)}`);
     if (tipo === 'inicio') {
       rutaBuild.inicio = { lat, lng, nombre: data.nombre };
+      const el = document.getElementById('cr-inicio');
+      const lb = document.getElementById('cr-inicio-label');
+      if (el) el.value = data.nombre;
+      if (lb) { lb.textContent = '◎ ' + data.nombre; lb.style.display = 'block'; }
     } else {
       rutaBuild.final = { lat, lng, nombre: data.nombre };
+      const el = document.getElementById('cr-final');
+      const lb = document.getElementById('cr-final-label');
+      if (el) el.value = data.nombre;
+      if (lb) { lb.textContent = '◎ ' + data.nombre; lb.style.display = 'block'; }
     }
-    saveBase();
-    renderBaseUI();
     showToast('✅ Ubicación GPS capturada');
   }, () => showToast('⚠️ No se pudo obtener el GPS'), { enableHighAccuracy: true, timeout: 8000 });
 }
@@ -3323,16 +2638,17 @@ function confirmarEditarParada() {
   closeModal('modal-editar-parada');
 
   if (pb) {
+    // Estamos en pantalla de paradas → re-optimizar
     actualizarMapaParadas();
     renderParadasList();
     if (rutaBuild.paradas.length > 1) {
-      // Mostrar botón de re-optimizar en lugar de hacerlo automático
-      showToast('✅ Parada actualizada');
-      mostrarBotonReoptimizar();
+      showToast('✅ Parada actualizada — re-optimizando...');
+      setTimeout(() => optimizarRuta(), 400);
     } else {
       showToast('✅ Parada actualizada');
     }
   } else if (pa) {
+    // Estamos en navegación → actualizar mapa y ruta
     actualizarNavPanel();
     trazarRutaCompleta();
     renderListaNav();
@@ -3410,40 +2726,33 @@ async function procesarMasivo() {
 
 (async function init() {
 
+  // Botón físico atrás
+  history.replaceState({}, '');
+  history.pushState({}, '');
+  window.addEventListener('popstate', () => {
+    navegarAtras();
+    history.pushState({}, '');
+  });
+  // Swipe derecha desde borde izquierdo
+  let sx = 0, sy = 0, st = 0;
+  document.addEventListener('touchstart', e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; st = Date.now(); }, {passive:true});
+  document.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy;
+    if (dx > 60 && Math.abs(dx) > Math.abs(dy)*1.5 && Date.now()-st < 400 && sx < 40) navegarAtras();
+  }, {passive:true});
+
   // Fecha hoy por defecto en crear ruta
   const hoy = new Date();
   const dd = String(hoy.getDate()).padStart(2,'0');
   const mm = String(hoy.getMonth()+1).padStart(2,'0');
   document.getElementById('cr-fecha').value = `${hoy.getFullYear()}-${mm}-${dd}`;
 
-  // ── Botón físico atrás ───────────────────────────────────────────
+  // Botón atrás físico
   history.replaceState({ s: 'screen-home' }, '');
   history.pushState({ s: 'screen-home' }, '');
   window.addEventListener('popstate', () => {
-    navegarAtras();
     history.pushState({ s: 'screen-home' }, '');
   });
-
-  // ── Swipe horizontal para navegar ───────────────────────────────
-  let swipeStartX = 0, swipeStartY = 0, swipeStartTime = 0;
-
-  document.addEventListener('touchstart', e => {
-    swipeStartX    = e.touches[0].clientX;
-    swipeStartY    = e.touches[0].clientY;
-    swipeStartTime = Date.now();
-  }, { passive: true });
-
-  document.addEventListener('touchend', e => {
-    const dx   = e.changedTouches[0].clientX - swipeStartX;
-    const dy   = e.changedTouches[0].clientY - swipeStartY;
-    const dt   = Date.now() - swipeStartTime;
-    const absX = Math.abs(dx), absY = Math.abs(dy);
-
-    // Swipe hacia la derecha (deslizar desde borde izquierdo = atrás)
-    if (dx > 60 && absX > absY * 1.5 && dt < 400 && swipeStartX < 40) {
-      navegarAtras();
-    }
-  }, { passive: true });
 
   // Cargar config GitHub y sincronizar al inicio
   ghConfig = loadGHConfig();
@@ -3458,41 +2767,7 @@ async function procesarMasivo() {
     }, 1500);
   }
 
-  // Cargar inicio/final guardados
-  cargarBase();
-
   renderHome();
-
-  // ── PWA: capturar evento de instalación ───────────────────────
-  let deferredInstall = null;
-  window.addEventListener('beforeinstallprompt', e => {
-    e.preventDefault();
-    deferredInstall = e;
-    const banner = document.getElementById('pwa-banner');
-    if (banner) banner.style.display = 'flex';
-  });
-  const installBtn = document.getElementById('pwa-install-btn');
-  if (installBtn) {
-    installBtn.onclick = async () => {
-      if (!deferredInstall) return;
-      deferredInstall.prompt();
-      const { outcome } = await deferredInstall.userChoice;
-      deferredInstall = null;
-      document.getElementById('pwa-banner').style.display = 'none';
-    };
-  }
-  window.addEventListener('appinstalled', () => {
-    document.getElementById('pwa-banner').style.display = 'none';
-    showToast('✅ App instalada en pantalla de inicio');
-  });
-
-  // iOS: mostrar instrucciones si no está instalada
-  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-  const isStandalone = window.matchMedia('(display-mode: standalone)').matches
-    || window.navigator.standalone;
-  if (isIOS && !isStandalone) {
-    setTimeout(() => showToast('💡 Toca Compartir → Agregar a inicio para pantalla completa'), 3000);
-  }
 })();
 </script>
 </body>
