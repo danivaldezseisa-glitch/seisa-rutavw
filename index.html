@@ -176,49 +176,67 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
     <!-- Lista de usuarios guardados -->
     <div id="login-usuarios-list" style="width:100%;display:flex;flex-direction:column;gap:8px;"></div>
 
-    <!-- Botón agregar usuario -->
-    <button onclick="mostrarFormNuevoUsuario()" class="btn btn-ghost" style="width:100%;border-style:dashed;">
-      ＋ Agregar usuario
-    </button>
-
-    <!-- Form nuevo usuario (oculto por defecto) -->
-    <div id="form-nuevo-usuario" style="display:none;width:100%;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;display:none;flex-direction:column;gap:10px;">
-      <div style="font-size:14px;font-weight:700;">Nuevo operador</div>
+    <!-- Modo admin: botón oculto (toca 5 veces el logo) -->
+    <div id="form-nuevo-usuario" style="display:none;width:100%;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;flex-direction:column;gap:10px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div style="font-size:14px;font-weight:700;">⚙️ Modo Administrador</div>
+        <button onclick="salirModoAdmin()" style="background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;">✕</button>
+      </div>
+      <div style="font-size:12px;color:var(--accent);">Agregar nuevo operador</div>
       <input class="input" id="nu-nombre" placeholder="Nombre del operador" maxlength="30">
-      <input class="input" id="nu-pin" placeholder="PIN (4 dígitos)" type="password" maxlength="4" inputmode="numeric" pattern="[0-9]*">
-      <div style="font-size:11px;color:var(--text3);">El PIN protege el acceso a esta cuenta</div>
+      <input class="input" id="nu-pin" placeholder="PIN del operador (4 dígitos)" type="password" maxlength="4" inputmode="numeric">
       <div style="display:flex;gap:8px;">
         <button class="btn btn-accent" onclick="crearUsuario()" style="flex:1;">✓ Crear</button>
-        <button class="btn btn-ghost" onclick="ocultarFormNuevoUsuario()" style="flex:1;">Cancelar</button>
       </div>
+      <div style="height:1px;background:var(--border);"></div>
+      <div style="font-size:12px;color:var(--text3);">Cambiar PIN de administrador</div>
+      <input class="input" id="admin-pin-nuevo" placeholder="Nuevo PIN admin (4 dígitos)" type="password" maxlength="4" inputmode="numeric">
+      <button class="btn btn-ghost" onclick="cambiarPINAdmin()" style="font-size:13px;">🔑 Cambiar PIN admin</button>
+    </div>
+
+    <!-- Acceso admin: toca el logo 5 veces -->
+    <div onclick="tapLogo()" style="cursor:pointer;margin-top:8px;">
+      <div style="font-size:11px;color:var(--border);text-align:center;">v1.0</div>
     </div>
   </div>
 </div>
 
 <!-- MODAL: PIN de acceso -->
 <div class="modal-overlay hidden" id="modal-pin">
-  <div class="modal-sheet" style="align-items:center;text-align:center;">
-    <div style="font-size:36px;font-weight:800;color:var(--accent);" id="modal-pin-nombre"></div>
-    <div style="font-size:13px;color:var(--text3);margin-bottom:4px;">Ingresa tu PIN</div>
-    <div style="display:flex;gap:10px;justify-content:center;margin:8px 0;" id="pin-dots">
+  <div class="modal-sheet" style="align-items:center;text-align:center;gap:8px;">
+    <div style="font-size:36px;font-weight:900;color:var(--accent);" id="modal-pin-nombre"></div>
+    <div style="font-size:13px;color:var(--text3);">Ingresa tu PIN</div>
+    <!-- Puntos indicadores -->
+    <div style="display:flex;gap:12px;justify-content:center;margin:4px 0;" id="pin-dots">
       <div class="pin-dot"></div><div class="pin-dot"></div>
       <div class="pin-dot"></div><div class="pin-dot"></div>
     </div>
-    <!-- Teclado numérico -->
-    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:220px;margin:8px auto 0;">
-      ${[1,2,3,4,5,6,7,8,9,'',0,'⌫'].map(n =>
-        n === '' ? '<div></div>' :
-        `<button onclick="pinInput('${n}')" style="height:56px;border-radius:12px;border:1px solid var(--border);background:var(--surface);font-size:${n==='⌫'?20:22}px;font-weight:700;cursor:pointer;color:var(--text);">${n}</button>`
-      ).join('')}
+    <!-- Teclado numérico estático -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:240px;margin:4px auto 0;">
+      <button class="pin-key" onclick="pinInput('1')">1</button>
+      <button class="pin-key" onclick="pinInput('2')">2</button>
+      <button class="pin-key" onclick="pinInput('3')">3</button>
+      <button class="pin-key" onclick="pinInput('4')">4</button>
+      <button class="pin-key" onclick="pinInput('5')">5</button>
+      <button class="pin-key" onclick="pinInput('6')">6</button>
+      <button class="pin-key" onclick="pinInput('7')">7</button>
+      <button class="pin-key" onclick="pinInput('8')">8</button>
+      <button class="pin-key" onclick="pinInput('9')">9</button>
+      <div></div>
+      <button class="pin-key" onclick="pinInput('0')">0</button>
+      <button class="pin-key pin-key-del" onclick="pinInput('DEL')">⌫</button>
     </div>
-    <div id="pin-error" style="color:var(--red);font-size:12px;min-height:18px;margin-top:6px;"></div>
-    <button class="btn btn-ghost" onclick="closeModal('modal-pin')" style="margin-top:4px;">Cancelar</button>
+    <div id="pin-error" style="color:var(--red);font-size:12px;min-height:18px;margin-top:2px;"></div>
+    <button class="btn btn-ghost" onclick="closeModal('modal-pin')">Cancelar</button>
   </div>
 </div>
 
 <style>
 .pin-dot { width:14px;height:14px;border-radius:50%;border:2px solid var(--accent);background:transparent;transition:background .15s; }
 .pin-dot.filled { background:var(--accent); }
+.pin-key { height:58px;border-radius:14px;border:1px solid var(--border);background:var(--surface);font-size:22px;font-weight:700;cursor:pointer;color:var(--text);transition:background .1s;-webkit-tap-highlight-color:transparent; }
+.pin-key:active { background:var(--surface2); }
+.pin-key-del { font-size:20px; }
 </style>
 
 <!-- ════════════════════════════════
@@ -763,8 +781,50 @@ function userAppKey(userId) { return 'seisa_app_v1_' + userId; }
 function userBaseKey(userId) { return 'seisa_base_v1_' + userId; }
 function userGHFile(userId)  { return 'seisa-data-' + userId + '.json'; }
 
+// ── Acceso admin: toca el logo 5 veces ───────────────────────────
+let _tapCount = 0, _tapTimer = null;
+function tapLogo() {
+  _tapCount++;
+  clearTimeout(_tapTimer);
+  _tapTimer = setTimeout(() => { _tapCount = 0; }, 1500);
+  if (_tapCount >= 5) {
+    _tapCount = 0;
+    pedirPINAdmin();
+  }
+}
+
+function pedirPINAdmin() {
+  const pin = prompt('PIN de administrador:');
+  if (pin === null) return;
+  if (pin === getAdminPIN()) {
+    window._adminActivo = true;
+    mostrarFormNuevoUsuario();
+    renderLoginScreen();
+    showToast('✅ Modo administrador activo');
+  } else {
+    showToast('❌ PIN de administrador incorrecto');
+  }
+}
+
+function salirModoAdmin() {
+  window._adminActivo = false;
+  ocultarFormNuevoUsuario();
+  renderLoginScreen();
+}
+
+function cambiarPINAdmin() {
+  const nuevo = document.getElementById('admin-pin-nuevo')?.value.trim();
+  if (!nuevo || nuevo.length !== 4 || !/^\d{4}$/.test(nuevo)) {
+    showToast('El PIN debe ser exactamente 4 dígitos'); return;
+  }
+  setAdminPIN(nuevo);
+  document.getElementById('admin-pin-nuevo').value = '';
+  showToast('✅ PIN de administrador actualizado');
+}
+
 // Crear usuario
 function crearUsuario() {
+  if (!isAdminMode()) { showToast('Solo el administrador puede crear usuarios'); return; }
   const nombre = document.getElementById('nu-nombre').value.trim();
   const pin    = document.getElementById('nu-pin').value.trim();
   if (!nombre) { showToast('Escribe un nombre'); return; }
@@ -792,12 +852,22 @@ function crearUsuario() {
 // Mostrar/ocultar form
 function mostrarFormNuevoUsuario() {
   const f = document.getElementById('form-nuevo-usuario');
-  if (f) { f.style.display = 'flex'; document.getElementById('nu-nombre').focus(); }
+  if (f) { f.style.display = 'flex'; setTimeout(() => document.getElementById('nu-nombre')?.focus(), 100); }
 }
 function ocultarFormNuevoUsuario() {
   const f = document.getElementById('form-nuevo-usuario');
-  if (f) f.style.display = 'none';
+  if (f) { f.style.display = 'none'; f.style.flexDirection = ''; }
 }
+
+// ── Admin PIN (guardado en localStorage, solo visible al configurar) ──
+const ADMIN_KEY = 'seisa_admin_pin_v1';
+function getAdminPIN() {
+  return localStorage.getItem(ADMIN_KEY) || '1234'; // PIN admin por defecto
+}
+function setAdminPIN(pin) {
+  localStorage.setItem(ADMIN_KEY, pin);
+}
+function isAdminMode() { return window._adminActivo === true; }
 
 // Render pantalla login
 function renderLoginScreen() {
@@ -807,29 +877,62 @@ function renderLoginScreen() {
   lista.innerHTML = '';
 
   if (!users.length) {
-    lista.innerHTML = '<div style="text-align:center;color:var(--text3);font-size:13px;padding:8px;">No hay usuarios. Agrega uno.</div>';
+    // Si es admin, mostrar form directo
+    if (isAdminMode()) {
+      lista.innerHTML = '<div style="text-align:center;color:var(--text3);font-size:13px;padding:8px;">No hay operadores. Crea el primero.</div>';
+    } else {
+      lista.innerHTML = '<div style="text-align:center;color:var(--text3);font-size:13px;padding:8px;">Sin operadores registrados. Contacta al administrador.</div>';
+    }
     return;
   }
 
   users.forEach(user => {
     const div = document.createElement('div');
-    div.style.cssText = 'display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:14px;cursor:pointer;transition:background .15s;';
-    div.innerHTML = `
-      <div style="width:44px;height:44px;border-radius:50%;background:rgba(0,212,255,.15);border:2px solid rgba(0,212,255,.3);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:var(--accent);flex-shrink:0;">
-        ${user.nombre.charAt(0).toUpperCase()}
-      </div>
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:15px;font-weight:700;"></div>
-        <div style="font-size:11px;color:var(--text3);margin-top:2px;">Toca para ingresar</div>
-      </div>
-      <button onclick="eliminarUsuario(event,'${user.id}')" style="background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;padding:6px;" title="Eliminar usuario">⋯</button>`;
-    div.querySelectorAll('div')[2].textContent = user.nombre;
+    div.style.cssText = 'display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:14px;cursor:pointer;-webkit-tap-highlight-color:transparent;';
+    // Inicial
+    const ini = document.createElement('div');
+    ini.style.cssText = 'width:44px;height:44px;border-radius:50%;background:rgba(0,212,255,.15);border:2px solid rgba(0,212,255,.3);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:var(--accent);flex-shrink:0;';
+    ini.textContent = user.nombre.charAt(0).toUpperCase();
+    // Info
+    const info = document.createElement('div');
+    info.style.cssText = 'flex:1;min-width:0;';
+    const nameEl = document.createElement('div');
+    nameEl.style.cssText = 'font-size:15px;font-weight:700;';
+    nameEl.textContent = user.nombre;
+    const subEl = document.createElement('div');
+    subEl.style.cssText = 'font-size:11px;color:var(--text3);margin-top:2px;';
+    subEl.textContent = 'Toca para ingresar';
+    info.appendChild(nameEl); info.appendChild(subEl);
+
+    div.appendChild(ini); div.appendChild(info);
+
+    // Botón admin: eliminar (solo en modo admin)
+    if (isAdminMode()) {
+      const btnDel = document.createElement('button');
+      btnDel.style.cssText = 'background:rgba(255,82,82,.1);border:1px solid rgba(255,82,82,.3);color:var(--red);border-radius:8px;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0;';
+      btnDel.textContent = 'Borrar';
+      btnDel.onclick = (e) => { e.stopPropagation(); eliminarUsuario(user.id); };
+      div.appendChild(btnDel);
+    }
+
     div.onclick = (e) => {
       if (e.target.tagName === 'BUTTON') return;
       pedirPIN(user);
     };
     lista.appendChild(div);
   });
+}
+
+function eliminarUsuario(userId) {
+  const users = loadUsers();
+  const user  = users.find(u => u.id === userId);
+  if (!user) return;
+  if (!confirm('¿Eliminar al operador "' + user.nombre + '"? Se borrarán sus datos.')) return;
+  try { localStorage.removeItem(userAppKey(userId)); } catch(ee) {}
+  try { localStorage.removeItem(userBaseKey(userId)); } catch(ee) {}
+  saveUsers(users.filter(u => u.id !== userId));
+  renderLoginScreen();
+  showToast('Operador eliminado');
 }
 
 // Pedir PIN
@@ -846,7 +949,7 @@ function pedirPIN(user) {
 }
 
 function pinInput(val) {
-  if (val === '⌫') {
+  if (val === 'DEL' || val === '⌫') {
     _pinActual = _pinActual.slice(0, -1);
   } else if (_pinActual.length < 4) {
     _pinActual += String(val);
