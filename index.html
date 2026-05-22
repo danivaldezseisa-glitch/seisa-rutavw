@@ -603,14 +603,27 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
 
 <script>
 // ══════════════════════════════════════════════════════════════════
-//  GITHUB BACKEND
+//  GITHUB BACKEND — Sync compartido multi-dispositivo
+//  Un solo archivo "seisa-shared.json" contiene TODO:
+//  usuarios, estados por usuario y base por usuario.
+//  Cualquier dispositivo que tenga el token ve la misma data.
 // ══════════════════════════════════════════════════════════════════
 const GH_CONFIG_KEY = 'seisa_gh_config';
 const APP_KEY       = 'seisa_app_v1';
-const GH_FILE       = 'seisa-data.json';
+const GH_FILE       = 'seisa-shared.json'; // archivo compartido único
 
-let ghConfig = null;
+let ghConfig  = null;
 let ghSyncing = false;
+let _ghSHA    = null;        // SHA del archivo remoto (evita conflictos)
+let _ghPullTimer = null;     // polling automático
+
+// ── Estructura del archivo compartido ────────────────────────────
+// {
+//   usuarios: [...],                     ← lista de operadores
+//   estados: { userId: stateObj },       ← estado de rutas por usuario
+//   bases:   { userId: baseObj },        ← base/inicio por usuario
+//   adminPin: "1234"                     ← pin admin compartido
+// }
 
 function loadGHConfig() {
   try { return JSON.parse(localStorage.getItem(GH_CONFIG_KEY)) || null; } catch(e) { return null; }
@@ -618,6 +631,173 @@ function loadGHConfig() {
 function saveGHConfig(cfg) {
   localStorage.setItem(GH_CONFIG_KEY, JSON.stringify(cfg));
   ghConfig = cfg;
+}
+
+// ── Leer el archivo compartido completo desde GitHub ─────────────
+async function ghReadShared() {
+  if (!ghConfig) return null;
+  try {
+    const r = await fetch(
+      `https://api.github.com/repos/${ghConfig.user}/${ghConfig.repo}/contents/${GH_FILE}`,
+      { headers: { Authorization: `token ${ghConfig.token}`, Accept: 'application/vnd.github.v3+json' },
+        cache: 'no-store' }
+    );
+    if (!r.ok) return null;
+    const d = await r.json();
+    _ghSHA = d.sha;
+    const raw = decodeURIComponent(escape(atob(d.content.replace(/\s/g,''))));
+    return JSON.parse(raw);
+  } catch(e) { console.warn('ghReadShared:', e); return null; }
+}
+
+// ── Escribir el archivo compartido completo en GitHub ────────────
+async function ghWriteShared(data) {
+  if (!ghConfig) return false;
+  try {
+    // Si no tenemos SHA todavía, intentar obtenerlo
+    if (!_ghSHA) {
+      const r2 = await fetch(
+        `https://api.github.com/repos/${ghConfig.user}/${ghConfig.repo}/contents/${GH_FILE}`,
+        { headers: { Authorization: `token ${ghConfig.token}`, Accept: 'application/vnd.github.v3+json' } }
+      );
+      if (r2.ok) { const d2 = await r2.json(); _ghSHA = d2.sha; }
+    }
+    const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2))));
+    const body = {
+      message: `[SEISA] Sync ${new Date().toISOString()}`,
+      content: encoded,
+      ...(_ghSHA ? { sha: _ghSHA } : {})
+    };
+    const r = await fetch(
+      `https://api.github.com/repos/${ghConfig.user}/${ghConfig.repo}/contents/${GH_FILE}`,
+      { method: 'PUT',
+        headers: { Authorization: `token ${ghConfig.token}`,
+                   Accept: 'application/vnd.github.v3+json',
+                   'Content-Type': 'application/json' },
+        body: JSON.stringify(body) }
+    );
+    if (r.ok) { const rd = await r.json(); _ghSHA = rd.content?.sha || _ghSHA; return true; }
+    // 409 Conflict: el SHA cambió (otro dispositivo escribió antes), re-leer y reintentar
+    if (r.status === 409) {
+      _ghSHA = null;
+      const fresh = await ghReadShared();
+      if (fresh) {
+        // Fusionar: conservar nuestro estado y el del remoto
+        const merged = _mergeShared(fresh, data);
+        return await ghWriteShared(merged);
+      }
+    }
+    console.error('ghWriteShared:', await r.text());
+    return false;
+  } catch(e) { console.warn('ghWriteShared:', e); return false; }
+}
+
+// ── Fusionar datos remotos con locales en caso de conflicto ──────
+function _mergeShared(remote, local) {
+  const merged = { ...remote };
+  // Usuarios: unir listas sin duplicar por id
+  const usMap = {};
+  (remote.usuarios || []).forEach(u => usMap[u.id] = u);
+  (local.usuarios  || []).forEach(u => usMap[u.id] = u);
+  merged.usuarios = Object.values(usMap);
+  // Estados: el más reciente gana (comparar por timestamp si existe)
+  merged.estados = { ...(remote.estados || {}), ...(local.estados || {}) };
+  merged.bases   = { ...(remote.bases   || {}), ...(local.bases   || {}) };
+  if (local.adminPin) merged.adminPin = local.adminPin;
+  return merged;
+}
+
+// ── Push: sube el estado actual al archivo compartido ────────────
+async function ghPush() {
+  if (!ghConfig || ghSyncing) return;
+  ghSyncing = true;
+  actualizarBtnGH(true);
+  try {
+    // Leer el remoto para no sobrescribir datos de otros usuarios
+    let shared = await ghReadShared() || { usuarios: [], estados: {}, bases: {}, adminPin: getAdminPIN() };
+    // Actualizar sección de este usuario
+    if (currentUser) {
+      shared.estados = shared.estados || {};
+      shared.bases   = shared.bases   || {};
+      shared.estados[currentUser.id] = state;
+      shared.bases[currentUser.id]   = loadBase();
+    }
+    // Actualizar lista de usuarios y pin admin desde local
+    const localUsers = loadUsersLocal();
+    if (localUsers.length) shared.usuarios = localUsers;
+    shared.adminPin = getAdminPIN();
+
+    const ok = await ghWriteShared(shared);
+    if (ok) {
+      showToast('☁️ Sincronizado');
+    } else {
+      showToast('⚠️ Error al sincronizar');
+    }
+  } catch(e) {
+    console.error('ghPush:', e);
+    showToast('⚠️ Sin conexión — guardado local');
+  }
+  ghSyncing = false;
+  actualizarBtnGH(false);
+}
+
+// ── Pull: descarga y aplica el archivo compartido ────────────────
+async function ghPull() {
+  if (!ghConfig) return false;
+  try {
+    const shared = await ghReadShared();
+    if (!shared) return false;
+
+    // 1. Restaurar usuarios en localStorage local
+    if (shared.usuarios && shared.usuarios.length) {
+      saveUsersLocal(shared.usuarios);
+    }
+
+    // 2. Restaurar PIN admin
+    if (shared.adminPin) {
+      localStorage.setItem(ADMIN_KEY, shared.adminPin);
+    }
+
+    // 3. Restaurar estado de TODOS los usuarios en localStorage
+    //    (para que al hacer login ya tengan su estado)
+    if (shared.estados) {
+      Object.entries(shared.estados).forEach(([uid, st]) => {
+        try { localStorage.setItem(userAppKey(uid), JSON.stringify(st)); } catch(e) {}
+      });
+    }
+    if (shared.bases) {
+      Object.entries(shared.bases).forEach(([uid, b]) => {
+        try { localStorage.setItem(userBaseKey(uid), JSON.stringify(b)); } catch(e) {}
+      });
+    }
+
+    // 4. Si hay sesión activa, recargar el estado del usuario actual
+    if (currentUser && shared.estados && shared.estados[currentUser.id]) {
+      state = { ...defaultState(), ...shared.estados[currentUser.id] };
+      saveStateLocal();
+    }
+
+    showToast('☁️ Datos sincronizados (' + (shared.usuarios?.length || 0) + ' operadores)');
+    return true;
+  } catch(e) {
+    console.warn('ghPull:', e);
+    return false;
+  }
+}
+
+// ── Poll automático: re-sincroniza cada 30 s cuando la app está abierta ──
+function iniciarPollGH() {
+  if (_ghPullTimer) clearInterval(_ghPullTimer);
+  if (!ghConfig) return;
+  _ghPullTimer = setInterval(async () => {
+    if (document.hidden) return; // no sincronizar en segundo plano
+    const ok = await ghPull();
+    if (ok) {
+      renderHome();
+      renderLoginScreen();
+      if (state.rutaActual) renderSeguimiento();
+    }
+  }, 30000); // cada 30 segundos
 }
 
 async function guardarConfigGH() {
@@ -633,8 +813,9 @@ async function guardarConfigGH() {
   closeModal('modal-github');
   actualizarBtnGH();
   showToast('✅ GitHub conectado correctamente');
-  await ghPull();
-  renderHome();
+  const pulled = await ghPull();
+  if (pulled) { renderLoginScreen(); renderHome(); }
+  iniciarPollGH();
 }
 
 async function testGHConnection(cfg) {
@@ -646,75 +827,6 @@ async function testGHConnection(cfg) {
   } catch(e) { return false; }
 }
 
-async function getFileSHA(cfg, file) {
-  file = file || GH_FILE;
-  try {
-    const r = await fetch(`https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/${file}`, {
-      headers: { Authorization: `token ${cfg.token}`, Accept: 'application/vnd.github.v3+json' }
-    });
-    if (r.ok) { const d = await r.json(); return d.sha; }
-  } catch(e) {}
-  return null;
-}
-
-async function ghPush() {
-  if (!ghConfig || ghSyncing) return;
-  ghSyncing = true;
-  actualizarBtnGH(true);
-  try {
-    const ghFile = (currentUser ? 'seisa-data-' + currentUser.id + '.json' : GH_FILE);
-    const sha = await getFileSHA(ghConfig, ghFile);
-    const content = btoa(unescape(encodeURIComponent(JSON.stringify(state, null, 2))));
-    const body = {
-      message: `[SEISA] Sync ${new Date().toISOString()}`,
-      content,
-      ...(sha ? { sha } : {})
-    };
-    const r = await fetch(`https://api.github.com/repos/${ghConfig.user}/${ghConfig.repo}/contents/${ghFile}`, {
-      method: 'PUT',
-      headers: {
-        Authorization: `token ${ghConfig.token}`,
-        Accept: 'application/vnd.github.v3+json',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify(body)
-    });
-    if (r.ok) {
-      showToast('☁️ Guardado en GitHub');
-    } else {
-      const err = await r.json();
-      console.error('ghPush error:', err);
-      showToast('⚠️ Error al guardar en GitHub');
-    }
-  } catch(e) {
-    console.error('ghPush:', e);
-    showToast('⚠️ Sin conexión — guardado local');
-  }
-  ghSyncing = false;
-  actualizarBtnGH(false);
-}
-
-async function ghPull() {
-  if (!ghConfig) return false;
-  try {
-    const ghFile = (currentUser ? 'seisa-data-' + currentUser.id + '.json' : GH_FILE);
-    const r = await fetch(`https://api.github.com/repos/${ghConfig.user}/${ghConfig.repo}/contents/${ghFile}`, {
-      headers: { Authorization: `token ${ghConfig.token}`, Accept: 'application/vnd.github.v3+json' }
-    });
-    if (!r.ok) return false;
-    const d = await r.json();
-    const raw = decodeURIComponent(escape(atob(d.content)));
-    const remote = JSON.parse(raw);
-    state = { ...defaultState(), ...remote };
-    saveStateLocal();
-    showToast('☁️ Datos sincronizados');
-    return true;
-  } catch(e) {
-    console.warn('ghPull:', e);
-    return false;
-  }
-}
-
 function actualizarBtnGH(syncing) {
   const btn = document.getElementById('btn-gh-status');
   if (!btn) return;
@@ -722,11 +834,13 @@ function actualizarBtnGH(syncing) {
     btn.textContent = '⟳ Sync...';
     btn.style.color = 'var(--yellow)';
   } else if (ghConfig) {
-    btn.textContent = '● GitHub';
+    btn.textContent = '● Sync';
     btn.style.color = 'var(--green)';
+    btn.title = 'Sincronizado con GitHub · toca para configurar';
   } else {
-    btn.textContent = '⬡ GitHub';
+    btn.textContent = '⬡ Sync';
     btn.style.color = 'var(--text3)';
+    btn.title = 'Sin sincronización · toca para conectar GitHub';
   }
 }
 
@@ -746,11 +860,18 @@ const USERS_KEY    = 'seisa_usuarios_v1';
 const SESSION_KEY  = 'seisa_sesion_v1';
 let currentUser    = null;
 
-function loadUsers() {
+// loadUsersLocal / saveUsersLocal: operan solo en localStorage del dispositivo
+function loadUsersLocal() {
   try { return JSON.parse(localStorage.getItem(USERS_KEY)) || []; } catch(e) { return []; }
 }
-function saveUsers(users) {
+function saveUsersLocal(users) {
   try { localStorage.setItem(USERS_KEY, JSON.stringify(users)); } catch(e) {}
+}
+// loadUsers / saveUsers: usan localStorage y empujan a GitHub si está conectado
+function loadUsers() { return loadUsersLocal(); }
+function saveUsers(users) {
+  saveUsersLocal(users);
+  if (ghConfig) ghPush(); // sincronizar inmediatamente al crear/borrar usuarios
 }
 function loadSession() {
   try { return JSON.parse(localStorage.getItem(SESSION_KEY)) || null; } catch(e) { return null; }
@@ -3093,6 +3214,7 @@ function showToast(msg) {
   if (ghConfig) {
     showToast('🔄 Sincronizando con GitHub...');
     await ghPull();
+    iniciarPollGH();
   } else {
     setTimeout(() => {
       if (!loadGHConfig()) mostrarConfigGH();
