@@ -94,10 +94,6 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
 .parada-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .parada-sub  { font-size: 11px; color: var(--text3); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
-/* ── SEGUIMIENTO SCROLL ── */
-#screen-seguimiento { display: flex; flex-direction: column; }
-#screen-seguimiento .scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
-
 /* ── NAV SCREEN ── */
 #nav-map { position: absolute; inset: 0; z-index: 1; }
 #nav-panel { position: absolute; bottom: 0; left: 0; right: 0; z-index: 100; padding: 0 12px calc(env(safe-area-inset-bottom,0px) + 12px); }
@@ -165,89 +161,104 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
 <body>
 
 <!-- ════════════════════════════════
+     SCREEN 0: LOGIN / USUARIO
+════════════════════════════════ -->
+<div class="screen" id="screen-login">
+  <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;gap:24px;">
+
+    <!-- Logo -->
+    <div style="text-align:center;">
+      <div style="font-size:52px;margin-bottom:8px;">🚛</div>
+      <div style="font-size:28px;font-weight:900;color:var(--accent);letter-spacing:2px;">SEISA</div>
+      <div style="font-size:13px;color:var(--text3);margin-top:4px;">Sistema de Rutas</div>
+    </div>
+
+    <!-- Lista de usuarios guardados -->
+    <div id="login-usuarios-list" style="width:100%;display:flex;flex-direction:column;gap:8px;"></div>
+
+    <!-- Modo admin: botón oculto (toca 5 veces el logo) -->
+    <div id="form-nuevo-usuario" style="display:none;width:100%;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:16px;flex-direction:column;gap:10px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;">
+        <div style="font-size:14px;font-weight:700;">⚙️ Modo Administrador</div>
+        <button onclick="salirModoAdmin()" style="background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;">✕</button>
+      </div>
+      <div style="font-size:12px;color:var(--accent);">Agregar nuevo operador</div>
+      <input class="input" id="nu-nombre" placeholder="Nombre del operador" maxlength="30">
+      <input class="input" id="nu-pin" placeholder="PIN del operador (4 dígitos)" type="password" maxlength="4" inputmode="numeric">
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-accent" onclick="crearUsuario()" style="flex:1;">✓ Crear</button>
+      </div>
+      <div style="height:1px;background:var(--border);"></div>
+      <div style="font-size:12px;color:var(--text3);">Cambiar PIN de administrador</div>
+      <input class="input" id="admin-pin-nuevo" placeholder="Nuevo PIN admin (4 dígitos)" type="password" maxlength="4" inputmode="numeric">
+      <button class="btn btn-ghost" onclick="cambiarPINAdmin()" style="font-size:13px;">🔑 Cambiar PIN admin</button>
+    </div>
+
+    <!-- Acceso admin: toca el logo 5 veces -->
+    <div onclick="tapLogo()" style="cursor:pointer;margin-top:8px;">
+      <div style="font-size:11px;color:var(--border);text-align:center;">v1.0</div>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: PIN de acceso -->
+<div class="modal-overlay hidden" id="modal-pin">
+  <div class="modal-sheet" style="align-items:center;text-align:center;gap:8px;">
+    <div style="font-size:36px;font-weight:900;color:var(--accent);" id="modal-pin-nombre"></div>
+    <div style="font-size:13px;color:var(--text3);">Ingresa tu PIN</div>
+    <!-- Puntos indicadores -->
+    <div style="display:flex;gap:12px;justify-content:center;margin:4px 0;" id="pin-dots">
+      <div class="pin-dot"></div><div class="pin-dot"></div>
+      <div class="pin-dot"></div><div class="pin-dot"></div>
+    </div>
+    <!-- Teclado numérico estático -->
+    <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:240px;margin:4px auto 0;">
+      <button class="pin-key" onclick="pinInput('1')">1</button>
+      <button class="pin-key" onclick="pinInput('2')">2</button>
+      <button class="pin-key" onclick="pinInput('3')">3</button>
+      <button class="pin-key" onclick="pinInput('4')">4</button>
+      <button class="pin-key" onclick="pinInput('5')">5</button>
+      <button class="pin-key" onclick="pinInput('6')">6</button>
+      <button class="pin-key" onclick="pinInput('7')">7</button>
+      <button class="pin-key" onclick="pinInput('8')">8</button>
+      <button class="pin-key" onclick="pinInput('9')">9</button>
+      <div></div>
+      <button class="pin-key" onclick="pinInput('0')">0</button>
+      <button class="pin-key pin-key-del" onclick="pinInput('DEL')">⌫</button>
+    </div>
+    <div id="pin-error" style="color:var(--red);font-size:12px;min-height:18px;margin-top:2px;"></div>
+    <button class="btn btn-ghost" onclick="closeModal('modal-pin')">Cancelar</button>
+  </div>
+</div>
+
+<style>
+.pin-dot { width:16px;height:16px;border-radius:50%;border:2.5px solid var(--accent);background:transparent;transition:background .15s; }
+.pin-dot.filled { background:var(--accent); }
+.pin-key { height:62px;border-radius:14px;border:1px solid var(--border);background:var(--surface);font-size:24px;font-weight:700;cursor:pointer;color:var(--text);transition:background .1s;-webkit-tap-highlight-color:transparent; }
+.pin-key:active { background:var(--accent);color:#000; }
+.pin-key-del { font-size:20px; }
+@keyframes shake {
+  0%,100%{transform:translateX(0)}
+  20%{transform:translateX(-8px)}
+  40%{transform:translateX(8px)}
+  60%{transform:translateX(-6px)}
+  80%{transform:translateX(6px)}
+}
+</style>
+
+<!-- ════════════════════════════════
      SCREEN 1: HOME
 ════════════════════════════════ -->
-<!-- ════════════════════════════════
-     SCREEN: LOGIN
-════════════════════════════════ -->
-<div class="screen" id="screen-login" style="justify-content:center;align-items:center;background:var(--bg);">
-  <div style="width:100%;max-width:360px;padding:32px 24px;display:flex;flex-direction:column;gap:20px;">
-    <div style="text-align:center;">
-      <div style="font-size:48px;margin-bottom:8px;">🚛</div>
-      <div style="font-size:22px;font-weight:800;color:var(--text);">SEISA Rutas</div>
-      <div style="font-size:13px;color:var(--text3);margin-top:4px;">Inicia sesión para continuar</div>
-    </div>
-    <div style="display:flex;flex-direction:column;gap:10px;">
-      <input class="input" id="login-user" placeholder="Usuario" autocomplete="username"
-        style="font-size:15px;" onkeydown="if(event.key==='Enter')document.getElementById('login-pass').focus()">
-      <input class="input" id="login-pass" type="password" placeholder="Contraseña" autocomplete="current-password"
-        style="font-size:15px;" onkeydown="if(event.key==='Enter')hacerLogin()">
-    </div>
-    <button class="btn btn-accent" onclick="hacerLogin()" style="font-size:16px;padding:15px;">
-      Entrar →
-    </button>
-    <div id="login-error" style="display:none;text-align:center;font-size:13px;color:var(--red);
-      background:rgba(255,60,60,.1);border:1px solid rgba(255,60,60,.3);border-radius:10px;padding:10px;">
-    </div>
-  </div>
-</div>
-
-<!-- ════════════════════════════════
-     SCREEN: ADMIN
-════════════════════════════════ -->
-<div class="screen hidden" id="screen-admin">
-  <div class="topbar">
-    <button class="topbar-back" onclick="cerrarSesion()">⏻</button>
-    <h2>⚙️ Panel Admin</h2>
-    <span style="font-size:11px;color:var(--accent);font-weight:700;">ADMIN</span>
-  </div>
-  <div class="scroll" style="padding:16px;display:flex;flex-direction:column;gap:16px;">
-
-    <!-- Agregar usuario -->
-    <div class="card" style="display:flex;flex-direction:column;gap:10px;">
-      <div class="label">Agregar usuario</div>
-      <input class="input" id="admin-new-user" placeholder="Nombre de usuario"
-        style="font-size:14px;" onkeydown="if(event.key==='Enter')document.getElementById('admin-new-pass').focus()">
-      <input class="input" id="admin-new-pass" type="password" placeholder="Contraseña"
-        style="font-size:14px;" onkeydown="if(event.key==='Enter')adminAgregarUsuario()">
-      <div style="display:flex;gap:8px;">
-        <select class="input" id="admin-new-rol" style="font-size:14px;flex:1;">
-          <option value="usuario">👷 Usuario</option>
-          <option value="admin">🔑 Admin</option>
-        </select>
-        <button class="btn btn-green" onclick="adminAgregarUsuario()" style="width:auto;padding:10px 18px;font-size:14px;">
-          ＋ Agregar
-        </button>
-      </div>
-      <div id="admin-add-error" style="display:none;font-size:12px;color:var(--red);"></div>
-    </div>
-
-    <!-- Lista de usuarios -->
-    <div class="card" style="display:flex;flex-direction:column;gap:0;">
-      <div class="label" style="margin-bottom:10px;">Usuarios registrados</div>
-      <div id="admin-users-list" style="display:flex;flex-direction:column;gap:8px;"></div>
-    </div>
-
-    <!-- Ir a la app -->
-    <button class="btn btn-accent" onclick="showScreen('screen-home')" style="font-size:15px;padding:14px;">
-      🗺️ Ir a la App
-    </button>
-    <button class="btn btn-ghost" onclick="cerrarSesion()" style="font-size:13px;">
-      ⏻ Cerrar sesión
-    </button>
-  </div>
-</div>
-
 <div class="screen hidden" id="screen-home">
   <div class="topbar">
-    <div style="display:flex;align-items:center;gap:8px;">
-      <h2 style="margin:0;">🚛 SEISA Rutas</h2>
-      <span id="home-user-badge" style="font-size:11px;color:var(--accent);font-weight:700;"></span>
+    <div style="flex:1;min-width:0;">
+      <div style="font-size:16px;font-weight:800;">🚛 SEISA Rutas</div>
+      <div id="home-usuario-label" style="font-size:11px;color:var(--accent);margin-top:1px;"></div>
     </div>
     <div style="display:flex;gap:6px;">
-      <button id="btn-gh-status" onclick="mostrarConfigGH()" style="width:auto;padding:6px 10px;font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text3);cursor:pointer;">⬡ GitHub</button>
-      <button class="btn btn-ghost" onclick="showHistorial()" style="width:auto;padding:6px 12px;font-size:12px;">📋</button>
-      <button class="btn btn-ghost" onclick="cerrarSesion()" style="width:auto;padding:6px 10px;font-size:12px;" title="Cerrar sesión">⏻</button>
+      <button id="btn-gh-status" onclick="mostrarConfigGH()" style="width:auto;padding:6px 10px;font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text3);cursor:pointer;">⬡ GH</button>
+      <button class="btn btn-ghost" onclick="showHistorial()" style="width:auto;padding:6px 10px;font-size:12px;">📋</button>
+      <button onclick="cerrarSesion()" style="width:auto;padding:6px 10px;font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text3);cursor:pointer;" title="Cambiar usuario">⇄</button>
     </div>
   </div>
   <div class="scroll" style="padding:16px;display:flex;flex-direction:column;gap:12px;">
@@ -405,17 +416,17 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
     <span id="res-paradas-count" style="font-size:12px;color:var(--accent);font-weight:700;"></span>
   </div>
 
-  <!-- Mapa de la ruta completa con Leaflet -->
-  <div id="res-map" style="height:220px;flex-shrink:0;position:relative;background:var(--surface2);border-bottom:1px solid var(--border);">
-    <div id="res-map-loading" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;z-index:10;background:var(--surface2);">
+  <!-- Mapa ruta completa -->
+  <div id="res-map" style="height:240px;min-height:240px;flex-shrink:0;position:relative;background:var(--surface2);border-bottom:1px solid var(--border);">
+    <div id="res-map-loading" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;z-index:10;background:var(--surface);">
       <div style="font-size:28px;">🗺️</div>
       <div style="font-size:13px;color:var(--text3);">Trazando ruta...</div>
     </div>
   </div>
 
-  <div class="scroll" style="padding:12px 14px;display:flex;flex-direction:column;gap:10px;">
+  <div class="scroll" style="padding:12px 16px;display:flex;flex-direction:column;gap:10px;">
 
-    <!-- Métricas compactas -->
+    <!-- Métricas -->
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
       <div class="card" style="padding:10px 4px;text-align:center;">
         <div style="font-size:18px;font-weight:800;color:var(--accent);font-family:var(--mono);" id="res-km">—</div>
@@ -439,168 +450,66 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
     <div class="card" style="padding:0;overflow:hidden;">
       <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;display:flex;justify-content:space-between;">
         <span>Orden optimizado</span>
+        <span id="res-km-real" style="color:var(--accent);"></span>
       </div>
       <div id="res-orden-list"></div>
     </div>
 
-    <button class="btn btn-green" onclick="iniciarRuta()" style="font-size:17px;padding:18px;gap:10px;">
+    <!-- Botón principal: abrir Google Maps con toda la ruta -->
+    <button class="btn btn-green" onclick="iniciarRutaGoogleMaps()" style="font-size:17px;padding:18px;gap:10px;">
       <span style="font-size:20px;">🚀</span> Iniciar en Google Maps
     </button>
     <button class="btn btn-ghost" onclick="showScreen('screen-paradas')">← Editar paradas</button>
   </div>
 </div>
 
+
+
 <!-- ════════════════════════════════
-     SCREEN 5: NAVEGADOR GPS
+     SCREEN: SEGUIMIENTO DE RUTA
 ════════════════════════════════ -->
-<div class="screen hidden" id="screen-nav" style="background:#0a1628;overflow:hidden;">
+<div class="screen hidden" id="screen-seguimiento">
+  <div class="topbar">
+    <button class="topbar-back" onclick="showScreen('screen-resumen')">←</button>
+    <h2>📦 Seguimiento</h2>
+    <button onclick="abrirGoogleMaps()" style="width:auto;padding:6px 10px;font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--green);cursor:pointer;font-weight:700;">🗺️ Abrir</button>
+  </div>
+  <div class="scroll" style="padding:12px 16px;display:flex;flex-direction:column;gap:10px;">
 
-  <!-- MAPA LEAFLET (sin Google Maps, sin API key) -->
-  <div id="nav-map" style="position:absolute;inset:0;z-index:1;"></div>
-
-  <!-- ══ BARRA SUPERIOR: instrucción de giro estilo Waze ══ -->
-  <div id="nav-instruccion" style="
-    position:absolute;top:0;left:0;right:0;z-index:100;
-    display:none;
-  ">
-    <!-- Fila principal: giro -->
-    <div style="
-      background:rgba(0,14,32,.97);
-      padding:max(16px,env(safe-area-inset-top)) 14px 12px;
-      border-bottom:3px solid var(--accent);
-      display:flex;align-items:center;gap:12px;
-    ">
-      <button onclick="salirNavegacion()" style="width:40px;height:40px;border-radius:50%;border:none;background:rgba(255,255,255,.1);color:#fff;font-size:22px;cursor:pointer;flex-shrink:0;">←</button>
-
-      <!-- Caja de giro (grande, tipo Google Maps) -->
-      <div id="nav-giro-box" style="
-        width:72px;height:72px;border-radius:18px;flex-shrink:0;
-        background:var(--accent);
-        display:flex;align-items:center;justify-content:center;
-        box-shadow:0 0 20px rgba(0,212,255,.5);
-      ">
-        <svg id="nav-giro-svg" viewBox="0 0 48 48" width="52" height="52" fill="white"></svg>
+    <!-- Progreso -->
+    <div class="card" style="padding:14px 16px;">
+      <div style="display:flex;justify-content:space-between;margin-bottom:8px;">
+        <span style="font-size:12px;color:var(--text3);">Progreso de entrega</span>
+        <span id="seg-pct" style="font-size:12px;font-weight:700;color:var(--accent);">0%</span>
       </div>
-
-      <div style="flex:1;min-width:0;">
-        <div id="nav-dist-prox" style="font-size:32px;font-weight:900;color:#fff;font-family:var(--mono);line-height:1;letter-spacing:-.5px;">—</div>
-        <div id="nav-calle" style="font-size:15px;font-weight:700;color:rgba(255,255,255,.75);line-height:1.2;margin-top:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></div>
+      <div style="height:6px;background:var(--surface2);border-radius:6px;overflow:hidden;">
+        <div id="seg-bar" style="height:100%;background:linear-gradient(90deg,var(--accent),var(--green));border-radius:6px;width:0%;transition:width .4s;"></div>
       </div>
-
-      <button onclick="toggleVoz()" id="btn-voz" style="width:40px;height:40px;border-radius:50%;border:none;background:rgba(0,212,255,.15);color:var(--accent);font-size:20px;cursor:pointer;flex-shrink:0;">🔊</button>
+      <div style="display:flex;gap:12px;margin-top:10px;">
+        <span id="seg-entregadas" style="font-size:12px;color:var(--green);font-weight:700;">✓ 0 entregadas</span>
+        <span id="seg-fallidas"   style="font-size:12px;color:var(--red);font-weight:700;">✗ 0 fallidas</span>
+        <span id="seg-pendientes" style="font-size:12px;color:var(--text3);">— 0 pendientes</span>
+      </div>
     </div>
 
-    <!-- Fila destino -->
-    <div style="
-      background:rgba(0,8,22,.92);
-      padding:8px 14px;
-      display:flex;justify-content:space-between;align-items:center;
-      border-bottom:1px solid rgba(0,212,255,.12);
-    ">
-      <div style="display:flex;align-items:center;gap:8px;min-width:0;flex:1;">
-        <div style="width:8px;height:8px;border-radius:50%;background:var(--green);flex-shrink:0;box-shadow:0 0 6px var(--green);"></div>
-        <div id="nav-destino-nombre" style="font-size:13px;font-weight:600;color:rgba(255,255,255,.85);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;"></div>
+    <!-- Botón re-abrir Google Maps (con paradas pendientes) -->
+    <button class="btn btn-accent" onclick="abrirGoogleMaps()" style="font-size:14px;">
+      🗺️ Continuar en Google Maps (paradas pendientes)
+    </button>
+
+    <!-- Lista de paradas con estado -->
+    <div class="card" style="padding:0;overflow:hidden;">
+      <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;">
+        Lista de paradas
       </div>
-      <div style="display:flex;align-items:center;gap:12px;flex-shrink:0;margin-left:10px;">
-        <div style="text-align:right;">
-          <div id="nav-dist-total" style="font-size:16px;font-weight:800;color:var(--accent);font-family:var(--mono);"></div>
-          <div id="nav-tiempo-restante" style="font-size:11px;color:rgba(255,255,255,.4);"></div>
-        </div>
-      </div>
+      <div id="seg-paradas-list"></div>
     </div>
+
+    <!-- Botón finalizar -->
+    <button class="btn btn-ghost" onclick="finalizarRuta()" style="color:var(--red);border-color:rgba(255,82,82,.3);">
+      🏁 Finalizar y guardar ruta
+    </button>
   </div>
-
-  <!-- Topbar simple (antes de tener ruta/GPS) -->
-  <div id="nav-topbar-simple" style="
-    position:absolute;top:0;left:0;right:0;z-index:100;
-    background:rgba(13,27,42,.95);
-    padding:max(14px,env(safe-area-inset-top)) 14px 12px;
-    display:flex;align-items:center;gap:10px;
-    border-bottom:1px solid rgba(30,53,96,.8);
-  ">
-    <button onclick="salirNavegacion()" style="width:36px;height:36px;border-radius:50%;border:none;background:rgba(255,255,255,.1);color:#fff;font-size:18px;cursor:pointer;flex-shrink:0;">←</button>
-    <div id="nav-sub" style="flex:1;font-size:13px;color:var(--text2);">📡 Obteniendo GPS...</div>
-    <button onclick="toggleListaNav()" style="width:36px;height:36px;border-radius:50%;border:none;background:rgba(255,255,255,.1);color:#fff;font-size:18px;cursor:pointer;flex-shrink:0;">☰</button>
-  </div>
-
-  <!-- VELOCÍMETRO circular izquierdo -->
-  <div id="nav-velocimetro" style="
-    position:absolute;left:10px;z-index:100;display:none;
-    bottom:calc(env(safe-area-inset-bottom,0px) + 255px);
-  ">
-    <div style="
-      width:62px;height:62px;border-radius:50%;
-      background:rgba(10,18,36,.95);border:2.5px solid var(--accent);
-      display:flex;flex-direction:column;align-items:center;justify-content:center;
-      box-shadow:0 0 14px rgba(0,212,255,.3);
-    ">
-      <div id="nav-vel-num" style="font-size:22px;font-weight:900;font-family:var(--mono);color:#fff;line-height:1;">0</div>
-      <div style="font-size:8px;color:rgba(255,255,255,.4);text-transform:uppercase;letter-spacing:.04em;margin-top:1px;">km/h</div>
-    </div>
-  </div>
-
-  <!-- BOTONES FLOTANTES DERECHA -->
-  <div style="position:absolute;right:10px;z-index:100;display:flex;flex-direction:column;gap:8px;bottom:calc(env(safe-area-inset-bottom,0px) + 255px);">
-    <button class="nav-float-btn" onclick="centrarGPS()" id="btn-centrar" title="Centrar GPS" style="color:var(--accent);">◎</button>
-    <button class="nav-float-btn" onclick="vistaGeneral()" title="Vista general">⊞</button>
-    <button class="nav-float-btn" onclick="toggleListaNav()" title="Lista paradas">☰</button>
-    <button class="nav-float-btn" onclick="editarUbicacion()" style="color:var(--yellow);" title="Editar ubicación">✏️</button>
-  </div>
-
-  <!-- ══ PANEL INFERIOR ══ -->
-  <div id="nav-panel" style="position:absolute;bottom:0;left:0;right:0;z-index:100;padding:0 10px calc(env(safe-area-inset-bottom,0px) + 10px);">
-    <div style="background:rgba(8,18,36,.98);border:1.5px solid rgba(0,212,255,.15);border-radius:20px;padding:14px;backdrop-filter:blur(20px);box-shadow:0 -4px 32px rgba(0,0,0,.9);display:flex;flex-direction:column;gap:12px;">
-
-      <!-- Métricas -->
-      <div style="display:grid;grid-template-columns:1fr 1px 1fr 1px 1fr;align-items:center;gap:0;">
-        <div class="nav-metric">
-          <div class="nav-metric-val" id="nav-km" style="color:var(--accent);font-size:20px;">—</div>
-          <div class="nav-metric-lbl">al destino</div>
-        </div>
-        <div style="width:1px;height:32px;background:rgba(255,255,255,.1);"></div>
-        <div class="nav-metric">
-          <div class="nav-metric-val" id="nav-progreso" style="color:var(--green);font-size:20px;">0/0</div>
-          <div class="nav-metric-lbl">paradas</div>
-        </div>
-        <div style="width:1px;height:32px;background:rgba(255,255,255,.1);"></div>
-        <div class="nav-metric">
-          <div class="nav-metric-val" id="nav-eta" style="color:var(--yellow);font-size:20px;">—</div>
-          <div class="nav-metric-lbl">hora fin</div>
-        </div>
-      </div>
-
-      <!-- Botones acción principales -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-        <button onclick="marcarEntregada()" style="padding:18px 8px;border-radius:16px;border:2px solid rgba(0,230,118,.5);background:rgba(0,230,118,.12);color:var(--green);font-size:17px;font-weight:800;cursor:pointer;font-family:var(--sans);letter-spacing:.3px;">
-          ✓ Entregada
-        </button>
-        <button onclick="marcarFallida()" style="padding:18px 8px;border-radius:16px;border:2px solid rgba(255,82,82,.45);background:rgba(255,82,82,.12);color:var(--red);font-size:17px;font-weight:800;cursor:pointer;font-family:var(--sans);letter-spacing:.3px;">
-          ✗ Fallida
-        </button>
-      </div>
-
-      <!-- Recalcular / Deshacer -->
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
-        <button onclick="recalcularRuta()" style="padding:11px 4px;border-radius:12px;border:1.5px solid rgba(0,212,255,.3);background:rgba(0,212,255,.08);color:var(--accent);font-size:13px;font-weight:700;cursor:pointer;font-family:var(--sans);display:flex;align-items:center;justify-content:center;gap:6px;">
-          🔄 Recalcular
-        </button>
-        <button onclick="deshacerAccion()" style="padding:11px 4px;border-radius:12px;border:1.5px solid rgba(255,215,64,.4);background:rgba(255,215,64,.1);color:var(--yellow);font-size:13px;font-weight:700;cursor:pointer;font-family:var(--sans);display:flex;align-items:center;justify-content:center;gap:6px;">
-          ↩ Deshacer
-        </button>
-      </div>
-
-    </div>
-  </div>
-
-  <!-- LISTA OVERLAY (paradas) -->
-  <div id="nav-lista-overlay" class="hidden" style="position:absolute;inset:0;z-index:200;background:var(--bg);display:flex;flex-direction:column;transition:transform .3s;">
-    <div style="display:flex;align-items:center;gap:10px;padding:max(14px,env(safe-area-inset-top)) 16px 12px;background:var(--bg2);border-bottom:1px solid var(--border);">
-      <button onclick="toggleListaNav()" style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;color:var(--text2);font-size:18px;width:36px;height:36px;cursor:pointer;display:flex;align-items:center;justify-content:center;">←</button>
-      <div style="font-size:15px;font-weight:700;">Lista de paradas</div>
-    </div>
-    <div class="scroll" id="nav-lista-items"></div>
-  </div>
-
 </div>
 
 <!-- ════════════════════════════════
@@ -714,181 +623,6 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
 // ══════════════════════════════════════════════════════════════════
 //  GITHUB BACKEND
 // ══════════════════════════════════════════════════════════════════
-// ══════════════════════════════════════════════════════════════════
-//  SISTEMA DE AUTENTICACIÓN LOCAL
-//  - Admin hardcodeado: seisa / seisa2024  (puede cambiarse desde el panel)
-//  - Usuarios adicionales en localStorage
-//  - Sesión en sessionStorage (se cierra al cerrar la pestaña)
-// ══════════════════════════════════════════════════════════════════
-const AUTH_KEY    = 'seisa_users_v1';
-const SESSION_KEY = 'seisa_session_v1';
-
-// Usuarios por defecto — solo se usan la primera vez (si no hay nada en localStorage)
-const DEFAULT_USERS = [
-  { user: 'admin', pass: btoa('seisa2024'), rol: 'admin' }
-];
-
-function getUsers() {
-  try {
-    const raw = localStorage.getItem(AUTH_KEY);
-    return raw ? JSON.parse(raw) : [...DEFAULT_USERS];
-  } catch(e) { return [...DEFAULT_USERS]; }
-}
-
-function saveUsers(users) {
-  localStorage.setItem(AUTH_KEY, JSON.stringify(users));
-}
-
-// Inicializar: si no hay usuarios, crear los default
-(function initAuth() {
-  if (!localStorage.getItem(AUTH_KEY)) saveUsers([...DEFAULT_USERS]);
-})();
-
-function getSession() {
-  try { return JSON.parse(sessionStorage.getItem(SESSION_KEY)); } catch(e) { return null; }
-}
-function setSession(u) { sessionStorage.setItem(SESSION_KEY, JSON.stringify(u)); }
-function clearSession() { sessionStorage.removeItem(SESSION_KEY); }
-
-// ── Login ──────────────────────────────────────────────────────────
-function hacerLogin() {
-  const user = document.getElementById('login-user').value.trim();
-  const pass = document.getElementById('login-pass').value;
-  const errEl = document.getElementById('login-error');
-
-  if (!user || !pass) {
-    errEl.textContent = 'Ingresa usuario y contraseña.';
-    errEl.style.display = 'block'; return;
-  }
-
-  const users = getUsers();
-  const match = users.find(u => u.user.toLowerCase() === user.toLowerCase() && u.pass === btoa(pass));
-
-  if (!match) {
-    errEl.textContent = 'Usuario o contraseña incorrectos.';
-    errEl.style.display = 'block';
-    document.getElementById('login-pass').value = '';
-    return;
-  }
-
-  errEl.style.display = 'none';
-  setSession({ user: match.user, rol: match.rol });
-  postLogin(match);
-}
-
-function postLogin(match) {
-  if (match.rol === 'admin') {
-    renderAdminUsers();
-    showScreen('screen-admin');
-  } else {
-    const badge = document.getElementById('home-user-badge');
-    if (badge) badge.textContent = match.user;
-    showScreen('screen-home');
-  }
-}
-
-function cerrarSesion() {
-  clearSession();
-  document.getElementById('login-user').value  = '';
-  document.getElementById('login-pass').value  = '';
-  document.getElementById('login-error').style.display = 'none';
-  showScreen('screen-login');
-}
-
-// ── Admin: renderizar lista de usuarios ───────────────────────────
-function renderAdminUsers() {
-  const list  = document.getElementById('admin-users-list');
-  const users = getUsers();
-  if (!list) return;
-
-  if (users.length === 0) {
-    list.innerHTML = '<div style="font-size:13px;color:var(--text3);text-align:center;padding:10px;">Sin usuarios registrados</div>';
-    return;
-  }
-
-  list.innerHTML = users.map((u, i) => `
-    <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;
-      background:var(--surface2);border-radius:10px;border:1px solid var(--border);">
-      <div style="font-size:20px;">${u.rol === 'admin' ? '🔑' : '👷'}</div>
-      <div style="flex:1;">
-        <div style="font-size:14px;font-weight:700;color:var(--text);">${u.user}</div>
-        <div style="font-size:11px;color:var(--text3);">${u.rol === 'admin' ? 'Administrador' : 'Usuario'}</div>
-      </div>
-      <button onclick="adminBorrarUsuario(${i})"
-        style="padding:6px 12px;border-radius:8px;border:1px solid rgba(255,60,60,.4);
-          background:rgba(255,60,60,.1);color:#ff6060;font-size:12px;font-weight:700;cursor:pointer;">
-        Borrar
-      </button>
-    </div>
-  `).join('');
-}
-
-// ── Admin: agregar usuario ─────────────────────────────────────────
-function adminAgregarUsuario() {
-  const newUser = document.getElementById('admin-new-user').value.trim();
-  const newPass = document.getElementById('admin-new-pass').value;
-  const newRol  = document.getElementById('admin-new-rol').value;
-  const errEl   = document.getElementById('admin-add-error');
-
-  if (!newUser || !newPass) {
-    errEl.textContent = 'Completa usuario y contraseña.';
-    errEl.style.display = 'block'; return;
-  }
-  if (newPass.length < 4) {
-    errEl.textContent = 'La contraseña debe tener al menos 4 caracteres.';
-    errEl.style.display = 'block'; return;
-  }
-
-  const users = getUsers();
-  if (users.find(u => u.user.toLowerCase() === newUser.toLowerCase())) {
-    errEl.textContent = 'Ya existe un usuario con ese nombre.';
-    errEl.style.display = 'block'; return;
-  }
-
-  users.push({ user: newUser, pass: btoa(newPass), rol: newRol });
-  saveUsers(users);
-
-  document.getElementById('admin-new-user').value = '';
-  document.getElementById('admin-new-pass').value = '';
-  document.getElementById('admin-new-rol').value  = 'usuario';
-  errEl.style.display = 'none';
-  renderAdminUsers();
-  showToast('✅ Usuario "' + newUser + '" creado');
-}
-
-// ── Admin: borrar usuario ─────────────────────────────────────────
-function adminBorrarUsuario(idx) {
-  const users = getUsers();
-  const u = users[idx];
-  if (!u) return;
-
-  // Evitar borrar el último admin
-  const admins = users.filter(x => x.rol === 'admin');
-  if (u.rol === 'admin' && admins.length <= 1) {
-    showToast('⚠️ No puedes borrar el único administrador'); return;
-  }
-
-  if (!confirm('¿Borrar al usuario "' + u.user + '"?')) return;
-  users.splice(idx, 1);
-  saveUsers(users);
-  renderAdminUsers();
-  showToast('🗑️ Usuario eliminado');
-}
-
-// ── Proteger la app: verificar sesión al cargar ───────────────────
-function verificarSesion() {
-  const session = getSession();
-  if (!session) {
-    // Sin sesión → mostrar login
-    document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
-    document.getElementById('screen-login')?.classList.remove('hidden');
-    return false;
-  }
-  const badge = document.getElementById('home-user-badge');
-  if (badge) badge.textContent = session.user;
-  return true;
-}
-
 const GH_CONFIG_KEY = 'seisa_gh_config';
 const APP_KEY       = 'seisa_app_v1';
 const GH_FILE       = 'seisa-data.json';
@@ -931,9 +665,10 @@ async function testGHConnection(cfg) {
 }
 
 // ── Obtener SHA del archivo (necesario para actualizar) ────────────
-async function getFileSHA(cfg) {
+async function getFileSHA(cfg, file) {
+  file = file || GH_FILE;
   try {
-    const r = await fetch(`https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/${GH_FILE}`, {
+    const r = await fetch(`https://api.github.com/repos/${cfg.user}/${cfg.repo}/contents/${file}`, {
       headers: { Authorization: `token ${cfg.token}`, Accept: 'application/vnd.github.v3+json' }
     });
     if (r.ok) { const d = await r.json(); return d.sha; }
@@ -947,14 +682,15 @@ async function ghPush() {
   ghSyncing = true;
   actualizarBtnGH(true);
   try {
-    const sha = await getFileSHA(ghConfig);
+    const ghFile = (currentUser ? 'seisa-data-' + currentUser.id + '.json' : GH_FILE);
+    const sha = await getFileSHA(ghConfig, ghFile);
     const content = btoa(unescape(encodeURIComponent(JSON.stringify(state, null, 2))));
     const body = {
       message: `[SEISA] Sync ${new Date().toISOString()}`,
       content,
       ...(sha ? { sha } : {})
     };
-    const r = await fetch(`https://api.github.com/repos/${ghConfig.user}/${ghConfig.repo}/contents/${GH_FILE}`, {
+    const r = await fetch(`https://api.github.com/repos/${ghConfig.user}/${ghConfig.repo}/contents/${ghFile}`, {
       method: 'PUT',
       headers: {
         Authorization: `token ${ghConfig.token}`,
@@ -982,7 +718,8 @@ async function ghPush() {
 async function ghPull() {
   if (!ghConfig) return false;
   try {
-    const r = await fetch(`https://api.github.com/repos/${ghConfig.user}/${ghConfig.repo}/contents/${GH_FILE}`, {
+    const ghFile = (currentUser ? 'seisa-data-' + currentUser.id + '.json' : GH_FILE);
+    const r = await fetch(`https://api.github.com/repos/${ghConfig.user}/${ghConfig.repo}/contents/${ghFile}`, {
       headers: { Authorization: `token ${ghConfig.token}`, Accept: 'application/vnd.github.v3+json' }
     });
     if (!r.ok) return false;
@@ -1024,7 +761,315 @@ function mostrarConfigGH() {
 }
 
 // ══════════════════════════════════════════════════════════════════
-//  ESTADO GLOBAL
+//  SISTEMA DE USUARIOS
+// ══════════════════════════════════════════════════════════════════
+const USERS_KEY    = 'seisa_usuarios_v1';   // lista de usuarios
+const SESSION_KEY  = 'seisa_sesion_v1';     // usuario activo
+let currentUser    = null;  // { id, nombre, pin }
+
+function loadUsers() {
+  try { return JSON.parse(localStorage.getItem(USERS_KEY)) || []; } catch(e) { return []; }
+}
+function saveUsers(users) {
+  try { localStorage.setItem(USERS_KEY, JSON.stringify(users)); } catch(e) {}
+}
+function loadSession() {
+  try { return JSON.parse(localStorage.getItem(SESSION_KEY)) || null; } catch(e) { return null; }
+}
+function saveSession(user) {
+  try { localStorage.setItem(SESSION_KEY, JSON.stringify(user)); } catch(e) {}
+}
+function clearSession() {
+  try { localStorage.removeItem(SESSION_KEY); } catch(e) {}
+}
+
+// Clave de localStorage única por usuario
+function userAppKey(userId) { return 'seisa_app_v1_' + userId; }
+function userBaseKey(userId) { return 'seisa_base_v1_' + userId; }
+
+// ── Base (inicio/final) por usuario ──────────────────────────────
+function loadBase() {
+  try {
+    const key = window.BASE_KEY || ('seisa_base_v1');
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : {};
+  } catch(e) { return {}; }
+}
+function saveBase() {
+  try {
+    const key = window.BASE_KEY || ('seisa_base_v1');
+    localStorage.setItem(key, JSON.stringify({ inicio: rutaBuild.inicio, final: rutaBuild.final }));
+  } catch(e) {}
+}
+function cargarBase() {
+  try {
+    const base = loadBase();
+    if (base.inicio) rutaBuild.inicio = base.inicio;
+    if (base.final)  rutaBuild.final  = base.final;
+  } catch(e) {}
+}
+function clearBase(tipo) {
+  if (tipo === 'inicio') rutaBuild.inicio = null;
+  else                   rutaBuild.final  = null;
+  saveBase();
+  renderBaseUI();
+}
+function userGHFile(userId)  { return 'seisa-data-' + userId + '.json'; }
+
+// ── Acceso admin: toca el logo 5 veces ───────────────────────────
+let _tapCount = 0, _tapTimer = null;
+function tapLogo() {
+  _tapCount++;
+  clearTimeout(_tapTimer);
+  _tapTimer = setTimeout(() => { _tapCount = 0; }, 1500);
+  if (_tapCount >= 5) {
+    _tapCount = 0;
+    pedirPINAdmin();
+  }
+}
+
+function pedirPINAdmin() {
+  const pin = prompt('PIN de administrador:');
+  if (pin === null) return;
+  if (pin === getAdminPIN()) {
+    window._adminActivo = true;
+    mostrarFormNuevoUsuario();
+    renderLoginScreen();
+    showToast('✅ Modo administrador activo');
+  } else {
+    showToast('❌ PIN de administrador incorrecto');
+  }
+}
+
+function salirModoAdmin() {
+  window._adminActivo = false;
+  ocultarFormNuevoUsuario();
+  renderLoginScreen();
+}
+
+function cambiarPINAdmin() {
+  const nuevo = document.getElementById('admin-pin-nuevo')?.value.trim();
+  if (!nuevo || nuevo.length !== 4 || !/^\d{4}$/.test(nuevo)) {
+    showToast('El PIN debe ser exactamente 4 dígitos'); return;
+  }
+  setAdminPIN(nuevo);
+  document.getElementById('admin-pin-nuevo').value = '';
+  showToast('✅ PIN de administrador actualizado');
+}
+
+// Crear usuario
+function crearUsuario() {
+  if (!isAdminMode()) { showToast('Solo el administrador puede crear usuarios'); return; }
+  const nombre = document.getElementById('nu-nombre').value.trim();
+  const pin    = document.getElementById('nu-pin').value.trim();
+  if (!nombre) { showToast('Escribe un nombre'); return; }
+  if (pin.length !== 4 || !/^\d{4}$/.test(pin)) { showToast('El PIN debe ser exactamente 4 dígitos'); return; }
+
+  const users = loadUsers();
+  if (users.find(u => u.nombre.toLowerCase() === nombre.toLowerCase())) {
+    showToast('Ya existe un usuario con ese nombre'); return;
+  }
+  const newUser = {
+    id:     'u_' + Date.now(),
+    nombre: nombre,
+    pin:    String(pin), // siempre string para comparación consistente
+    creado: new Date().toISOString(),
+  };
+  users.push(newUser);
+  saveUsers(users);
+  ocultarFormNuevoUsuario();
+  document.getElementById('nu-nombre').value = '';
+  document.getElementById('nu-pin').value = '';
+  renderLoginScreen();
+  showToast('✅ Usuario "' + nombre + '" creado');
+}
+
+// Mostrar/ocultar form
+function mostrarFormNuevoUsuario() {
+  const f = document.getElementById('form-nuevo-usuario');
+  if (!f) return;
+  f.style.display = 'flex';
+  f.style.flexDirection = 'column';
+  setTimeout(() => document.getElementById('nu-nombre')?.focus(), 100);
+}
+function ocultarFormNuevoUsuario() {
+  const f = document.getElementById('form-nuevo-usuario');
+  if (f) { f.style.display = 'none'; f.style.flexDirection = ''; }
+}
+
+// ── Admin PIN (guardado en localStorage, solo visible al configurar) ──
+const ADMIN_KEY = 'seisa_admin_pin_v1';
+function getAdminPIN() {
+  return localStorage.getItem(ADMIN_KEY) || '1234'; // PIN admin por defecto
+}
+function setAdminPIN(pin) {
+  localStorage.setItem(ADMIN_KEY, pin);
+}
+function isAdminMode() { return window._adminActivo === true; }
+
+// Render pantalla login
+function renderLoginScreen() {
+  const users = loadUsers();
+  const lista = document.getElementById('login-usuarios-list');
+  if (!lista) return;
+  lista.innerHTML = '';
+
+  if (!users.length) {
+    // Si es admin, mostrar form directo
+    if (isAdminMode()) {
+      lista.innerHTML = '<div style="text-align:center;color:var(--text3);font-size:13px;padding:8px;">No hay operadores. Crea el primero.</div>';
+    } else {
+      lista.innerHTML = '<div style="text-align:center;color:var(--text3);font-size:13px;padding:8px;">Sin operadores registrados. Contacta al administrador.</div>';
+    }
+    return;
+  }
+
+  users.forEach(user => {
+    const div = document.createElement('div');
+    div.style.cssText = 'display:flex;align-items:center;gap:12px;padding:14px 16px;background:var(--surface);border:1px solid var(--border);border-radius:14px;cursor:pointer;-webkit-tap-highlight-color:transparent;';
+    // Inicial
+    const ini = document.createElement('div');
+    ini.style.cssText = 'width:44px;height:44px;border-radius:50%;background:rgba(0,212,255,.15);border:2px solid rgba(0,212,255,.3);display:flex;align-items:center;justify-content:center;font-size:20px;font-weight:800;color:var(--accent);flex-shrink:0;';
+    ini.textContent = user.nombre.charAt(0).toUpperCase();
+    // Info
+    const info = document.createElement('div');
+    info.style.cssText = 'flex:1;min-width:0;';
+    const nameEl = document.createElement('div');
+    nameEl.style.cssText = 'font-size:15px;font-weight:700;';
+    nameEl.textContent = user.nombre;
+    const subEl = document.createElement('div');
+    subEl.style.cssText = 'font-size:11px;color:var(--text3);margin-top:2px;';
+    subEl.textContent = 'Toca para ingresar';
+    info.appendChild(nameEl); info.appendChild(subEl);
+
+    div.appendChild(ini); div.appendChild(info);
+
+    // Botón admin: eliminar (solo en modo admin)
+    if (isAdminMode()) {
+      const btnDel = document.createElement('button');
+      btnDel.style.cssText = 'background:rgba(255,82,82,.1);border:1px solid rgba(255,82,82,.3);color:var(--red);border-radius:8px;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0;';
+      btnDel.textContent = 'Borrar';
+      btnDel.onclick = (e) => { e.stopPropagation(); e.preventDefault(); eliminarUsuario(user.id); };
+      div.appendChild(btnDel);
+    }
+
+    div.onclick = (e) => {
+      if (e.target.tagName === 'BUTTON') return;
+      pedirPIN(user);
+    };
+    lista.appendChild(div);
+  });
+}
+
+function eliminarUsuario(userId) {
+  const users = loadUsers();
+  const user  = users.find(u => u.id === userId);
+  if (!user) { showToast('Usuario no encontrado'); return; }
+  if (!confirm('¿Eliminar al operador "' + user.nombre + '"? Se borrarán sus datos.')) return;
+  try { localStorage.removeItem(userAppKey(userId)); } catch(ee) {}
+  try { localStorage.removeItem(userBaseKey(userId)); } catch(ee) {}
+  saveUsers(users.filter(u => u.id !== userId));
+  renderLoginScreen(); // re-renderizar lista
+  showToast('✅ Operador "' + user.nombre + '" eliminado');
+}
+
+// Pedir PIN
+let _pinUsuario = null;
+let _pinActual  = '';
+
+function pedirPIN(user) {
+  _pinUsuario = user;
+  _pinActual  = '';
+  const nombreEl = document.getElementById('modal-pin-nombre');
+  const errorEl  = document.getElementById('pin-error');
+  if (nombreEl) nombreEl.textContent = user.nombre;
+  if (errorEl)  errorEl.textContent  = '';
+  actualizarPinDots();
+  document.getElementById('modal-pin').classList.remove('hidden');
+}
+
+function pinInput(val) {
+  if (val === 'DEL' || val === '⌫') {
+    _pinActual = _pinActual.slice(0, -1);
+  } else if (_pinActual.length < 4) {
+    _pinActual += String(val);
+  }
+  actualizarPinDots();
+  if (_pinActual.length === 4) {
+    setTimeout(() => verificarPIN(), 150);
+  }
+}
+
+function actualizarPinDots() {
+  const modal = document.getElementById('modal-pin');
+  if (!modal) return;
+  const dots = modal.querySelectorAll('.pin-dot');
+  dots.forEach((d, i) => d.classList.toggle('filled', i < _pinActual.length));
+}
+
+function verificarPIN() {
+  if (!_pinUsuario) { console.warn('[PIN] no hay usuario'); return; }
+  const pinIngresado = _pinActual;
+  const pinEsperado  = String(_pinUsuario.pin).trim();
+  console.log('[PIN] ingresado:', pinIngresado, '| esperado:', pinEsperado, '| ok:', pinIngresado === pinEsperado);
+
+  if (pinIngresado === pinEsperado) {
+    // Ocultar modal directamente sin usar closeModal (que limpia estado)
+    document.getElementById('modal-pin').classList.add('hidden');
+    const usuario = _pinUsuario;
+    _pinActual  = '';
+    _pinUsuario = null;
+    actualizarPinDots();
+    iniciarSesion(usuario);
+  } else {
+    const errEl = document.getElementById('pin-error');
+    if (errEl) errEl.textContent = 'PIN incorrecto';
+    _pinActual = '';
+    actualizarPinDots();
+    // Vibrar el modal como feedback
+    const sheet = document.querySelector('#modal-pin .modal-sheet');
+    if (sheet) {
+      sheet.style.animation = 'shake .3s ease';
+      setTimeout(() => sheet.style.animation = '', 300);
+    }
+  }
+}
+
+function iniciarSesion(user) {
+  console.log('[LOGIN] iniciando sesión para:', user.nombre);
+  currentUser = user;
+  saveSession(user);
+
+  // Claves de localStorage únicas por usuario
+  window.APP_KEY  = userAppKey(user.id);
+  window.BASE_KEY = userBaseKey(user.id);
+
+  // Recargar estado de este usuario
+  state = loadState();
+  cargarBase();
+
+  // Label de usuario en home
+  const labelEl = document.getElementById('home-usuario-label');
+  if (labelEl) labelEl.textContent = '👤 ' + user.nombre;
+
+  // Navegar a home
+  showScreen('screen-home');
+  renderHome();
+
+  setTimeout(() => showToast('¡Hola, ' + user.nombre + '!'), 300);
+  console.log('[LOGIN] sesión iniciada, pantalla:', currentScreen);
+}
+
+function cerrarSesion() {
+  if (!confirm('¿Cambiar de usuario?')) return;
+  currentUser = null;
+  clearSession();
+  showScreen('screen-login');
+  renderLoginScreen();
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  ESTADO GLOBAL (por usuario)
 // ══════════════════════════════════════════════════════════════════
 
 let state = loadState();
@@ -1039,13 +1084,17 @@ function defaultState() {
 
 function loadState() {
   try {
-    const raw = localStorage.getItem(APP_KEY);
+    const key = window.APP_KEY || APP_KEY;
+    const raw = localStorage.getItem(key);
     return raw ? JSON.parse(raw) : defaultState();
   } catch(e) { return defaultState(); }
 }
 
 function saveStateLocal() {
-  try { localStorage.setItem(APP_KEY, JSON.stringify(state)); } catch(e) {}
+  try {
+    const key = window.APP_KEY || APP_KEY;
+    localStorage.setItem(key, JSON.stringify(state));
+  } catch(e) {}
 }
 
 // Guarda local + sube a GitHub
@@ -1074,28 +1123,45 @@ let editUbData    = null; // {lat,lng,nombre} para edición temporal
 // ══════════════════════════════════════════════════════════════════
 //  NAVEGACIÓN DE PANTALLAS
 // ══════════════════════════════════════════════════════════════════
+let currentScreen = 'screen-home';
+const BACK_MAP = {
+  'screen-home':         'screen-login',  // cambiar usuario
+  'screen-crear':        'screen-home',
+  'screen-paradas':      'screen-crear',
+  'screen-resumen':      'screen-paradas',
+  'screen-seguimiento':  'screen-resumen',
+  'screen-historial':    'screen-home',
+  'screen-detalle-ruta': 'screen-historial',
+};
+
+function navegarAtras() {
+  const prev = BACK_MAP[currentScreen];
+  if (prev) showScreen(prev);
+}
+
 function showScreen(id) {
-  // Pantallas libres (no requieren sesión)
-  const PUBLIC = ['screen-login', 'screen-admin'];
-  if (!PUBLIC.includes(id) && !getSession()) {
-    id = 'screen-login';
-  }
   document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
   const target = document.getElementById(id);
   if (target) {
     target.classList.remove('hidden');
     currentScreen = id;
-    if (id === 'screen-paradas') initMapaParadas();
-    if (id === 'screen-nav')     initMapaNav();
-    if (id === 'screen-resumen') setTimeout(function() {
-      if (mapResumen) { mapResumen.invalidateSize(); trazarRutaResumen(); }
-    }, 150);
-    if (id === 'screen-admin')   renderAdminUsers();
+    if (id === 'screen-paradas')    initMapaParadas();
+    if (id === 'screen-seguimiento') renderSeguimiento();
+    if (id === 'screen-historial')   renderHistorial();
   }
 }
 
 function closeModal(id) {
-  document.getElementById(id)?.classList.add('hidden');
+  const el = document.getElementById(id);
+  if (el) {
+    el.classList.add('hidden');
+    // Para modal-pin: limpiar estado
+    if (id === 'modal-pin') {
+      _pinActual = '';
+      _pinUsuario = null;
+      actualizarPinDots();
+    }
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -1351,26 +1417,6 @@ const ESTADOS_MX = [
 // Detectar si la cadena empieza con un Plus Code
 function isPlusCode(q) {
   return /^[23456789CFGHJMPQRVWX]{2,8}\+[23456789CFGHJMPQRVWX0-9]*/i.test(q.trim());
-}
-
-// Normalizar abreviaturas comunes en nombres de ciudades mexicanas
-function normalizarCiudad(ciudad) {
-  const abrevs = [
-    [/\bcdad\b\.?/gi, 'Ciudad'],
-    [/\bcd\b\./gi,    'Ciudad'],
-    [/\bcol\b\./gi,   'Colonia'],
-    [/\bmpio\b\.?/gi, 'Municipio'],
-    [/\bmun\b\./gi,   'Municipio'],
-    [/\bfracc?\b\.?/gi, 'Fraccionamiento'],
-    [/\bblvd\b\.?/gi, 'Boulevard'],
-    [/\bav\b\./gi,    'Avenida'],
-    [/\bcarr\b\.?/gi, 'Carretera'],
-    [/\bprol\b\.?/gi, 'Prolongación'],
-    [/\bedo\b\.?/gi,  'Estado de'],
-  ];
-  let c = ciudad;
-  abrevs.forEach(([re, rep]) => { c = c.replace(re, rep); });
-  return c.replace(/\s+/g, ' ').trim();
 }
 
 // Parsear "PLUSCODE Ciudad, Estado nombre de calle 123"
@@ -1789,93 +1835,52 @@ function eliminarParada(id) {
 }
 
 // ══════════════════════════════════════════════════════════════════
-//  OPTIMIZAR RUTA — Nearest Neighbor + 2-opt
+//  OPTIMIZAR RUTA (nearest neighbor desde inicio)
 // ══════════════════════════════════════════════════════════════════
-function calcularDistRuta(paradas, inicio, fin) {
-  const puntos = [inicio, ...paradas, fin].filter(Boolean);
-  let d = 0;
-  for (let i = 0; i < puntos.length - 1; i++)
-    d += distHaversine(puntos[i].lat, puntos[i].lng, puntos[i+1].lat, puntos[i+1].lng);
-  return d;
-}
+function optimizarRuta() {
+  if (!rutaBuild.paradas.length) return;
+  showToast('⚡ Optimizando...');
 
-function nearestNeighbor(paradas, inicio) {
-  let sinVisitar = [...paradas];
-  let actual = inicio || sinVisitar[0];
-  let resultado = [];
+  // Nearest neighbor desde el punto de inicio
+  let sinVisitar = [...rutaBuild.paradas];
+  let actual = rutaBuild.inicio || sinVisitar[0];
+  let ordenadas = [];
+
   while (sinVisitar.length) {
     let minDist = Infinity, minIdx = 0;
     sinVisitar.forEach((p, i) => {
       const d = distHaversine(actual.lat, actual.lng, p.lat, p.lng);
       if (d < minDist) { minDist = d; minIdx = i; }
     });
-    resultado.push(sinVisitar[minIdx]);
+    ordenadas.push(sinVisitar[minIdx]);
     actual = sinVisitar[minIdx];
     sinVisitar.splice(minIdx, 1);
-  }
-  return resultado;
-}
-
-// 2-opt: mejora la ruta intercambiando segmentos hasta que no mejore más
-function twoOpt(paradas, inicio, fin) {
-  let mejor = [...paradas];
-  let mejorado = true;
-  let iteraciones = 0;
-  const MAX_ITER = 200;
-  while (mejorado && iteraciones < MAX_ITER) {
-    mejorado = false;
-    iteraciones++;
-    for (let i = 0; i < mejor.length - 1; i++) {
-      for (let j = i + 2; j < mejor.length; j++) {
-        // Intercambiar segmento [i+1..j]
-        const nueva = [
-          ...mejor.slice(0, i + 1),
-          ...mejor.slice(i + 1, j + 1).reverse(),
-          ...mejor.slice(j + 1)
-        ];
-        if (calcularDistRuta(nueva, inicio, fin) < calcularDistRuta(mejor, inicio, fin) - 0.0001) {
-          mejor = nueva;
-          mejorado = true;
-        }
-      }
-    }
-  }
-  return mejor;
-}
-
-function optimizarRuta() {
-  if (!rutaBuild.paradas.length) return;
-  showToast('⚡ Optimizando ruta...');
-
-  // Paso 1: Nearest Neighbor para solución inicial
-  let ordenadas = nearestNeighbor(rutaBuild.paradas, rutaBuild.inicio);
-
-  // Paso 2: 2-opt para mejorar (solo si hay más de 3 paradas, máx 30 para no bloquear UI)
-  if (ordenadas.length > 2 && ordenadas.length <= 30) {
-    ordenadas = twoOpt(ordenadas, rutaBuild.inicio, rutaBuild.final);
   }
 
   rutaBuild.paradas = ordenadas;
 
-  // Distancia haversine total × 1.25 (factor de calles reales)
-  const puntos = [rutaBuild.inicio, ...ordenadas, rutaBuild.final].filter(Boolean);
+  // Calcular km y tiempo total
+  // Calcular km reales (haversine * factor de ruta)
   let kmTotal = 0;
-  for (let i = 0; i < puntos.length - 1; i++)
-    kmTotal += distHaversine(puntos[i].lat, puntos[i].lng, puntos[i+1].lat, puntos[i+1].lng) * 1.25;
+  const puntos = [rutaBuild.inicio, ...ordenadas, rutaBuild.final].filter(Boolean);
+  for (let i = 0; i < puntos.length - 1; i++) {
+    kmTotal += distHaversine(puntos[i].lat, puntos[i].lng, puntos[i+1].lat, puntos[i+1].lng) * 1.3;
+  }
   rutaBuild.kmTotal = Math.round(kmTotal * 10) / 10;
 
-  // Tiempo: 35 km/h promedio en ciudad + 8 min por parada
-  const minManejo  = Math.round((kmTotal / 35) * 60);
-  const minParadas = ordenadas.length * 8;
-  rutaBuild.tiempoMin  = minManejo + minParadas;
-  rutaBuild.tiempoHrs  = Math.round(rutaBuild.tiempoMin / 6) / 10;
+  // Tiempo aprox: 30 km/h promedio + 9 min por parada
+  const minManejo = Math.round((kmTotal / 30) * 60);
+  const minParadas = ordenadas.length * 9;
+  rutaBuild.tiempoMin = minManejo + minParadas;
 
+  // Hora estimada de fin
   const ahora = new Date();
-  const fin2  = new Date(ahora.getTime() + rutaBuild.tiempoMin * 60000);
-  const hh    = fin2.getHours() % 12 || 12;
-  const mm    = String(fin2.getMinutes()).padStart(2,'0');
-  const ap    = fin2.getHours() >= 12 ? 'PM' : 'AM';
-  rutaBuild.horaFin = hh + ':' + mm + ' ' + ap;
+  const fin = new Date(ahora.getTime() + rutaBuild.tiempoMin * 60000);
+  const hh = fin.getHours() % 12 || 12;
+  const mm = String(fin.getMinutes()).padStart(2,'0');
+  const ap = fin.getHours() >= 12 ? 'PM' : 'AM';
+  rutaBuild.horaFin = `${hh}:${mm} ${ap}`;
+  rutaBuild.tiempoHrs = Math.round(rutaBuild.tiempoMin / 6) / 10;
 
   renderResumen();
   showScreen('screen-resumen');
@@ -1889,126 +1894,122 @@ function distHaversine(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
-let mapResumen = null;
-let resMarkers = [];
-let resPolyline = null;
-
 function renderResumen() {
-  document.getElementById('res-km').textContent      = rutaBuild.kmTotal + ' km';
+  document.getElementById('res-km').textContent      = (rutaBuild.kmTotal || '—') + ' km';
   document.getElementById('res-paradas').textContent = rutaBuild.paradas.length;
-  document.getElementById('res-tiempo').textContent  = rutaBuild.tiempoHrs + ' hrs';
-  document.getElementById('res-fin').textContent     = rutaBuild.horaFin;
-  const cntEl = document.getElementById('res-paradas-count');
-  if (cntEl) cntEl.textContent = rutaBuild.paradas.length + ' paradas';
+  document.getElementById('res-tiempo').textContent  = (rutaBuild.tiempoHrs || '—') + ' hrs';
+  document.getElementById('res-fin').textContent     = rutaBuild.horaFin || '—';
+  const countEl = document.getElementById('res-paradas-count');
+  if (countEl) countEl.textContent = rutaBuild.paradas.length + ' paradas';
 
-  // Lista de paradas con ETA
   const lista = document.getElementById('res-orden-list');
   lista.innerHTML = '';
   const ahora = new Date();
-  const MINS_POR_PARADA = 8;
+  const MINS_POR_PARADA = 9;
 
+  // Inicio
   if (rutaBuild.inicio) {
     const d = document.createElement('div');
     d.className = 'parada-item';
     d.style.cssText = 'background:rgba(0,230,118,.05);border-left:3px solid var(--green);';
-    d.innerHTML = '<div class="parada-num" style="background:rgba(0,230,118,.15);color:var(--green);border:1px solid rgba(0,230,118,.3);font-size:14px;">&#127968;</div>' +
-      '<div class="parada-info"><div class="parada-name"></div><div class="parada-sub" style="color:var(--green);">Inicio &middot; ' + fmtHora(ahora) + '</div></div>';
+    d.innerHTML = '<div class="parada-num" style="background:rgba(0,230,118,.15);color:var(--green);border:1px solid rgba(0,230,118,.3);font-size:14px;">🏠</div>' +
+      '<div class="parada-info"><div class="parada-name"></div><div class="parada-sub" style="color:var(--green);">Inicio · ' + fmtHora(ahora) + '</div></div>';
     d.querySelector('.parada-name').textContent = rutaBuild.inicio.nombre;
     lista.appendChild(d);
   }
 
-  let distAcum = 0;
-  let prevPunto = rutaBuild.inicio;
-  rutaBuild.paradas.forEach(function(p, i) {
-    if (prevPunto) distAcum += distHaversine(prevPunto.lat, prevPunto.lng, p.lat, p.lng) * 1.25;
-    prevPunto = p;
-    const minsViaje   = Math.round((distAcum / 35) * 60);
-    const minsParadas = i * MINS_POR_PARADA;
-    const eta = new Date(ahora.getTime() + (minsViaje + minsParadas) * 60000);
+  // Paradas con ETA estimada
+  let puntosPrev = [rutaBuild.inicio].filter(Boolean);
+  rutaBuild.paradas.forEach((p, i) => {
+    puntosPrev.push(p);
+    let distAcum = 0;
+    for (let j = 0; j < puntosPrev.length - 1; j++) {
+      distAcum += distHaversine(puntosPrev[j].lat, puntosPrev[j].lng, puntosPrev[j+1].lat, puntosPrev[j+1].lng);
+    }
+    const minsConduccion = Math.round((distAcum * 1.3 / 30) * 60);
+    const minsTotal = minsConduccion + i * MINS_POR_PARADA;
+    const eta = new Date(ahora.getTime() + minsTotal * 60000);
+
     const d = document.createElement('div');
     d.className = 'parada-item';
-    d.innerHTML = '<div class="parada-num" style="background:rgba(0,212,255,.12);color:var(--accent);border:1px solid rgba(0,212,255,.25);">' + (i+1) + '</div>' +
-      '<div class="parada-info"><div class="parada-name"></div><div class="parada-sub">~' + MINS_POR_PARADA + ' min &middot; ETA: ' + fmtHora(eta) + '</div></div>' +
-      '<div style="font-size:12px;color:var(--accent);flex-shrink:0;font-family:var(--mono);font-weight:700;margin-left:6px;">' + fmtHora(eta) + '</div>';
+    d.style.cssText = p.hecha ? 'opacity:.5;' : p.fallida ? 'opacity:.5;' : '';
+    d.innerHTML = `<div class="parada-num" style="background:rgba(0,212,255,.12);color:var(--accent);border:1px solid rgba(0,212,255,.25);">${i+1}</div>
+      <div class="parada-info" style="flex:1;min-width:0;">
+        <div class="parada-name"></div>
+        <div class="parada-sub">~${MINS_POR_PARADA} min · ETA: ${fmtHora(eta)}</div>
+      </div>
+      <div style="font-size:12px;color:var(--accent);flex-shrink:0;font-family:var(--mono);font-weight:700;">${fmtHora(eta)}</div>`;
     d.querySelector('.parada-name').textContent = p.nombre;
     lista.appendChild(d);
   });
 
-  if (rutaBuild.final) {
+  // Final/Base
+  const base = rutaBuild.final || loadBase().final;
+  if (base) {
     const d = document.createElement('div');
     d.className = 'parada-item';
     d.style.cssText = 'background:rgba(255,145,0,.05);border-left:3px solid var(--orange);';
-    d.innerHTML = '<div class="parada-num" style="background:rgba(255,145,0,.15);color:var(--orange);border:1px solid rgba(255,145,0,.3);font-size:14px;">&#127937;</div>' +
-      '<div class="parada-info"><div class="parada-name"></div><div class="parada-sub" style="color:var(--orange);">Base &middot; fin ' + (rutaBuild.horaFin || '&#8212;') + '</div></div>';
-    d.querySelector('.parada-name').textContent = rutaBuild.final.nombre;
+    d.innerHTML = '<div class="parada-num" style="background:rgba(255,145,0,.15);color:var(--orange);border:1px solid rgba(255,145,0,.3);font-size:14px;">🏁</div>' +
+      '<div class="parada-info"><div class="parada-name"></div><div class="parada-sub" style="color:var(--orange);">Base · fin ' + (rutaBuild.horaFin || '—') + '</div></div>';
+    d.querySelector('.parada-name').textContent = base.nombre;
     lista.appendChild(d);
   }
 
-  // Dibujar mapa Leaflet
-  setTimeout(function() { trazarRutaResumen(); }, 200);
-}
-
-function trazarRutaResumen() {
-  const el = document.getElementById('res-map');
-  if (!el) return;
-  const loading = document.getElementById('res-map-loading');
-
-  if (!mapResumen) {
-    const centro = rutaBuild.inicio
-      ? [rutaBuild.inicio.lat, rutaBuild.inicio.lng]
-      : [19.4326, -99.1332];
-    mapResumen = L.map('res-map', { zoomControl: false, attributionControl: false }).setView(centro, 12);
-    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-      maxZoom: 19, subdomains: 'abcd'
-    }).addTo(mapResumen);
-  }
-  mapResumen.invalidateSize();
-
-  resMarkers.forEach(function(m) { m.remove(); }); resMarkers = [];
-  if (resPolyline) { resPolyline.remove(); resPolyline = null; }
-
-  const puntos = [rutaBuild.inicio].concat(rutaBuild.paradas).concat([rutaBuild.final]).filter(Boolean);
-  if (!puntos.length) { if (loading) loading.style.display = 'none'; return; }
-
-  const coords = puntos.map(function(p) { return [p.lat, p.lng]; });
-  resPolyline = L.polyline(coords, { color: '#00d4ff', weight: 3, opacity: 0.85, dashArray: '6,4' }).addTo(mapResumen);
-
-  puntos.forEach(function(p, i) {
-    var size = 26, bg, txt;
-    if (i === 0)                                          { bg = '#00e676'; txt = '&#127968;'; }
-    else if (i === puntos.length - 1 && rutaBuild.final) { bg = '#ff9100'; txt = '&#127937;'; }
-    else                                                  { bg = '#00d4ff'; txt = String(i);  }
-    var html = '<div style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;background:' + bg + ';border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#000;">' + txt + '</div>';
-    var m = L.marker([p.lat, p.lng], {
-      icon: L.divIcon({ html: html, className: '', iconSize: [size, size], iconAnchor: [size/2, size/2] })
-    }).addTo(mapResumen);
-    resMarkers.push(m);
-  });
-
-  mapResumen.fitBounds(L.latLngBounds(coords), { padding: [20, 20] });
-  if (loading) loading.style.display = 'none';
+  // Trazar mapa (esperar Google Maps)
+  const _wait = (n) => {
+    if (!googleMapsReady || !window.google?.maps) {
+      if (n > 0) setTimeout(() => _wait(n-1), 500);
+      return;
+    }
+    const el = document.getElementById('res-map');
+    if (!el || el.offsetHeight < 10) { if (n > 0) setTimeout(() => _wait(n-1), 300); return; }
+    trazarRutaResumen();
+  };
+  setTimeout(() => _wait(15), 300);
 }
 
 // ══════════════════════════════════════════════════════════════════
 //  INICIAR RUTA
 // ══════════════════════════════════════════════════════════════════
-function iniciarRuta() {
-  state.rutaActual = { ...rutaBuild };
+function iniciarRuta() { iniciarRutaGoogleMaps(); }
+
+// Abrir Google Maps con ruta completa (inicio → todas las paradas → final)
+function iniciarRutaGoogleMaps() {
+  state.rutaActual = { ...rutaBuild, final: rutaBuild.final || loadBase().final };
   state.paradaActual = 0;
   saveState();
-  showScreen('screen-nav');
-  setTimeout(async () => {
-    actualizarNavPanel();
-    renderListaNav();
-    trazarRutaCompleta();
-    iniciarGPS();
-    // Anunciar primera parada
-    const p = state.rutaActual?.paradas[0];
-    if (p) hablar('Ruta iniciada. Dirigiéndose a ' + p.nombre);
-    // Calcular ruta OSRM
-    await recalcularRuta();
-  }, 500);
+
+  const ruta = state.rutaActual;
+  const inicio  = ruta.inicio;
+  const fin     = ruta.final;
+  // Solo paradas pendientes (no entregadas ni fallidas)
+  const paradas = (ruta.paradas || []).filter(p => !p.hecha && !p.fallida);
+
+  if (!inicio || !fin) { showToast('Faltan puntos de inicio o final'); return; }
+  if (!paradas.length) { showToast('No hay paradas pendientes'); return; }
+
+  const enc = (p) => encodeURIComponent(p.lat + ',' + p.lng);
+  const MAX_WP = 23; // Google Maps soporta hasta 25 puntos incluyendo origen y destino
+
+  if (paradas.length <= MAX_WP) {
+    const wps = paradas.map(enc).join('/');
+    const url = 'https://www.google.com/maps/dir/' + enc(inicio) + '/' + wps + '/' + enc(fin);
+    window.open(url, '_blank');
+    showToast('🗺️ Abriendo ruta completa en Google Maps...');
+  } else {
+    // Dividir en segmentos si hay más de 23 paradas
+    showToast(paradas.length + ' paradas — abriendo primer segmento...');
+    const seg = paradas.slice(0, MAX_WP);
+    const wps = seg.map(enc).join('/');
+    const url = 'https://www.google.com/maps/dir/' + enc(inicio) + '/' + wps + '/' + enc(paradas[MAX_WP] || fin);
+    window.open(url, '_blank');
+  }
+
+  // Ir a pantalla de seguimiento
+  showScreen('screen-seguimiento');
+  renderSeguimiento();
 }
+
 
 // ══════════════════════════════════════════════════════════════════
 //  MAPA NAVEGACIÓN — Leaflet puro (sin Google Maps, sin API key)
@@ -2683,6 +2684,180 @@ function deshacerAccion() {
   showToast('Nada que deshacer');
 }
 
+// ── Funciones de seguimiento de ruta ─────────────────────────────
+function renderSeguimiento() {
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+  const total      = ruta.paradas.length;
+  const entregadas = ruta.paradas.filter(p => p.hecha && !p.fallida).length;
+  const fallidas   = ruta.paradas.filter(p => p.fallida).length;
+  const pendientes = total - entregadas - fallidas;
+  const pct        = total ? Math.round((entregadas + fallidas) / total * 100) : 0;
+
+  const barEl = document.getElementById('seg-bar');
+  const pctEl = document.getElementById('seg-pct');
+  if (barEl) barEl.style.width = pct + '%';
+  if (pctEl) pctEl.textContent = pct + '%';
+  const eEl = document.getElementById('seg-entregadas'); if(eEl) eEl.textContent = '✓ ' + entregadas + ' entregadas';
+  const fEl = document.getElementById('seg-fallidas');   if(fEl) fEl.textContent = '✗ ' + fallidas + ' fallidas';
+  const pEl = document.getElementById('seg-pendientes'); if(pEl) pEl.textContent = '— ' + pendientes + ' pendientes';
+
+  // Lista de paradas con botones
+  const lista = document.getElementById('seg-paradas-list');
+  if (!lista) return;
+  lista.innerHTML = '';
+  ruta.paradas.forEach((p, i) => {
+    const entregada = p.hecha && !p.fallida;
+    const fallida   = p.fallida;
+    const color = entregada ? 'var(--green)' : fallida ? 'var(--red)' : 'var(--accent)';
+    const icono = entregada ? '✓' : fallida ? '✗' : String(i+1);
+    const div = document.createElement('div');
+    div.style.cssText = 'padding:12px 16px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;' +
+      (entregada ? 'background:rgba(0,230,118,.05);' : fallida ? 'background:rgba(255,82,82,.05);' : '');
+    // Badge
+    const badge = document.createElement('div');
+    badge.style.cssText = 'width:30px;height:30px;border-radius:50%;border:2px solid ' + color + ';color:' + color + ';display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;flex-shrink:0;';
+    badge.textContent = icono;
+    // Info
+    const info = document.createElement('div');
+    info.style.cssText = 'flex:1;min-width:0;';
+    const nameEl = document.createElement('div');
+    nameEl.style.cssText = 'font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
+    nameEl.textContent = p.nombre;
+    const subEl2 = document.createElement('div');
+    subEl2.style.cssText = 'font-size:11px;color:' + (p.horaAccion ? color : 'var(--text3)') + ';margin-top:2px;';
+    subEl2.textContent = p.horaAccion ? (entregada ? '✓ ' : '✗ ') + p.horaAccion : 'Pendiente';
+    info.appendChild(nameEl); info.appendChild(subEl2);
+    // Botones (solo si pendiente)
+    if (!entregada && !fallida) {
+      const btnWrap = document.createElement('div');
+      btnWrap.style.cssText = 'display:flex;gap:5px;flex-shrink:0;';
+      const btnE = document.createElement('button');
+      btnE.style.cssText = 'padding:6px 10px;border-radius:8px;border:1px solid rgba(0,230,118,.4);background:rgba(0,230,118,.1);color:var(--green);font-size:11px;font-weight:700;cursor:pointer;';
+      btnE.textContent = '✓';
+      btnE.onclick = (ev) => { ev.stopPropagation(); marcarEntregadaSeg(i); };
+      const btnF = document.createElement('button');
+      btnF.style.cssText = 'padding:6px 10px;border-radius:8px;border:1px solid rgba(255,82,82,.4);background:rgba(255,82,82,.1);color:var(--red);font-size:11px;font-weight:700;cursor:pointer;';
+      btnF.textContent = '✗';
+      btnF.onclick = (ev) => { ev.stopPropagation(); marcarFallidaSeg(i); };
+      btnWrap.appendChild(btnE); btnWrap.appendChild(btnF);
+      div.appendChild(badge); div.appendChild(info); div.appendChild(btnWrap);
+    } else {
+      const btnEdit = document.createElement('button');
+      btnEdit.style.cssText = 'background:none;border:none;color:var(--text3);font-size:15px;cursor:pointer;padding:4px;flex-shrink:0;';
+      btnEdit.textContent = '↩';
+      btnEdit.title = 'Deshacer';
+      btnEdit.onclick = (ev) => { ev.stopPropagation(); deshacerSeg(i); };
+      div.appendChild(badge); div.appendChild(info); div.appendChild(btnEdit);
+    }
+    lista.appendChild(div);
+  });
+}
+
+function marcarEntregadaSeg(idx) {
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+  const p = ruta.paradas[idx];
+  if (!p || p.hecha) return;
+  p.hecha = true; p.fallida = false; p.horaAccion = fmtHora(new Date());
+  saveState();
+  renderSeguimiento();
+  showToast('✅ Entregada · ' + p.horaAccion);
+  // Re-abrir Google Maps con paradas restantes
+  const pendientes = ruta.paradas.filter(q => !q.hecha && !q.fallida);
+  if (pendientes.length > 0) {
+    setTimeout(() => abrirGoogleMaps(), 800);
+  } else {
+    showToast('🎉 ¡Todas las paradas completadas!');
+  }
+}
+
+function marcarFallidaSeg(idx) {
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+  const p = ruta.paradas[idx];
+  if (!p || p.hecha) return;
+  p.hecha = true; p.fallida = true; p.horaAccion = fmtHora(new Date());
+  saveState();
+  renderSeguimiento();
+  showToast('⚠️ Fallida · ' + p.horaAccion);
+  const pendientes = ruta.paradas.filter(q => !q.hecha && !q.fallida);
+  if (pendientes.length > 0) setTimeout(() => abrirGoogleMaps(), 800);
+}
+
+function deshacerSeg(idx) {
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+  const p = ruta.paradas[idx];
+  if (!p) return;
+  p.hecha = false; p.fallida = false; p.horaAccion = null;
+  saveState();
+  renderSeguimiento();
+  showToast('↩ Deshecho · parada ' + (idx+1));
+}
+
+// Abrir Google Maps con las paradas PENDIENTES (ya entregadas/fallidas se saltan)
+function abrirGoogleMaps() {
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+  const inicio  = ruta.inicio;
+  const fin     = ruta.final;
+  const pendientes = ruta.paradas.filter(p => !p.hecha && !p.fallida);
+
+  if (!inicio || !fin) { showToast('Sin puntos de inicio/fin'); return; }
+
+  const enc = (p) => encodeURIComponent(p.lat + ',' + p.lng);
+  const MAX_WP = 23;
+
+  let wpsArr = pendientes.slice(0, MAX_WP);
+  let wps = wpsArr.map(enc).join('/');
+
+  // Si no hay pendientes, abrir solo ruta de regreso a base
+  if (!wpsArr.length) {
+    // Usar posición GPS actual si disponible, si no desde inicio
+    const url = 'https://www.google.com/maps/dir/My+Location/' + enc(fin);
+    window.open(url, '_blank');
+    return;
+  }
+
+  const url = 'https://www.google.com/maps/dir/' + enc(inicio) + '/' + wps + '/' + enc(fin);
+  window.open(url, '_blank');
+  showToast('🗺️ Abriendo ' + wpsArr.length + ' paradas pendientes...');
+}
+
+// Re-optimizar excluyendo entregadas/fallidas
+function reoptimizarPendientes() {
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+  const pendientes = ruta.paradas.filter(p => !p.hecha && !p.fallida);
+  if (!pendientes.length) { showToast('No hay paradas pendientes'); return; }
+
+  // Nearest neighbor desde la última posición (o inicio)
+  const hechas = ruta.paradas.filter(p => p.hecha || p.fallida);
+  let actual = hechas.length ? hechas[hechas.length - 1] : ruta.inicio;
+  let sinVisitar = [...pendientes];
+  let ordenadas = [];
+  while (sinVisitar.length) {
+    let minDist = Infinity, minIdx = 0;
+    sinVisitar.forEach((p, i) => {
+      if (!actual) return;
+      const d = distHaversine(actual.lat, actual.lng, p.lat, p.lng);
+      if (d < minDist) { minDist = d; minIdx = i; }
+    });
+    ordenadas.push(sinVisitar[minIdx]);
+    actual = sinVisitar[minIdx];
+    sinVisitar.splice(minIdx, 1);
+  }
+
+  // Reconstruir paradas: hechas + reordenadas
+  ruta.paradas = [...hechas, ...ordenadas];
+  saveState();
+  renderSeguimiento();
+  showToast('⚡ Ruta re-optimizada con ' + ordenadas.length + ' paradas pendientes');
+  // Abrir Google Maps con el nuevo orden
+  setTimeout(() => abrirGoogleMaps(), 800);
+}
+
 function finalizarRuta() {
   const ruta = state.rutaActual;
   if (!ruta) return;
@@ -2966,6 +3141,21 @@ async function procesarMasivo() {
 
 (async function init() {
 
+  // Botón físico atrás
+  history.replaceState({}, '');
+  history.pushState({}, '');
+  window.addEventListener('popstate', () => {
+    navegarAtras();
+    history.pushState({}, '');
+  });
+  // Swipe derecha desde borde izquierdo
+  let sx = 0, sy = 0, st = 0;
+  document.addEventListener('touchstart', e => { sx = e.touches[0].clientX; sy = e.touches[0].clientY; st = Date.now(); }, {passive:true});
+  document.addEventListener('touchend', e => {
+    const dx = e.changedTouches[0].clientX - sx, dy = e.changedTouches[0].clientY - sy;
+    if (dx > 60 && Math.abs(dx) > Math.abs(dy)*1.5 && Date.now()-st < 400 && sx < 40) navegarAtras();
+  }, {passive:true});
+
   // Fecha hoy por defecto en crear ruta
   const hoy = new Date();
   const dd = String(hoy.getDate()).padStart(2,'0');
@@ -2975,8 +3165,6 @@ async function procesarMasivo() {
   // Botón atrás físico
   history.replaceState({ s: 'screen-home' }, '');
   history.pushState({ s: 'screen-home' }, '');
-  // Verificar sesión al cargar
-  verificarSesion();
   window.addEventListener('popstate', () => {
     history.pushState({ s: 'screen-home' }, '');
   });
@@ -2994,7 +3182,22 @@ async function procesarMasivo() {
     }, 1500);
   }
 
-  renderHome();
+  // ── Restaurar sesión o mostrar login ─────────────────────────────
+  const savedSession = loadSession();
+  if (savedSession) {
+    currentUser = savedSession;
+    window.APP_KEY  = userAppKey(savedSession.id);
+    window.BASE_KEY = userBaseKey(savedSession.id);
+    state = loadState();
+    cargarBase();
+    const labelEl = document.getElementById('home-usuario-label');
+    if (labelEl) labelEl.textContent = '👤 ' + savedSession.nombre;
+    showScreen('screen-home');
+    renderHome();
+  } else {
+    // Mostrar login (ya es visible por defecto)
+    renderLoginScreen();
+  }
 })();
 </script>
 </body>
