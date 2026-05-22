@@ -2169,74 +2169,38 @@ function _optimizarMedio(paradas, inicio, fin) {
   if (!paradas.length) return [];
   if (paradas.length === 1) return [...paradas];
 
-  // 1. CREAR LAS ZONAS GEOGRÁFICAS (Gravedad Espacial)
-  // Calculamos aprox. 8 paquetes por zona para simular el tamaño de una colonia real.
-  const numZonas = Math.max(1, Math.ceil(paradas.length / 8));
-  
-  // Usamos el algoritmo K-Means de tu archivo para agrupar por cercanía física.
-  // Esto hace que las orillas se asignen a la colonia que les quede más cerca.
-  const asignaciones = kMeansGeo(paradas, numZonas);
+  // 1. Encontrar el Centro Geométrico de toda la carga
+  let sumLat = 0, sumLng = 0;
+  paradas.forEach(p => { sumLat += p.lat; sumLng += p.lng; });
+  const centro = { lat: sumLat / paradas.length, lng: sumLng / paradas.length };
 
-  // Armamos los grupos de paquetes
-  const zonas = Array.from({length: numZonas}, () => []);
-  paradas.forEach((p, i) => zonas[asignaciones[i]].push(p));
-
-  // Filtramos zonas vacías y calculamos el centro geográfico de cada colonia
-  const zonasValidas = zonas.filter(z => z.length > 0).map(z => {
-    const cLat = z.reduce((sum, p) => sum + p.lat, 0) / z.length;
-    const cLng = z.reduce((sum, p) => sum + p.lng, 0) / z.length;
-    return { centro: { lat: cLat, lng: cLng }, paradas: z };
+  // 2. Calcular el ángulo de cada punto respecto al centro
+  // Math.atan2 nos da el ángulo exacto en el círculo
+  const conAngulos = paradas.map(p => {
+    let angulo = Math.atan2(p.lat - centro.lat, p.lng - centro.lng);
+    // Convertimos a grados 0-360 para ordenarlos más fácil
+    if (angulo < 0) angulo += 2 * Math.PI;
+    return { ...p, angulo };
   });
 
-  const rutaFinal = [];
-  let actual = inicio;
-  let zonasPendientes = [...zonasValidas];
+  // 3. Definir desde qué ángulo empezamos (según donde esté el chofer)
+  const anguloInicio = Math.atan2(inicio.lat - centro.lat, inicio.lng - centro.lng);
+  let anguloBase = anguloInicio;
+  if (anguloBase < 0) anguloBase += 2 * Math.PI;
 
-  // 2. RUTEO NIVEL MACRO (Ir a la Colonia más cercana)
-  while (zonasPendientes.length > 0) {
-    let mejorZonaIdx = -1;
-    let minDistZona = Infinity;
+  // 4. ORDENAR POR ÁNGULO (Aquí ocurre la magia del círculo)
+  conAngulos.sort((a, b) => {
+    // Ajustamos los ángulos para que el orden empiece desde la posición del chofer
+    let diffA = a.angulo - anguloBase;
+    let diffB = b.angulo - anguloBase;
+    
+    if (diffA < 0) diffA += 2 * Math.PI;
+    if (diffB < 0) diffB += 2 * Math.PI;
+    
+    return diffA - diffB;
+  });
 
-    // Buscamos cuál es el centro de colonia que nos queda más cerca AHORA
-    zonasPendientes.forEach((z, idx) => {
-      const d = distHaversine(actual.lat, actual.lng, z.centro.lat, z.centro.lng);
-      if (d < minDistZona) {
-        minDistZona = d;
-        mejorZonaIdx = idx;
-      }
-    });
-
-    const zonaActual = zonasPendientes[mejorZonaIdx];
-    let paradasZona = [...zonaActual.paradas];
-
-    // 3. RUTEO NIVEL MICRO (Tiro a Tiro dentro de la colonia)
-    // Entregamos TODO en esta zona, obligando a sacar las orillas de una vez.
-    while (paradasZona.length > 0) {
-      let mejorP = null;
-      let mejorPIdx = -1;
-      let minDistP = Infinity;
-
-      paradasZona.forEach((p, idx) => {
-        const d = distHaversine(actual.lat, actual.lng, p.lat, p.lng);
-        if (d < minDistP) {
-          minDistP = d;
-          mejorP = p;
-          mejorPIdx = idx;
-        }
-      });
-
-      // Efectuamos el tiro, avanzamos la posición del chofer y quitamos el paquete
-      rutaFinal.push(mejorP);
-      actual = mejorP; 
-      paradasZona.splice(mejorPIdx, 1);
-    }
-
-    // Una vez vaciada la colonia completa, la borramos de pendientes y vamos a la siguiente
-    zonasPendientes.splice(mejorZonaIdx, 1);
-  }
-
-  // La base final se agrega de forma automática en la función superior.
-  return rutaFinal;
+  return conAngulos;
 }
 
 function optimizarRuta() {
