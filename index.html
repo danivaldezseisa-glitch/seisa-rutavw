@@ -2169,97 +2169,94 @@ function _optimizarMedio(paradas, inicio, fin) {
   if (!paradas.length) return [];
   if (paradas.length === 1) return [...paradas];
 
-  // 1. LEER DIRECCIONES: Extraer CP y Colonia de cada parada
+  // 1. CREAR CORRALES MATEMÁTICOS (Ignoramos los textos que fallan)
+  // 0.03 grados ~ 3.3 km (Simula el Código Postal)
+  // 0.008 grados ~ 800 metros (Simula la Colonia)
+  const MACRO_SIZE = 0.03; 
+  const MICRO_SIZE = 0.008;
+
+  const macroZonas = {};
+
   paradas.forEach(p => {
-    // Buscar un Código Postal de 5 dígitos en el nombre
-    const matchCP = p.nombre.match(/\b\d{5}\b/);
-    p._cp = matchCP ? matchCP[0] : "SIN_CP"; // Agrupa los que no tengan CP juntos
-    
-    // Intentar extraer la colonia (generalmente separada por comas)
-    const partes = p.nombre.split(',');
-    p._colonia = partes.length > 1 ? partes[1].trim().toUpperCase() : "GENERAL";
+    // Clasificamos cada punto en su cuadrícula exacta
+    const macroKey = Math.floor(p.lat / MACRO_SIZE) + '_' + Math.floor(p.lng / MACRO_SIZE);
+    const microKey = Math.floor(p.lat / MICRO_SIZE) + '_' + Math.floor(p.lng / MICRO_SIZE);
+
+    if (!macroZonas[macroKey]) macroZonas[macroKey] = {};
+    if (!macroZonas[macroKey][microKey]) macroZonas[macroKey][microKey] = [];
+
+    macroZonas[macroKey][microKey].push(p);
   });
 
-  // 2. AGRUPAR LA CARGA: Armar cajas por CP, y dentro de ellas, sub-cajas por Colonia
-  const almacenes = {};
-  paradas.forEach(p => {
-    if (!almacenes[p._cp]) almacenes[p._cp] = {};
-    if (!almacenes[p._cp][p._colonia]) almacenes[p._cp][p._colonia] = [];
-    almacenes[p._cp][p._colonia].push(p);
-  });
-
-  // 3. SECUENCIA LÓGICA (Simulación humana)
   const rutaFinal = [];
-  let actual = inicio; // Arrancamos desde el ancla de inicio (tu primer tiro)
-  
-  let cpsPendientes = Object.keys(almacenes);
+  let actual = inicio; // El tiro de inicio ya está anclado y protegido
 
-  // PASO A: Ir al Código Postal más cercano
-  while (cpsPendientes.length > 0) {
-    let mejorCP = null;
-    let minDistCP = Infinity;
+  let macrosPendientes = Object.keys(macroZonas);
 
-    cpsPendientes.forEach(cp => {
-      // Calculamos un centro aproximado del Código Postal
+  // 2. ORDEN DE ATAQUE: Nivel 1 (Códigos Postales / Zonas Grandes)
+  while (macrosPendientes.length > 0) {
+    let mejorMacro = null;
+    let minDistMacro = Infinity;
+
+    // Buscamos la Macro Zona más cercana a donde está el chofer AHORA
+    macrosPendientes.forEach(mKey => {
       let sumLat = 0, sumLng = 0, count = 0;
-      Object.values(almacenes[cp]).forEach(col => {
-        col.forEach(p => { sumLat += p.lat; sumLng += p.lng; count++; });
+      Object.values(macroZonas[mKey]).forEach(micro => {
+        micro.forEach(p => { sumLat += p.lat; sumLng += p.lng; count++; });
       });
-      const d = distHaversine(actual.lat, actual.lng, sumLat/count, sumLng/count);
-      if (d < minDistCP) { minDistCP = d; mejorCP = cp; }
+      const cLat = sumLat / count;
+      const cLng = sumLng / count;
+      const d = distHaversine(actual.lat, actual.lng, cLat, cLng);
+      
+      if (d < minDistMacro) { minDistMacro = d; mejorMacro = mKey; }
     });
 
-    const coloniasObj = almacenes[mejorCP];
-    let coloniasPendientes = Object.keys(coloniasObj);
+    const microsObj = macroZonas[mejorMacro];
+    let microsPendientes = Object.keys(microsObj);
 
-    // PASO B: Dentro de ese CP, ir a la Colonia más cercana
-    while (coloniasPendientes.length > 0) {
-      let mejorCol = null;
-      let minDistCol = Infinity;
+    // 3. ORDEN DE ATAQUE: Nivel 2 (Colonias / Micro Zonas dentro del CP)
+    while (microsPendientes.length > 0) {
+      let mejorMicro = null;
+      let minDistMicro = Infinity;
 
-      coloniasPendientes.forEach(col => {
-        const arr = coloniasObj[col];
+      // Buscamos la Colonia más cercana a donde está el chofer AHORA
+      microsPendientes.forEach(miKey => {
+        const arr = microsObj[miKey];
         const cLat = arr.reduce((s, p) => s + p.lat, 0) / arr.length;
         const cLng = arr.reduce((s, p) => s + p.lng, 0) / arr.length;
         const d = distHaversine(actual.lat, actual.lng, cLat, cLng);
-        if (d < minDistCol) { minDistCol = d; mejorCol = col; }
+        
+        if (d < minDistMicro) { minDistMicro = d; mejorMicro = miKey; }
       });
 
-      let puntosCalle = coloniasObj[mejorCol];
+      let puntosCalle = microsObj[mejorMicro];
 
-      // PASO C: Dentro de la Colonia, ir punto por punto a la calle más cercana (Tiro a tiro)
+      // 4. ORDEN DE ATAQUE: Nivel 3 (Calle por calle, tiro más cercano)
       while (puntosCalle.length > 0) {
         let mejorP = null;
         let mejorPIdx = -1;
         let minDistP = Infinity;
 
+        // Buscamos literalmente la puerta más cercana para no pasar de largo
         puntosCalle.forEach((p, idx) => {
           const d = distHaversine(actual.lat, actual.lng, p.lat, p.lng);
           if (d < minDistP) { minDistP = d; mejorP = p; mejorPIdx = idx; }
         });
 
-        // Hacemos el tiro y actualizamos nuestra posición
+        // Entregamos el paquete, avanzamos la camioneta a ese punto, y borramos el paquete de la lista
         rutaFinal.push(mejorP);
         actual = mejorP;
         puntosCalle.splice(mejorPIdx, 1);
       }
       
-      // Terminamos esta colonia, la tachamos de la lista
-      coloniasPendientes = coloniasPendientes.filter(c => c !== mejorCol);
+      // Ya vaciamos esta colonia, vamos a la siguiente
+      microsPendientes = microsPendientes.filter(k => k !== mejorMicro);
     }
-
-    // Terminamos este CP completo, lo tachamos de la lista y vamos al siguiente CP
-    cpsPendientes = cpsPendientes.filter(c => c !== mejorCP);
+    
+    // Ya vaciamos este CP completo, vamos al siguiente
+    macrosPendientes = macrosPendientes.filter(k => k !== mejorMacro);
   }
 
-  // 4. LIMPIEZA: Quitamos las etiquetas temporales para no ensuciar tu base de datos
-  rutaFinal.forEach(p => { 
-    delete p._cp; 
-    delete p._colonia; 
-  });
-
-  // Nota: El "Primer Tiro" y "Último Tiro" ya están garantizados y anclados 
-  // en la función externa (optimizarPipeline) que llama a esta.
   return rutaFinal;
 }
 
