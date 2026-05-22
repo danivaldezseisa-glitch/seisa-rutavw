@@ -2436,7 +2436,12 @@ function renderSeguimiento() {
       btnEd.textContent = '✏️';
       btnEd.title = 'Editar parada';
       btnEd.onclick = (ev) => { ev.stopPropagation(); abrirEditarParada(p.id); };
-      actionRow.appendChild(btnE); actionRow.appendChild(btnF); actionRow.appendChild(btnEd);
+      const btnDel = document.createElement('button');
+      btnDel.style.cssText = 'padding:5px 8px;border-radius:7px;border:1px solid rgba(255,82,82,.35);background:rgba(255,82,82,.1);color:var(--red);font-size:13px;font-weight:700;cursor:pointer;line-height:1;';
+      btnDel.textContent = '✕';
+      btnDel.title = 'Eliminar parada';
+      btnDel.onclick = (ev) => { ev.stopPropagation(); eliminarParadaSeg(p.id); };
+      actionRow.appendChild(btnE); actionRow.appendChild(btnF); actionRow.appendChild(btnEd); actionRow.appendChild(btnDel);
       btnWrap.appendChild(actionRow);
       div.appendChild(badge); div.appendChild(info); div.appendChild(btnWrap);
     } else {
@@ -2492,6 +2497,17 @@ function deshacerSeg(idx) {
   showToast('↩ Deshecho · parada ' + (idx+1));
 }
 
+
+function eliminarParadaSeg(id) {
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+  const idx = ruta.paradas.findIndex(p => p.id === id);
+  if (idx < 0) return;
+  ruta.paradas.splice(idx, 1);
+  saveState();
+  renderSeguimiento();
+  showToast('🗑️ Parada eliminada');
+}
 function abrirGoogleMaps() {
   const ruta = state.rutaActual;
   if (!ruta) return;
