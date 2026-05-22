@@ -1746,8 +1746,9 @@ function eliminarParada(id) {
 //  OPTIMIZAR RUTA — Nearest Neighbor + 2-opt
 // ══════════════════════════════════════════════════════════════════
 // ══════════════════════════════════════════════════════════════════
-//  MOTOR DE OPTIMIZACIÓN v2 — Multi-start NN + 2-opt edge-delta + Or-opt
-//  Produce circuitos sin zigzag y minimiza km reales de traslado
+//  MOTOR DE OPTIMIZACIÓN v3 — Circuito real sin espagueti
+//  Estrategia: Angular Sweep + 2-opt circuito cerrado + Or-opt delta
+//  Garantiza recorrido en bucle, sin cruces, sin zigzag
 // ══════════════════════════════════════════════════════════════════
 
 function calcDistRuta(paradas, inicio, fin) {
@@ -1758,104 +1759,197 @@ function calcDistRuta(paradas, inicio, fin) {
   return d;
 }
 
-// Nearest Neighbor desde un punto de inicio dado
-function nearestNeighborDesde(paradas, inicio) {
+// Distancia total de un circuito cerrado (sin inicio/fin fijos)
+function distCircuito(ruta) {
+  let d = 0;
+  const n = ruta.length;
+  for (let i = 0; i < n; i++)
+    d += distHaversine(ruta[i].lat, ruta[i].lng, ruta[(i+1) % n].lat, ruta[(i+1) % n].lng);
+  return d;
+}
+
+// ── PASO 1: Angular Sweep ────────────────────────────────────────
+// Ordena las paradas por ángulo respecto al centroide → forma natural
+// de circuito convexo, elimina espagueti desde el inicio
+function angularSweep(paradas, inicio) {
+  if (paradas.length <= 2) return [...paradas];
+
+  // Centroide de todas las paradas + inicio
+  const todos = [inicio, ...paradas].filter(Boolean);
+  const cLat = todos.reduce((s, p) => s + p.lat, 0) / todos.length;
+  const cLng = todos.reduce((s, p) => s + p.lng, 0) / todos.length;
+
+  // Ángulo de inicio como referencia (para que el circuito empiece cerca del depot)
+  const anguloInicio = Math.atan2(inicio.lat - cLat, inicio.lng - cLng);
+
+  // Ordenar paradas por ángulo relativo al inicio (sentido horario)
+  const conAngulo = paradas.map(p => {
+    let ang = Math.atan2(p.lat - cLat, p.lng - cLng) - anguloInicio;
+    if (ang < 0) ang += 2 * Math.PI;
+    return { p, ang };
+  });
+  conAngulo.sort((a, b) => a.ang - b.ang);
+  return conAngulo.map(x => x.p);
+}
+
+// ── PASO 2: Nearest Neighbor dentro de cada zona ─────────────────
+// Después del sweep, afina el orden local con NN para no saltar zonas
+function nearestNeighborLocal(paradas, inicio) {
   let sinVisitar = [...paradas];
   let actual = inicio;
-  let ordenadas = [];
+  const ordenadas = [];
   while (sinVisitar.length) {
-    let minDist = Infinity, minIdx = 0;
+    let minD = Infinity, minI = 0;
     for (let i = 0; i < sinVisitar.length; i++) {
       const d = distHaversine(actual.lat, actual.lng, sinVisitar[i].lat, sinVisitar[i].lng);
-      if (d < minDist) { minDist = d; minIdx = i; }
+      if (d < minD) { minD = d; minI = i; }
     }
-    ordenadas.push(sinVisitar[minIdx]);
-    actual = sinVisitar[minIdx];
-    sinVisitar.splice(minIdx, 1);
+    ordenadas.push(sinVisitar[minI]);
+    actual = sinVisitar[minI];
+    sinVisitar.splice(minI, 1);
   }
   return ordenadas;
 }
 
-// Multi-start NN: prueba desde cada parada como inicio y queda con la mejor
-function nearestNeighbor(paradas, inicio) {
-  if (paradas.length <= 2) return [...paradas];
-  let mejor = nearestNeighborDesde(paradas, inicio);
-  let mejorDist = calcDistRuta(mejor, inicio, inicio);
-  const semillas = paradas.length <= 12 ? paradas : paradas.filter((_, i) => i % Math.ceil(paradas.length / 12) === 0);
-  for (const semilla of semillas) {
-    const candidato = nearestNeighborDesde(paradas, semilla);
-    const dist = calcDistRuta(candidato, inicio, inicio);
-    if (dist < mejorDist) { mejorDist = dist; mejor = candidato; }
-  }
-  return mejor;
-}
-
-// 2-opt con calculo de delta por aristas (mucho mas rapido)
-function twoOpt(paradas, inicio, fin) {
-  if (paradas.length < 4) return [...paradas];
-  const refInicio = inicio || paradas[0];
-  const refFin    = fin    || paradas[0];
-  const puntos = [refInicio, ...paradas, refFin];
-  const n = puntos.length;
-  let ruta = puntos.map((_, i) => i);
+// ── PASO 3: 2-opt sobre CIRCUITO CERRADO ─────────────────────────
+// Opera sobre el anillo completo (incluyendo arista última→primera),
+// lo que elimina cruces que el 2-opt lineal no ve
+function twoOptCircuito(ruta) {
+  if (ruta.length < 4) return [...ruta];
+  let r = [...ruta];
+  const n = r.length;
   let mejorado = true;
   let iter = 0;
-  while (mejorado && iter < 150) {
+  while (mejorado && iter < 300) {
     mejorado = false; iter++;
-    for (let i = 1; i < n - 2; i++) {
-      for (let j = i + 1; j < n - 1; j++) {
-        const a = puntos[ruta[i-1]], b = puntos[ruta[i]];
-        const c = puntos[ruta[j]],  d = puntos[ruta[j+1]];
+    for (let i = 0; i < n - 1; i++) {
+      for (let j = i + 2; j < n; j++) {
+        if (i === 0 && j === n - 1) continue; // misma arista en anillo
+        const a = r[i], b = r[(i+1) % n];
+        const c = r[j], d = r[(j+1) % n];
         const antes   = distHaversine(a.lat, a.lng, b.lat, b.lng)
                       + distHaversine(c.lat, c.lng, d.lat, d.lng);
         const despues = distHaversine(a.lat, a.lng, c.lat, c.lng)
                       + distHaversine(b.lat, b.lng, d.lat, d.lng);
-        if (despues < antes - 0.001) {
-          let l = i, r = j;
-          while (l < r) { [ruta[l], ruta[r]] = [ruta[r], ruta[l]]; l++; r--; }
+        if (despues < antes - 0.0005) {
+          // Invertir segmento i+1 .. j
+          let l = i + 1, rr = j;
+          while (l < rr) { [r[l], r[rr]] = [r[rr], r[l]]; l++; rr--; }
           mejorado = true;
         }
       }
     }
   }
-  return ruta.slice(1, n - 1).map(i => puntos[i]);
+  return r;
 }
 
-// Or-opt: reubica segmentos de 1-3 paradas en la mejor posicion
-function orOpt(paradas, inicio, fin) {
-  if (paradas.length < 4) return [...paradas];
-  let ruta = [...paradas];
+// ── PASO 4: Or-opt delta — reubica nodos y pares ─────────────────
+// Calcula delta exacto de aristas afectadas (O(1) por movimiento)
+// sin recalcular la ruta completa → puede hacer muchas más iteraciones
+function orOptDelta(ruta) {
+  if (ruta.length < 5) return [...ruta];
+  let r = [...ruta];
+  const n = () => r.length;
   let mejorado = true;
   let iter = 0;
-  while (mejorado && iter < 80) {
+  while (mejorado && iter < 200) {
     mejorado = false; iter++;
-    outer:
-    for (let segLen = 1; segLen <= Math.min(3, ruta.length - 2); segLen++) {
-      for (let i = 0; i < ruta.length - segLen + 1; i++) {
-        const seg    = ruta.slice(i, i + segLen);
-        const sinSeg = [...ruta.slice(0, i), ...ruta.slice(i + segLen)];
-        const distBase = calcDistRuta(ruta, inicio, fin);
-        for (let j = 0; j <= sinSeg.length; j++) {
-          const nueva = [...sinSeg.slice(0, j), ...seg, ...sinSeg.slice(j)];
-          if (calcDistRuta(nueva, inicio, fin) < distBase - 0.001) {
-            ruta = nueva; mejorado = true; break outer;
+    for (let segLen = 1; segLen <= 2; segLen++) {
+      for (let i = 0; i < n(); i++) {
+        const prev_i  = (i - 1 + n()) % n();
+        const last_i  = (i + segLen - 1) % n();
+        const next_i  = (i + segLen) % n();
+        if (next_i === prev_i) continue;
+
+        // Costo de remover el segmento de su posición actual
+        const costRemove =
+          distHaversine(r[prev_i].lat, r[prev_i].lng, r[i].lat, r[i].lng) +
+          distHaversine(r[last_i].lat, r[last_i].lng, r[next_i].lat, r[next_i].lng) -
+          distHaversine(r[prev_i].lat, r[prev_i].lng, r[next_i].lat, r[next_i].lng);
+
+        // Probar insertar en cada otra posición
+        for (let j = 0; j < n(); j++) {
+          // Saltar posiciones que son parte del segmento o adyacentes
+          if (j === prev_i || j === i || (segLen === 2 && j === last_i)) continue;
+          const next_j = (j + 1) % n();
+          if (next_j === i) continue;
+
+          // Costo de insertar el segmento entre j y next_j
+          const costInsert =
+            distHaversine(r[j].lat, r[j].lng, r[i].lat, r[i].lng) +
+            distHaversine(r[last_i].lat, r[last_i].lng, r[next_j].lat, r[next_j].lng) -
+            distHaversine(r[j].lat, r[j].lng, r[next_j].lat, r[next_j].lng);
+
+          if (costInsert - costRemove < -0.0005) {
+            // Aplicar movimiento: extraer segmento e insertar en nueva pos
+            const seg = [];
+            for (let k = 0; k < segLen; k++) seg.push(r[(i + k) % n()]);
+            // Reconstruir sin el segmento
+            const sinSeg = [];
+            for (let k = 0; k < n(); k++) {
+              let esSeg = false;
+              for (let s = 0; s < segLen; s++) if ((i + s) % n() === k) esSeg = true;
+              if (!esSeg) sinSeg.push(r[k]);
+            }
+            // Encontrar posición de inserción en sinSeg
+            const jEnSinSeg = sinSeg.indexOf(r[j]);
+            if (jEnSinSeg < 0) continue;
+            r = [...sinSeg.slice(0, jEnSinSeg + 1), ...seg, ...sinSeg.slice(jEnSinSeg + 1)];
+            mejorado = true;
+            break;
           }
         }
+        if (mejorado) break;
       }
+      if (mejorado) break;
     }
   }
+  return r;
+}
+
+// ── PASO 5: Alinear circuito al inicio ───────────────────────────
+// Rota el anillo para que la parada más cercana al depot quede primero
+function alinearCircuitoAlInicio(circuito, inicio) {
+  if (!inicio || !circuito.length) return circuito;
+  let minD = Infinity, minI = 0;
+  circuito.forEach((p, i) => {
+    const d = distHaversine(inicio.lat, inicio.lng, p.lat, p.lng);
+    if (d < minD) { minD = d; minI = i; }
+  });
+  return [...circuito.slice(minI), ...circuito.slice(0, minI)];
+}
+
+// ── PIPELINE COMPLETO ────────────────────────────────────────────
+function optimizarPipeline(paradas, inicio, fin) {
+  if (!paradas.length) return [];
+  if (paradas.length <= 2) return [...paradas];
+  if (paradas.length === 3) return nearestNeighborLocal(paradas, inicio);
+
+  // 1. Angular Sweep → orden circular inicial sin espagueti
+  let ruta = angularSweep(paradas, inicio);
+
+  // 2. Comparar con NN puro y quedarse con el mejor (por si las paradas
+  //    no forman un cluster convexo claro)
+  const rutaNN = nearestNeighborLocal(paradas, inicio);
+  if (distCircuito(rutaNN) < distCircuito(ruta)) ruta = rutaNN;
+
+  // 3. 2-opt sobre circuito CERRADO → elimina cruces en el anillo
+  ruta = twoOptCircuito(ruta);
+
+  // 4. Or-opt delta → elimina zigzags locales con delta de aristas
+  ruta = orOptDelta(ruta);
+
+  // 5. Segunda pasada 2-opt (Or-opt puede crear nuevas mejoras)
+  ruta = twoOptCircuito(ruta);
+
+  // 6. Alinear para que el circuito empiece cerca del depot
+  ruta = alinearCircuitoAlInicio(ruta, inicio);
+
   return ruta;
 }
 
-// Pipeline completo
-function optimizarPipeline(paradas, inicio, fin) {
-  if (!paradas.length) return [];
-  if (paradas.length === 1) return [...paradas];
-  let ruta = nearestNeighbor(paradas, inicio);
-  if (ruta.length >= 4) ruta = twoOpt(ruta, inicio, fin);
-  if (ruta.length >= 4) ruta = orOpt(ruta, inicio, fin);
-  if (ruta.length >= 4) ruta = twoOpt(ruta, inicio, fin);
-  return ruta;
+function nearestNeighbor(paradas, inicio) {
+  return nearestNeighborLocal(paradas, inicio);
 }
 
 function optimizarRuta() {
@@ -1868,10 +1962,11 @@ function optimizarRuta() {
   const ordenadas = optimizarPipeline(rutaBuild.paradas, inicio, fin);
   rutaBuild.paradas = ordenadas;
 
-  let kmTotal = calcDistRuta(ordenadas, rutaBuild.inicio, rutaBuild.final) * 1.3;
+  // Factor urbano México: 1.25x distancia en línea recta, velocidad 30 km/h
+  let kmTotal = calcDistRuta(ordenadas, rutaBuild.inicio, rutaBuild.final) * 1.25;
   rutaBuild.kmTotal = Math.round(kmTotal * 10) / 10;
 
-  const minManejo  = Math.round((kmTotal / 28) * 60);
+  const minManejo  = Math.round((kmTotal / 30) * 60);
   const minParadas = ordenadas.length * 8;
   rutaBuild.tiempoMin = minManejo + minParadas;
 
