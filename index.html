@@ -232,11 +232,18 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
 </div>
 
 <style>
-.pin-dot { width:14px;height:14px;border-radius:50%;border:2px solid var(--accent);background:transparent;transition:background .15s; }
+.pin-dot { width:16px;height:16px;border-radius:50%;border:2.5px solid var(--accent);background:transparent;transition:background .15s; }
 .pin-dot.filled { background:var(--accent); }
-.pin-key { height:58px;border-radius:14px;border:1px solid var(--border);background:var(--surface);font-size:22px;font-weight:700;cursor:pointer;color:var(--text);transition:background .1s;-webkit-tap-highlight-color:transparent; }
-.pin-key:active { background:var(--surface2); }
+.pin-key { height:62px;border-radius:14px;border:1px solid var(--border);background:var(--surface);font-size:24px;font-weight:700;cursor:pointer;color:var(--text);transition:background .1s;-webkit-tap-highlight-color:transparent; }
+.pin-key:active { background:var(--accent);color:#000; }
 .pin-key-del { font-size:20px; }
+@keyframes shake {
+  0%,100%{transform:translateX(0)}
+  20%{transform:translateX(-8px)}
+  40%{transform:translateX(8px)}
+  60%{transform:translateX(-6px)}
+  80%{transform:translateX(6px)}
+}
 </style>
 
 <!-- ════════════════════════════════
@@ -779,6 +786,34 @@ function clearSession() {
 // Clave de localStorage única por usuario
 function userAppKey(userId) { return 'seisa_app_v1_' + userId; }
 function userBaseKey(userId) { return 'seisa_base_v1_' + userId; }
+
+// ── Base (inicio/final) por usuario ──────────────────────────────
+function loadBase() {
+  try {
+    const key = window.BASE_KEY || ('seisa_base_v1');
+    const raw = localStorage.getItem(key);
+    return raw ? JSON.parse(raw) : {};
+  } catch(e) { return {}; }
+}
+function saveBase() {
+  try {
+    const key = window.BASE_KEY || ('seisa_base_v1');
+    localStorage.setItem(key, JSON.stringify({ inicio: rutaBuild.inicio, final: rutaBuild.final }));
+  } catch(e) {}
+}
+function cargarBase() {
+  try {
+    const base = loadBase();
+    if (base.inicio) rutaBuild.inicio = base.inicio;
+    if (base.final)  rutaBuild.final  = base.final;
+  } catch(e) {}
+}
+function clearBase(tipo) {
+  if (tipo === 'inicio') rutaBuild.inicio = null;
+  else                   rutaBuild.final  = null;
+  saveBase();
+  renderBaseUI();
+}
 function userGHFile(userId)  { return 'seisa-data-' + userId + '.json'; }
 
 // ── Acceso admin: toca el logo 5 veces ───────────────────────────
@@ -966,51 +1001,63 @@ function pinInput(val) {
 }
 
 function actualizarPinDots() {
-  const dots = document.querySelectorAll('.pin-dot');
+  const modal = document.getElementById('modal-pin');
+  if (!modal) return;
+  const dots = modal.querySelectorAll('.pin-dot');
   dots.forEach((d, i) => d.classList.toggle('filled', i < _pinActual.length));
 }
 
 function verificarPIN() {
-  if (!_pinUsuario) return;
-  // Comparar siempre como string
-  if (_pinActual === String(_pinUsuario.pin)) {
-    closeModal('modal-pin');
-    _pinActual = '';
+  if (!_pinUsuario) { console.warn('[PIN] no hay usuario'); return; }
+  const pinIngresado = _pinActual;
+  const pinEsperado  = String(_pinUsuario.pin).trim();
+  console.log('[PIN] ingresado:', pinIngresado, '| esperado:', pinEsperado, '| ok:', pinIngresado === pinEsperado);
+
+  if (pinIngresado === pinEsperado) {
+    // Ocultar modal directamente sin usar closeModal (que limpia estado)
+    document.getElementById('modal-pin').classList.add('hidden');
+    const usuario = _pinUsuario;
+    _pinActual  = '';
+    _pinUsuario = null;
     actualizarPinDots();
-    iniciarSesion(_pinUsuario);
+    iniciarSesion(usuario);
   } else {
-    document.getElementById('pin-error').textContent = 'PIN incorrecto';
+    const errEl = document.getElementById('pin-error');
+    if (errEl) errEl.textContent = 'PIN incorrecto';
     _pinActual = '';
     actualizarPinDots();
+    // Vibrar el modal como feedback
+    const sheet = document.querySelector('#modal-pin .modal-sheet');
+    if (sheet) {
+      sheet.style.animation = 'shake .3s ease';
+      setTimeout(() => sheet.style.animation = '', 300);
+    }
   }
 }
 
 function iniciarSesion(user) {
+  console.log('[LOGIN] iniciando sesión para:', user.nombre);
   currentUser = user;
   saveSession(user);
 
-  // Cambiar claves de localStorage al usuario activo
+  // Claves de localStorage únicas por usuario
   window.APP_KEY  = userAppKey(user.id);
   window.BASE_KEY = userBaseKey(user.id);
 
-  // Recargar estado del usuario
+  // Recargar estado de este usuario
   state = loadState();
   cargarBase();
 
-  // Actualizar GH_FILE si hay config de GitHub
-  if (ghConfig) {
-    window.GH_FILE_ACTIVE = userGHFile(user.id);
-  }
-
-  // Actualizar UI
+  // Label de usuario en home
   const labelEl = document.getElementById('home-usuario-label');
   if (labelEl) labelEl.textContent = '👤 ' + user.nombre;
 
-  // Ir a home
+  // Navegar a home
   showScreen('screen-home');
   renderHome();
 
-  showToast('¡Hola, ' + user.nombre + '!');
+  setTimeout(() => showToast('¡Hola, ' + user.nombre + '!'), 300);
+  console.log('[LOGIN] sesión iniciada, pantalla:', currentScreen);
 }
 
 function cerrarSesion() {
@@ -1105,7 +1152,16 @@ function showScreen(id) {
 }
 
 function closeModal(id) {
-  document.getElementById(id)?.classList.add('hidden');
+  const el = document.getElementById(id);
+  if (el) {
+    el.classList.add('hidden');
+    // Para modal-pin: limpiar estado
+    if (id === 'modal-pin') {
+      _pinActual = '';
+      _pinUsuario = null;
+      actualizarPinDots();
+    }
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════
