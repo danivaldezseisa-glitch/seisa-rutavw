@@ -2169,38 +2169,73 @@ function _optimizarMedio(paradas, inicio, fin) {
   if (!paradas.length) return [];
   if (paradas.length === 1) return [...paradas];
 
+  // 1. CREAR LAS ZONAS GEOGRÁFICAS (Gravedad Espacial)
+  // Calculamos aprox. 8 paquetes por zona para simular el tamaño de una colonia real.
+  const numZonas = Math.max(1, Math.ceil(paradas.length / 8));
+  
+  // Usamos el algoritmo K-Means de tu archivo para agrupar por cercanía física.
+  // Esto hace que las orillas se asignen a la colonia que les quede más cerca.
+  const asignaciones = kMeansGeo(paradas, numZonas);
+
+  // Armamos los grupos de paquetes
+  const zonas = Array.from({length: numZonas}, () => []);
+  paradas.forEach((p, i) => zonas[asignaciones[i]].push(p));
+
+  // Filtramos zonas vacías y calculamos el centro geográfico de cada colonia
+  const zonasValidas = zonas.filter(z => z.length > 0).map(z => {
+    const cLat = z.reduce((sum, p) => sum + p.lat, 0) / z.length;
+    const cLng = z.reduce((sum, p) => sum + p.lng, 0) / z.length;
+    return { centro: { lat: cLat, lng: cLng }, paradas: z };
+  });
+
   const rutaFinal = [];
-  let actual = inicio; // El chofer arranca en el punto de inicio
-  let pendientes = [...paradas];
+  let actual = inicio;
+  let zonasPendientes = [...zonasValidas];
 
-  // Mientras haya paquetes en la camioneta...
-  while (pendientes.length > 0) {
-    let mejorP = null;
-    let mejorIdx = -1;
-    let minDist = Infinity;
+  // 2. RUTEO NIVEL MACRO (Ir a la Colonia más cercana)
+  while (zonasPendientes.length > 0) {
+    let mejorZonaIdx = -1;
+    let minDistZona = Infinity;
 
-    // 1. Escanear todos los paquetes pendientes
-    for (let i = 0; i < pendientes.length; i++) {
-      const p = pendientes[i];
-      // 2. Medir la distancia real desde donde está la camioneta AHORA
-      const d = distHaversine(actual.lat, actual.lng, p.lat, p.lng);
-      
-      // 3. Encontrar el que está a menor distancia absoluta
-      if (d < minDist) {
-        minDist = d;
-        mejorP = p;
-        mejorIdx = i;
+    // Buscamos cuál es el centro de colonia que nos queda más cerca AHORA
+    zonasPendientes.forEach((z, idx) => {
+      const d = distHaversine(actual.lat, actual.lng, z.centro.lat, z.centro.lng);
+      if (d < minDistZona) {
+        minDistZona = d;
+        mejorZonaIdx = idx;
       }
+    });
+
+    const zonaActual = zonasPendientes[mejorZonaIdx];
+    let paradasZona = [...zonaActual.paradas];
+
+    // 3. RUTEO NIVEL MICRO (Tiro a Tiro dentro de la colonia)
+    // Entregamos TODO en esta zona, obligando a sacar las orillas de una vez.
+    while (paradasZona.length > 0) {
+      let mejorP = null;
+      let mejorPIdx = -1;
+      let minDistP = Infinity;
+
+      paradasZona.forEach((p, idx) => {
+        const d = distHaversine(actual.lat, actual.lng, p.lat, p.lng);
+        if (d < minDistP) {
+          minDistP = d;
+          mejorP = p;
+          mejorPIdx = idx;
+        }
+      });
+
+      // Efectuamos el tiro, avanzamos la posición del chofer y quitamos el paquete
+      rutaFinal.push(mejorP);
+      actual = mejorP; 
+      paradasZona.splice(mejorPIdx, 1);
     }
 
-    // 4. Hacer la entrega: mover la camioneta a ese punto y quitar el paquete de la lista
-    rutaFinal.push(mejorP);
-    actual = mejorP;
-    pendientes.splice(mejorIdx, 1);
+    // Una vez vaciada la colonia completa, la borramos de pendientes y vamos a la siguiente
+    zonasPendientes.splice(mejorZonaIdx, 1);
   }
 
-  // La función principal ya se encarga de que el "último tiro" (la base) 
-  // se agregue al final de esta lista.
+  // La base final se agrega de forma automática en la función superior.
   return rutaFinal;
 }
 
