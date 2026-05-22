@@ -2170,96 +2170,84 @@ function _optimizarMedio(paradas, inicio, fin) {
   if (!paradas.length) return [];
   if (paradas.length === 1) return [...paradas];
   if (paradas.length === 2) {
-    // Elegir el orden que sea más corto pasando por los dos puntos
     const d1 = distHaversine(inicio.lat, inicio.lng, paradas[0].lat, paradas[0].lng)
-              + distHaversine(paradas[0].lat, paradas[0].lng, paradas[1].lat, paradas[1].lng)
-              + distHaversine(paradas[1].lat, paradas[1].lng, fin.lat, fin.lng);
+             + distHaversine(paradas[0].lat, paradas[0].lng, paradas[1].lat, paradas[1].lng)
+             + distHaversine(paradas[1].lat, paradas[1].lng, fin.lat, fin.lng);
     const d2 = distHaversine(inicio.lat, inicio.lng, paradas[1].lat, paradas[1].lng)
-              + distHaversine(paradas[1].lat, paradas[1].lng, paradas[0].lat, paradas[0].lng)
-              + distHaversine(paradas[0].lat, paradas[0].lng, fin.lat, fin.lng);
+             + distHaversine(paradas[1].lat, paradas[1].lng, paradas[0].lat, paradas[0].lng)
+             + distHaversine(paradas[0].lat, paradas[0].lng, fin.lat, fin.lng);
     return d1 <= d2 ? [...paradas] : [paradas[1], paradas[0]];
   }
 
   const depotI = inicio;
   const depotF = fin;
 
-  // FASE 1: construir ruta base con Cheapest Insertion y Nearest Neighbor
-  let numClusters = Math.max(2, Math.round(Math.sqrt(paradas.length * 0.7)));
-  if (paradas.length <= 6) numClusters = 1;
-  let paradaOrdenada;
+  // 1. Agrupar en colonias (micro-zonas geográficas).
+  // Forzamos clusters de ~6 paradas para asegurar que las colonias se mantengan compactas.
+  let numClusters = Math.max(1, Math.ceil(paradas.length / 6));
+  let ruta = [];
 
   if (numClusters === 1) {
-    const rutaCI = cheapestInsertion(paradas, depotI, depotF);
-    const rutaNN = nearestNeighborLocal(paradas, depotI);
-    paradaOrdenada = calcDistRuta(rutaCI, depotI, depotF) <= calcDistRuta(rutaNN, depotI, depotF)
-      ? rutaCI : rutaNN;
+    ruta = cheapestInsertion(paradas, depotI, depotF);
+    ruta = twoOptLineal(ruta, depotI, depotF);
   } else {
-    // --- NUEVO: Agrupación por Colonia ---
-    const gruposMap = {};
-    paradas.forEach((p) => {
-      let nombreColonia = "ZONA GENERAL"; // Fallback
-      
-      // Intentamos extraer la colonia del nombre (formato habitual: "Calle, Colonia, Ciudad")
-      if (p.nombre && p.nombre.includes(',')) {
-          const partes = p.nombre.split(',');
-          // Usualmente la colonia está en el segundo fragmento
-          nombreColonia = partes.length > 2 ? partes[1].trim().toUpperCase() : partes[0].trim().toUpperCase();
-      }
-      
-      if (!gruposMap[nombreColonia]) gruposMap[nombreColonia] = [];
-      gruposMap[nombreColonia].push(p);
-    });
+    // Generar los grupos geográficos
+    const asignaciones = kMeansGeo(paradas, numClusters);
+    const grupos = Array.from({length: numClusters}, () => []);
+    paradas.forEach((p, i) => grupos[asignaciones[i]].push(p));
+    
+    // Filtrar grupos que hayan quedado vacíos
+    const gruposValidos = grupos.filter(g => g.length > 0);
 
-    let grupos = [];
-    // Si una colonia tiene demasiadas entregas, la subdividimos geográficamente
-    // para no saturar el motor de optimización interno (límite sugerido: 12 paradas)
-    Object.values(gruposMap).forEach(grupo => {
-        if (grupo.length > 12) {
-            const subClusters = Math.ceil(grupo.length / 8);
-            const subAsig = kMeansGeo(grupo, subClusters);
-            const subMap = {};
-            grupo.forEach((gp, i) => {
-                if (!subMap[subAsig[i]]) subMap[subAsig[i]] = [];
-                subMap[subAsig[i]].push(gp);
-            });
-            grupos.push(...Object.values(subMap));
-        } else {
-            grupos.push(grupo);
-        }
-    });
-    // -------------------------------------
-
-    const gruposOrdenados = ordenarClustersCircular(grupos, depotI);
-    const centroides = gruposOrdenados.map(g => ({
+    // Calcular el centro de cada colonia
+    const centroides = gruposValidos.map(g => ({
       lat: g.reduce((s,p)=>s+p.lat,0)/g.length,
       lng: g.reduce((s,p)=>s+p.lng,0)/g.length,
       grupo: g
     }));
-    let sinVisitar = [...centroides], actual = depotI;
-    const gruposFinal = [];
+
+    // 2. Ordenar las colonias por cercanía secuencial (Nearest Neighbor)
+    // Esto evita que el chofer cruce la ciudad de lado a lado (cero zigzags masivos).
+    let sinVisitar = [...centroides];
+    let actual = depotI;
+    const gruposOrdenados = [];
+    
     while (sinVisitar.length) {
       let minD = Infinity, minI = 0;
       sinVisitar.forEach((c, i) => {
         const d = distHaversine(actual.lat, actual.lng, c.lat, c.lng);
         if (d < minD) { minD = d; minI = i; }
       });
-      gruposFinal.push(sinVisitar[minI].grupo);
+      gruposOrdenados.push(sinVisitar[minI].grupo);
       actual = sinVisitar[minI];
       sinVisitar.splice(minI, 1);
     }
-    const seccionesOptimizadas = [];
+
+    // 3. Ruteo interno por colonia
     let puntoEntrada = depotI;
-    gruposFinal.forEach((grupo, gi) => {
-      const puntoBuf = gi < gruposFinal.length - 1
-        ? { lat: gruposFinal[gi+1].reduce((s,p)=>s+p.lat,0)/gruposFinal[gi+1].length,
-            lng: gruposFinal[gi+1].reduce((s,p)=>s+p.lng,0)/gruposFinal[gi+1].length }
+    gruposOrdenados.forEach((grupo, gi) => {
+      const puntoSalida = gi < gruposOrdenados.length - 1
+        ? { lat: gruposOrdenados[gi+1].reduce((s,p)=>s+p.lat,0)/gruposOrdenados[gi+1].length,
+            lng: gruposOrdenados[gi+1].reduce((s,p)=>s+p.lng,0)/gruposOrdenados[gi+1].length }
         : depotF;
-      const opt = cheapestInsertion(grupo, puntoEntrada, puntoBuf);
-      seccionesOptimizadas.push(...opt);
-      if (opt.length) puntoEntrada = opt[opt.length - 1];
+        
+      // Deshace los nudos y cruces DENTRO de la colonia
+      let optLocal = cheapestInsertion(grupo, puntoEntrada, puntoSalida);
+      optLocal = twoOptLineal(optLocal, puntoEntrada, puntoSalida); 
+      
+      ruta.push(...optLocal);
+      if (optLocal.length) puntoEntrada = optLocal[optLocal.length - 1];
     });
-    paradaOrdenada = seccionesOptimizadas;
+    
+    // 4. Suavizado final de costuras
+    // Solo quitamos cruces mínimos entre las fronteras de las colonias
+    ruta = twoOptLineal(ruta, depotI, depotF);
   }
+
+  // FASE 3 ELIMINADA: Ya no comparamos con el algoritmo global para proteger el ruteo por colonias.
+
+  return ruta;
+}
 
   // FASE 2: refinamiento con 3-opt + 2-opt + Or-opt
   // Importante: depotI = anclaInicio y depotF = anclaFin actúan como
