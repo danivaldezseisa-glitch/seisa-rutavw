@@ -2167,84 +2167,99 @@ function optimizarPipeline(paradas, inicio, fin) {
 
 function _optimizarMedio(paradas, inicio, fin) {
   if (!paradas.length) return [];
-  if (paradas.length <= 2) {
-    const d1 = distHaversine(inicio.lat, inicio.lng, paradas[0].lat, paradas[0].lng)
-             + (paradas[1] ? distHaversine(paradas[0].lat, paradas[0].lng, paradas[1].lat, paradas[1].lng) : 0)
-             + (paradas[1] ? distHaversine(paradas[1].lat, paradas[1].lng, fin.lat, fin.lng) : distHaversine(paradas[0].lat, paradas[0].lng, fin.lat, fin.lng));
-    const d2 = paradas[1] ? distHaversine(inicio.lat, inicio.lng, paradas[1].lat, paradas[1].lng)
-             + distHaversine(paradas[1].lat, paradas[1].lng, paradas[0].lat, paradas[0].lng)
-             + distHaversine(paradas[0].lat, paradas[0].lng, fin.lat, fin.lng) : Infinity;
-    return d1 <= d2 ? [...paradas] : [paradas[1], paradas[0]];
-  }
+  if (paradas.length === 1) return [...paradas];
 
-  // 1. CREAR MICRO-ZONAS (Nivel Micro)
-  // Agrupamos de 5 en 5 para que el ahorro de KM actúe solo en corto alcance.
-  const numClusters = Math.max(1, Math.ceil(paradas.length / 5));
-  let grupos = [];
-
-  if (numClusters === 1) {
-    grupos = [{ grupo: paradas, lat: paradas.reduce((s,p)=>s+p.lat,0)/paradas.length, lng: paradas.reduce((s,p)=>s+p.lng,0)/paradas.length }];
-  } else {
-    const asignaciones = kMeansGeo(paradas, numClusters);
-    const gruposTemp = Array.from({length: numClusters}, () => []);
-    paradas.forEach((p, i) => gruposTemp[asignaciones[i]].push(p));
+  // 1. LEER DIRECCIONES: Extraer CP y Colonia de cada parada
+  paradas.forEach(p => {
+    // Buscar un Código Postal de 5 dígitos en el nombre
+    const matchCP = p.nombre.match(/\b\d{5}\b/);
+    p._cp = matchCP ? matchCP[0] : "SIN_CP"; // Agrupa los que no tengan CP juntos
     
-    grupos = gruposTemp.filter(g => g.length > 0).map(g => ({
-      grupo: g,
-      lat: g.reduce((s,p)=>s+p.lat,0)/g.length,
-      lng: g.reduce((s,p)=>s+p.lng,0)/g.length
-    }));
-  }
-
-  // 2. ORDENAR MICRO-ZONAS CON BARRIDO (Nivel Macro)
-  const distCierre = distHaversine(inicio.lat, inicio.lng, fin.lat, fin.lng);
-  
-  if (distCierre > 0.5) { 
-    // Ruta Lineal: Proyectar sobre la flecha de Inicio a Fin
-    const vLat = fin.lat - inicio.lat;
-    const vLng = fin.lng - inicio.lng;
-    const vMag = Math.sqrt(vLat * vLat + vLng * vLng);
-
-    grupos.sort((a, b) => {
-      const projA = ((a.lat - inicio.lat) * vLat + (a.lng - inicio.lng) * vLng) / vMag;
-      const projB = ((b.lat - inicio.lat) * vLat + (b.lng - inicio.lng) * vLng) / vMag;
-      return projA - projB;
-    });
-  } else {
-    // Circuito: Barrido de reloj
-    let sumLat = 0, sumLng = 0;
-    paradas.forEach(p => { sumLat += p.lat; sumLng += p.lng; });
-    const centroGlobal = { lat: sumLat / paradas.length, lng: sumLng / paradas.length };
-    const anguloInicio = Math.atan2(inicio.lng - centroGlobal.lng, inicio.lat - centroGlobal.lat);
-    
-    grupos.sort((a, b) => {
-      let angA = Math.atan2(a.lng - centroGlobal.lng, a.lat - centroGlobal.lat) - anguloInicio;
-      let angB = Math.atan2(b.lng - centroGlobal.lng, b.lat - centroGlobal.lat) - anguloInicio;
-      if (angA < 0) angA += 2 * Math.PI;
-      if (angB < 0) angB += 2 * Math.PI;
-      return angA - angB;
-    });
-  }
-
-  // 3. CONECTAR Y AHORRAR KILÓMETROS
-  const rutaFinal = [];
-  let puntoEntrada = inicio;
-
-  grupos.forEach((c, i) => {
-    // Apuntamos la salida hacia el siguiente grupo
-    let puntoSalida = fin;
-    if (i < grupos.length - 1) {
-      puntoSalida = { lat: grupos[i+1].lat, lng: grupos[i+1].lng };
-    }
-
-    // Optimizamos por dentro del grupo: ahorra KM sin romper el barrido general
-    let rutaGrupo = cheapestInsertion(c.grupo, puntoEntrada, puntoSalida);
-    rutaGrupo = twoOptLineal(rutaGrupo, puntoEntrada, puntoSalida);
-    
-    rutaFinal.push(...rutaGrupo);
-    if (rutaGrupo.length > 0) puntoEntrada = rutaGrupo[rutaGrupo.length - 1];
+    // Intentar extraer la colonia (generalmente separada por comas)
+    const partes = p.nombre.split(',');
+    p._colonia = partes.length > 1 ? partes[1].trim().toUpperCase() : "GENERAL";
   });
 
+  // 2. AGRUPAR LA CARGA: Armar cajas por CP, y dentro de ellas, sub-cajas por Colonia
+  const almacenes = {};
+  paradas.forEach(p => {
+    if (!almacenes[p._cp]) almacenes[p._cp] = {};
+    if (!almacenes[p._cp][p._colonia]) almacenes[p._cp][p._colonia] = [];
+    almacenes[p._cp][p._colonia].push(p);
+  });
+
+  // 3. SECUENCIA LÓGICA (Simulación humana)
+  const rutaFinal = [];
+  let actual = inicio; // Arrancamos desde el ancla de inicio (tu primer tiro)
+  
+  let cpsPendientes = Object.keys(almacenes);
+
+  // PASO A: Ir al Código Postal más cercano
+  while (cpsPendientes.length > 0) {
+    let mejorCP = null;
+    let minDistCP = Infinity;
+
+    cpsPendientes.forEach(cp => {
+      // Calculamos un centro aproximado del Código Postal
+      let sumLat = 0, sumLng = 0, count = 0;
+      Object.values(almacenes[cp]).forEach(col => {
+        col.forEach(p => { sumLat += p.lat; sumLng += p.lng; count++; });
+      });
+      const d = distHaversine(actual.lat, actual.lng, sumLat/count, sumLng/count);
+      if (d < minDistCP) { minDistCP = d; mejorCP = cp; }
+    });
+
+    const coloniasObj = almacenes[mejorCP];
+    let coloniasPendientes = Object.keys(coloniasObj);
+
+    // PASO B: Dentro de ese CP, ir a la Colonia más cercana
+    while (coloniasPendientes.length > 0) {
+      let mejorCol = null;
+      let minDistCol = Infinity;
+
+      coloniasPendientes.forEach(col => {
+        const arr = coloniasObj[col];
+        const cLat = arr.reduce((s, p) => s + p.lat, 0) / arr.length;
+        const cLng = arr.reduce((s, p) => s + p.lng, 0) / arr.length;
+        const d = distHaversine(actual.lat, actual.lng, cLat, cLng);
+        if (d < minDistCol) { minDistCol = d; mejorCol = col; }
+      });
+
+      let puntosCalle = coloniasObj[mejorCol];
+
+      // PASO C: Dentro de la Colonia, ir punto por punto a la calle más cercana (Tiro a tiro)
+      while (puntosCalle.length > 0) {
+        let mejorP = null;
+        let mejorPIdx = -1;
+        let minDistP = Infinity;
+
+        puntosCalle.forEach((p, idx) => {
+          const d = distHaversine(actual.lat, actual.lng, p.lat, p.lng);
+          if (d < minDistP) { minDistP = d; mejorP = p; mejorPIdx = idx; }
+        });
+
+        // Hacemos el tiro y actualizamos nuestra posición
+        rutaFinal.push(mejorP);
+        actual = mejorP;
+        puntosCalle.splice(mejorPIdx, 1);
+      }
+      
+      // Terminamos esta colonia, la tachamos de la lista
+      coloniasPendientes = coloniasPendientes.filter(c => c !== mejorCol);
+    }
+
+    // Terminamos este CP completo, lo tachamos de la lista y vamos al siguiente CP
+    cpsPendientes = cpsPendientes.filter(c => c !== mejorCP);
+  }
+
+  // 4. LIMPIEZA: Quitamos las etiquetas temporales para no ensuciar tu base de datos
+  rutaFinal.forEach(p => { 
+    delete p._cp; 
+    delete p._colonia; 
+  });
+
+  // Nota: El "Primer Tiro" y "Último Tiro" ya están garantizados y anclados 
+  // en la función externa (optimizarPipeline) que llama a esta.
   return rutaFinal;
 }
 
