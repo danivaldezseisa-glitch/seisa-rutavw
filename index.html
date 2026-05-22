@@ -2516,7 +2516,10 @@ function abrirGoogleMaps() {
   const pendientes = ruta.paradas.filter(p => !p.hecha && !p.fallida);
 
   if (!inicio || !fin) { showToast('Sin puntos de inicio/fin'); return; }
-  const enc = (p) => encodeURIComponent(p.lat + ',' + p.lng);
+  // Coordenada normal para inicio/fin
+  const enc    = (p) => encodeURIComponent(p.lat + ',' + p.lng);
+  // Paradas con sufijo ",r" → Google Maps llega por el lado derecho de la calle
+  const encDer = (p) => encodeURIComponent(p.lat + ',' + p.lng + ',r');
   const MAX_WP = 23;
   let wpsArr = pendientes.slice(0, MAX_WP);
 
@@ -2526,10 +2529,10 @@ function abrirGoogleMaps() {
     return;
   }
 
-  const wps = wpsArr.map(enc).join('/');
+  const wps = wpsArr.map(encDer).join('/');
   const url = 'https://www.google.com/maps/dir/' + enc(inicio) + '/' + wps + '/' + enc(fin);
   window.open(url, '_blank');
-  showToast('🗺️ Abriendo ' + wpsArr.length + ' paradas pendientes...');
+  showToast('🗺️ ' + wpsArr.length + ' paradas · lado derecho ▶');
 }
 
 function reoptimizarPendientes() {
