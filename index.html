@@ -1745,22 +1745,10 @@ function eliminarParada(id) {
 // ══════════════════════════════════════════════════════════════════
 //  OPTIMIZAR RUTA — Nearest Neighbor + 2-opt
 // ══════════════════════════════════════════════════════════════════
-function nearestNeighbor(paradas, inicio) {
-  let sinVisitar = [...paradas];
-  let actual = inicio || sinVisitar[0];
-  let ordenadas = [];
-  while (sinVisitar.length) {
-    let minDist = Infinity, minIdx = 0;
-    sinVisitar.forEach((p, i) => {
-      const d = distHaversine(actual.lat, actual.lng, p.lat, p.lng);
-      if (d < minDist) { minDist = d; minIdx = i; }
-    });
-    ordenadas.push(sinVisitar[minIdx]);
-    actual = sinVisitar[minIdx];
-    sinVisitar.splice(minIdx, 1);
-  }
-  return ordenadas;
-}
+// ══════════════════════════════════════════════════════════════════
+//  MOTOR DE OPTIMIZACIÓN v2 — Multi-start NN + 2-opt edge-delta + Or-opt
+//  Produce circuitos sin zigzag y minimiza km reales de traslado
+// ══════════════════════════════════════════════════════════════════
 
 function calcDistRuta(paradas, inicio, fin) {
   const puntos = [inicio, ...paradas, fin].filter(Boolean);
@@ -1770,26 +1758,103 @@ function calcDistRuta(paradas, inicio, fin) {
   return d;
 }
 
+// Nearest Neighbor desde un punto de inicio dado
+function nearestNeighborDesde(paradas, inicio) {
+  let sinVisitar = [...paradas];
+  let actual = inicio;
+  let ordenadas = [];
+  while (sinVisitar.length) {
+    let minDist = Infinity, minIdx = 0;
+    for (let i = 0; i < sinVisitar.length; i++) {
+      const d = distHaversine(actual.lat, actual.lng, sinVisitar[i].lat, sinVisitar[i].lng);
+      if (d < minDist) { minDist = d; minIdx = i; }
+    }
+    ordenadas.push(sinVisitar[minIdx]);
+    actual = sinVisitar[minIdx];
+    sinVisitar.splice(minIdx, 1);
+  }
+  return ordenadas;
+}
+
+// Multi-start NN: prueba desde cada parada como inicio y queda con la mejor
+function nearestNeighbor(paradas, inicio) {
+  if (paradas.length <= 2) return [...paradas];
+  let mejor = nearestNeighborDesde(paradas, inicio);
+  let mejorDist = calcDistRuta(mejor, inicio, inicio);
+  const semillas = paradas.length <= 12 ? paradas : paradas.filter((_, i) => i % Math.ceil(paradas.length / 12) === 0);
+  for (const semilla of semillas) {
+    const candidato = nearestNeighborDesde(paradas, semilla);
+    const dist = calcDistRuta(candidato, inicio, inicio);
+    if (dist < mejorDist) { mejorDist = dist; mejor = candidato; }
+  }
+  return mejor;
+}
+
+// 2-opt con calculo de delta por aristas (mucho mas rapido)
 function twoOpt(paradas, inicio, fin) {
-  let ruta = [...paradas];
+  if (paradas.length < 4) return [...paradas];
+  const refInicio = inicio || paradas[0];
+  const refFin    = fin    || paradas[0];
+  const puntos = [refInicio, ...paradas, refFin];
+  const n = puntos.length;
+  let ruta = puntos.map((_, i) => i);
   let mejorado = true;
-  let iteraciones = 0;
-  const MAX_ITER = 200;
-  while (mejorado && iteraciones < MAX_ITER) {
-    mejorado = false;
-    iteraciones++;
-    for (let i = 0; i < ruta.length - 1; i++) {
-      for (let j = i + 1; j < ruta.length; j++) {
-        const antes  = calcDistRuta(ruta, inicio, fin);
-        const nueva  = [...ruta.slice(0, i), ...ruta.slice(i, j + 1).reverse(), ...ruta.slice(j + 1)];
-        const despues = calcDistRuta(nueva, inicio, fin);
-        if (despues < antes - 0.01) {
-          ruta = nueva;
+  let iter = 0;
+  while (mejorado && iter < 150) {
+    mejorado = false; iter++;
+    for (let i = 1; i < n - 2; i++) {
+      for (let j = i + 1; j < n - 1; j++) {
+        const a = puntos[ruta[i-1]], b = puntos[ruta[i]];
+        const c = puntos[ruta[j]],  d = puntos[ruta[j+1]];
+        const antes   = distHaversine(a.lat, a.lng, b.lat, b.lng)
+                      + distHaversine(c.lat, c.lng, d.lat, d.lng);
+        const despues = distHaversine(a.lat, a.lng, c.lat, c.lng)
+                      + distHaversine(b.lat, b.lng, d.lat, d.lng);
+        if (despues < antes - 0.001) {
+          let l = i, r = j;
+          while (l < r) { [ruta[l], ruta[r]] = [ruta[r], ruta[l]]; l++; r--; }
           mejorado = true;
         }
       }
     }
   }
+  return ruta.slice(1, n - 1).map(i => puntos[i]);
+}
+
+// Or-opt: reubica segmentos de 1-3 paradas en la mejor posicion
+function orOpt(paradas, inicio, fin) {
+  if (paradas.length < 4) return [...paradas];
+  let ruta = [...paradas];
+  let mejorado = true;
+  let iter = 0;
+  while (mejorado && iter < 80) {
+    mejorado = false; iter++;
+    outer:
+    for (let segLen = 1; segLen <= Math.min(3, ruta.length - 2); segLen++) {
+      for (let i = 0; i < ruta.length - segLen + 1; i++) {
+        const seg    = ruta.slice(i, i + segLen);
+        const sinSeg = [...ruta.slice(0, i), ...ruta.slice(i + segLen)];
+        const distBase = calcDistRuta(ruta, inicio, fin);
+        for (let j = 0; j <= sinSeg.length; j++) {
+          const nueva = [...sinSeg.slice(0, j), ...seg, ...sinSeg.slice(j)];
+          if (calcDistRuta(nueva, inicio, fin) < distBase - 0.001) {
+            ruta = nueva; mejorado = true; break outer;
+          }
+        }
+      }
+    }
+  }
+  return ruta;
+}
+
+// Pipeline completo
+function optimizarPipeline(paradas, inicio, fin) {
+  if (!paradas.length) return [];
+  if (paradas.length === 1) return [...paradas];
+  let ruta = nearestNeighbor(paradas, inicio);
+  if (ruta.length >= 4) ruta = twoOpt(ruta, inicio, fin);
+  if (ruta.length >= 4) ruta = orOpt(ruta, inicio, fin);
+  if (ruta.length >= 4) ruta = twoOpt(ruta, inicio, fin);
   return ruta;
 }
 
@@ -1800,22 +1865,14 @@ function optimizarRuta() {
   const inicio = rutaBuild.inicio || rutaBuild.paradas[0];
   const fin    = rutaBuild.final  || rutaBuild.inicio || rutaBuild.paradas[0];
 
-  // Paso 1: Nearest Neighbor para ruta inicial
-  let ordenadas = nearestNeighbor(rutaBuild.paradas, inicio);
-
-  // Paso 2: 2-opt para eliminar cruces y minimizar km totales en circuito
-  if (ordenadas.length >= 3) {
-    ordenadas = twoOpt(ordenadas, inicio, fin);
-  }
-
+  const ordenadas = optimizarPipeline(rutaBuild.paradas, inicio, fin);
   rutaBuild.paradas = ordenadas;
 
-  // Calcular km reales con factor urbano
-  let kmTotal = calcDistRuta(ordenadas, rutaBuild.inicio, rutaBuild.final) * 1.35;
+  let kmTotal = calcDistRuta(ordenadas, rutaBuild.inicio, rutaBuild.final) * 1.3;
   rutaBuild.kmTotal = Math.round(kmTotal * 10) / 10;
 
-  const minManejo  = Math.round((kmTotal / 35) * 60);
-  const minParadas = ordenadas.length * 9;
+  const minManejo  = Math.round((kmTotal / 28) * 60);
+  const minParadas = ordenadas.length * 8;
   rutaBuild.tiempoMin = minManejo + minParadas;
 
   const ahora = new Date();
@@ -2230,8 +2287,7 @@ function reoptimizarPendientes() {
 
   const hechas = ruta.paradas.filter(p => p.hecha || p.fallida);
   const actualPunto = hechas.length ? hechas[hechas.length - 1] : ruta.inicio;
-  let ordenadas = nearestNeighbor(pendientes, actualPunto);
-  if (ordenadas.length >= 3) ordenadas = twoOpt(ordenadas, actualPunto, ruta.final);
+  const ordenadas = optimizarPipeline(pendientes, actualPunto, ruta.final);
 
   ruta.paradas = [...hechas, ...ordenadas];
   saveState();
@@ -2399,8 +2455,7 @@ function confirmarAgregarParadaSeg(reoptimizar) {
   if (reoptimizar) {
     pendientes.push(nuevaParada);
     const puntoActual = hechas.length ? hechas[hechas.length - 1] : ruta.inicio;
-    let ordenadas = nearestNeighbor(pendientes, puntoActual);
-    if (ordenadas.length >= 3) ordenadas = twoOpt(ordenadas, puntoActual, ruta.final);
+    const ordenadas = optimizarPipeline(pendientes, puntoActual, ruta.final);
     ruta.paradas = [...hechas, ...ordenadas];
     showToast('⚡ Parada agregada y ruta re-optimizada');
   } else {
