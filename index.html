@@ -94,6 +94,10 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
 .parada-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .parada-sub  { font-size: 11px; color: var(--text3); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
+/* ── SEGUIMIENTO SCROLL ── */
+#screen-seguimiento { display: flex; flex-direction: column; }
+#screen-seguimiento .scroll { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; }
+
 /* ── NAV SCREEN ── */
 #nav-map { position: absolute; inset: 0; z-index: 1; }
 #nav-panel { position: absolute; bottom: 0; left: 0; right: 0; z-index: 100; padding: 0 12px calc(env(safe-area-inset-bottom,0px) + 12px); }
@@ -322,44 +326,52 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
 <div class="screen hidden" id="screen-resumen">
   <div class="topbar">
     <button class="topbar-back" onclick="showScreen('screen-paradas')">←</button>
-    <h2>📊 Resumen de Ruta</h2>
+    <h2>📊 Resumen</h2>
+    <span id="res-paradas-count" style="font-size:12px;color:var(--accent);font-weight:700;"></span>
   </div>
-  <div class="scroll" style="padding:16px;display:flex;flex-direction:column;gap:12px;">
 
-    <!-- Métricas -->
-    <div class="card" style="display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--border);padding:0;overflow:hidden;">
-      <div style="padding:16px;background:var(--surface);text-align:center;">
-        <div style="font-size:28px;font-weight:800;color:var(--accent);font-family:var(--mono);" id="res-km">—</div>
-        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;margin-top:3px;">Kilómetros</div>
+  <!-- Mapa de la ruta completa con Leaflet -->
+  <div id="res-map" style="height:220px;flex-shrink:0;position:relative;background:var(--surface2);border-bottom:1px solid var(--border);">
+    <div id="res-map-loading" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;z-index:10;background:var(--surface2);">
+      <div style="font-size:28px;">🗺️</div>
+      <div style="font-size:13px;color:var(--text3);">Trazando ruta...</div>
+    </div>
+  </div>
+
+  <div class="scroll" style="padding:12px 14px;display:flex;flex-direction:column;gap:10px;">
+
+    <!-- Métricas compactas -->
+    <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
+      <div class="card" style="padding:10px 4px;text-align:center;">
+        <div style="font-size:18px;font-weight:800;color:var(--accent);font-family:var(--mono);" id="res-km">—</div>
+        <div style="font-size:9px;color:var(--text3);text-transform:uppercase;margin-top:2px;">km</div>
       </div>
-      <div style="padding:16px;background:var(--surface);text-align:center;">
-        <div style="font-size:28px;font-weight:800;color:var(--green);font-family:var(--mono);" id="res-paradas">—</div>
-        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;margin-top:3px;">Paradas</div>
+      <div class="card" style="padding:10px 4px;text-align:center;">
+        <div style="font-size:18px;font-weight:800;color:var(--green);font-family:var(--mono);" id="res-paradas">—</div>
+        <div style="font-size:9px;color:var(--text3);text-transform:uppercase;margin-top:2px;">paradas</div>
       </div>
-      <div style="padding:16px;background:var(--surface);text-align:center;">
-        <div style="font-size:28px;font-weight:800;color:var(--yellow);font-family:var(--mono);" id="res-tiempo">—</div>
-        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;margin-top:3px;">Hrs trabajo aprox</div>
+      <div class="card" style="padding:10px 4px;text-align:center;">
+        <div style="font-size:18px;font-weight:800;color:var(--yellow);font-family:var(--mono);" id="res-tiempo">—</div>
+        <div style="font-size:9px;color:var(--text3);text-transform:uppercase;margin-top:2px;">hrs trab.</div>
       </div>
-      <div style="padding:16px;background:var(--surface);text-align:center;">
-        <div style="font-size:22px;font-weight:800;color:var(--orange);font-family:var(--mono);" id="res-fin">—</div>
-        <div style="font-size:11px;color:var(--text3);text-transform:uppercase;margin-top:3px;">Hora aprox fin</div>
+      <div class="card" style="padding:10px 4px;text-align:center;">
+        <div style="font-size:14px;font-weight:800;color:var(--orange);font-family:var(--mono);" id="res-fin">—</div>
+        <div style="font-size:9px;color:var(--text3);text-transform:uppercase;margin-top:2px;">hora fin</div>
       </div>
     </div>
 
-    <!-- Orden de paradas -->
+    <!-- Lista con ETAs -->
     <div class="card" style="padding:0;overflow:hidden;">
-      <div style="padding:12px 14px;border-bottom:1px solid var(--border);font-size:12px;font-weight:700;color:var(--text3);text-transform:uppercase;">Orden optimizado</div>
+      <div style="padding:10px 14px;border-bottom:1px solid var(--border);font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;display:flex;justify-content:space-between;">
+        <span>Orden optimizado</span>
+      </div>
       <div id="res-orden-list"></div>
     </div>
 
-    <!-- Botón iniciar -->
-    <button class="btn btn-green" onclick="iniciarRuta()" style="font-size:18px;padding:20px;">
-      🚀 Iniciar Ruta
+    <button class="btn btn-green" onclick="iniciarRuta()" style="font-size:17px;padding:18px;gap:10px;">
+      <span style="font-size:20px;">🚀</span> Iniciar en Google Maps
     </button>
-
-    <button class="btn btn-ghost" onclick="showScreen('screen-paradas')">
-      ← Editar paradas
-    </button>
+    <button class="btn btn-ghost" onclick="showScreen('screen-paradas')">← Editar paradas</button>
   </div>
 </div>
 
@@ -817,9 +829,12 @@ function showScreen(id) {
   const target = document.getElementById(id);
   if (target) {
     target.classList.remove('hidden');
-    // Inicializar mapas cuando se muestran
+    currentScreen = id;
     if (id === 'screen-paradas') initMapaParadas();
     if (id === 'screen-nav')     initMapaNav();
+    if (id === 'screen-resumen') setTimeout(function() {
+      if (mapResumen) { mapResumen.invalidateSize(); trazarRutaResumen(); }
+    }, 150);
   }
 }
 
@@ -1525,52 +1540,93 @@ function eliminarParada(id) {
 }
 
 // ══════════════════════════════════════════════════════════════════
-//  OPTIMIZAR RUTA (nearest neighbor desde inicio)
+//  OPTIMIZAR RUTA — Nearest Neighbor + 2-opt
 // ══════════════════════════════════════════════════════════════════
-function optimizarRuta() {
-  if (!rutaBuild.paradas.length) return;
-  showToast('⚡ Optimizando...');
+function calcularDistRuta(paradas, inicio, fin) {
+  const puntos = [inicio, ...paradas, fin].filter(Boolean);
+  let d = 0;
+  for (let i = 0; i < puntos.length - 1; i++)
+    d += distHaversine(puntos[i].lat, puntos[i].lng, puntos[i+1].lat, puntos[i+1].lng);
+  return d;
+}
 
-  // Nearest neighbor desde el punto de inicio
-  let sinVisitar = [...rutaBuild.paradas];
-  let actual = rutaBuild.inicio || sinVisitar[0];
-  let ordenadas = [];
-
+function nearestNeighbor(paradas, inicio) {
+  let sinVisitar = [...paradas];
+  let actual = inicio || sinVisitar[0];
+  let resultado = [];
   while (sinVisitar.length) {
     let minDist = Infinity, minIdx = 0;
     sinVisitar.forEach((p, i) => {
       const d = distHaversine(actual.lat, actual.lng, p.lat, p.lng);
       if (d < minDist) { minDist = d; minIdx = i; }
     });
-    ordenadas.push(sinVisitar[minIdx]);
+    resultado.push(sinVisitar[minIdx]);
     actual = sinVisitar[minIdx];
     sinVisitar.splice(minIdx, 1);
+  }
+  return resultado;
+}
+
+// 2-opt: mejora la ruta intercambiando segmentos hasta que no mejore más
+function twoOpt(paradas, inicio, fin) {
+  let mejor = [...paradas];
+  let mejorado = true;
+  let iteraciones = 0;
+  const MAX_ITER = 200;
+  while (mejorado && iteraciones < MAX_ITER) {
+    mejorado = false;
+    iteraciones++;
+    for (let i = 0; i < mejor.length - 1; i++) {
+      for (let j = i + 2; j < mejor.length; j++) {
+        // Intercambiar segmento [i+1..j]
+        const nueva = [
+          ...mejor.slice(0, i + 1),
+          ...mejor.slice(i + 1, j + 1).reverse(),
+          ...mejor.slice(j + 1)
+        ];
+        if (calcularDistRuta(nueva, inicio, fin) < calcularDistRuta(mejor, inicio, fin) - 0.0001) {
+          mejor = nueva;
+          mejorado = true;
+        }
+      }
+    }
+  }
+  return mejor;
+}
+
+function optimizarRuta() {
+  if (!rutaBuild.paradas.length) return;
+  showToast('⚡ Optimizando ruta...');
+
+  // Paso 1: Nearest Neighbor para solución inicial
+  let ordenadas = nearestNeighbor(rutaBuild.paradas, rutaBuild.inicio);
+
+  // Paso 2: 2-opt para mejorar (solo si hay más de 3 paradas, máx 30 para no bloquear UI)
+  if (ordenadas.length > 2 && ordenadas.length <= 30) {
+    ordenadas = twoOpt(ordenadas, rutaBuild.inicio, rutaBuild.final);
   }
 
   rutaBuild.paradas = ordenadas;
 
-  // Calcular km y tiempo total
-  // Calcular km reales (haversine * factor de ruta)
-  let kmTotal = 0;
+  // Distancia haversine total × 1.25 (factor de calles reales)
   const puntos = [rutaBuild.inicio, ...ordenadas, rutaBuild.final].filter(Boolean);
-  for (let i = 0; i < puntos.length - 1; i++) {
-    kmTotal += distHaversine(puntos[i].lat, puntos[i].lng, puntos[i+1].lat, puntos[i+1].lng) * 1.3;
-  }
+  let kmTotal = 0;
+  for (let i = 0; i < puntos.length - 1; i++)
+    kmTotal += distHaversine(puntos[i].lat, puntos[i].lng, puntos[i+1].lat, puntos[i+1].lng) * 1.25;
   rutaBuild.kmTotal = Math.round(kmTotal * 10) / 10;
 
-  // Tiempo aprox: 30 km/h promedio + 9 min por parada
-  const minManejo = Math.round((kmTotal / 30) * 60);
-  const minParadas = ordenadas.length * 9;
-  rutaBuild.tiempoMin = minManejo + minParadas;
+  // Tiempo: 35 km/h promedio en ciudad + 8 min por parada
+  const minManejo  = Math.round((kmTotal / 35) * 60);
+  const minParadas = ordenadas.length * 8;
+  rutaBuild.tiempoMin  = minManejo + minParadas;
+  rutaBuild.tiempoHrs  = Math.round(rutaBuild.tiempoMin / 6) / 10;
 
-  // Hora estimada de fin
   const ahora = new Date();
-  const fin = new Date(ahora.getTime() + rutaBuild.tiempoMin * 60000);
-  const hh = fin.getHours() % 12 || 12;
-  const mm = String(fin.getMinutes()).padStart(2,'0');
-  const ap = fin.getHours() >= 12 ? 'PM' : 'AM';
-  rutaBuild.horaFin = `${hh}:${mm} ${ap}`;
-  rutaBuild.tiempoHrs = Math.round(rutaBuild.tiempoMin / 6) / 10;
+  const fin2  = new Date(ahora.getTime() + rutaBuild.tiempoMin * 60000);
+  const hh    = fin2.getHours() % 12 || 12;
+  const mm    = String(fin2.getMinutes()).padStart(2,'0');
+  const ap    = fin2.getHours() >= 12 ? 'PM' : 'AM';
+  rutaBuild.horaFin = hh + ':' + mm + ' ' + ap;
 
   renderResumen();
   showScreen('screen-resumen');
@@ -1584,19 +1640,104 @@ function distHaversine(lat1, lng1, lat2, lng2) {
   return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
 }
 
+let mapResumen = null;
+let resMarkers = [];
+let resPolyline = null;
+
 function renderResumen() {
   document.getElementById('res-km').textContent      = rutaBuild.kmTotal + ' km';
   document.getElementById('res-paradas').textContent = rutaBuild.paradas.length;
   document.getElementById('res-tiempo').textContent  = rutaBuild.tiempoHrs + ' hrs';
   document.getElementById('res-fin').textContent     = rutaBuild.horaFin;
+  const cntEl = document.getElementById('res-paradas-count');
+  if (cntEl) cntEl.textContent = rutaBuild.paradas.length + ' paradas';
 
-  document.getElementById('res-orden-list').innerHTML = rutaBuild.paradas.map((p, i) => `
-    <div class="parada-item">
-      <div class="parada-num" style="background:rgba(0,212,255,.12);color:var(--accent);border:1px solid rgba(0,212,255,.25);">${i+1}</div>
-      <div class="parada-info">
-        <div class="parada-name">${p.nombre}</div>
-      </div>
-    </div>`).join('');
+  // Lista de paradas con ETA
+  const lista = document.getElementById('res-orden-list');
+  lista.innerHTML = '';
+  const ahora = new Date();
+  const MINS_POR_PARADA = 8;
+
+  if (rutaBuild.inicio) {
+    const d = document.createElement('div');
+    d.className = 'parada-item';
+    d.style.cssText = 'background:rgba(0,230,118,.05);border-left:3px solid var(--green);';
+    d.innerHTML = '<div class="parada-num" style="background:rgba(0,230,118,.15);color:var(--green);border:1px solid rgba(0,230,118,.3);font-size:14px;">&#127968;</div>' +
+      '<div class="parada-info"><div class="parada-name"></div><div class="parada-sub" style="color:var(--green);">Inicio &middot; ' + fmtHora(ahora) + '</div></div>';
+    d.querySelector('.parada-name').textContent = rutaBuild.inicio.nombre;
+    lista.appendChild(d);
+  }
+
+  let distAcum = 0;
+  let prevPunto = rutaBuild.inicio;
+  rutaBuild.paradas.forEach(function(p, i) {
+    if (prevPunto) distAcum += distHaversine(prevPunto.lat, prevPunto.lng, p.lat, p.lng) * 1.25;
+    prevPunto = p;
+    const minsViaje   = Math.round((distAcum / 35) * 60);
+    const minsParadas = i * MINS_POR_PARADA;
+    const eta = new Date(ahora.getTime() + (minsViaje + minsParadas) * 60000);
+    const d = document.createElement('div');
+    d.className = 'parada-item';
+    d.innerHTML = '<div class="parada-num" style="background:rgba(0,212,255,.12);color:var(--accent);border:1px solid rgba(0,212,255,.25);">' + (i+1) + '</div>' +
+      '<div class="parada-info"><div class="parada-name"></div><div class="parada-sub">~' + MINS_POR_PARADA + ' min &middot; ETA: ' + fmtHora(eta) + '</div></div>' +
+      '<div style="font-size:12px;color:var(--accent);flex-shrink:0;font-family:var(--mono);font-weight:700;margin-left:6px;">' + fmtHora(eta) + '</div>';
+    d.querySelector('.parada-name').textContent = p.nombre;
+    lista.appendChild(d);
+  });
+
+  if (rutaBuild.final) {
+    const d = document.createElement('div');
+    d.className = 'parada-item';
+    d.style.cssText = 'background:rgba(255,145,0,.05);border-left:3px solid var(--orange);';
+    d.innerHTML = '<div class="parada-num" style="background:rgba(255,145,0,.15);color:var(--orange);border:1px solid rgba(255,145,0,.3);font-size:14px;">&#127937;</div>' +
+      '<div class="parada-info"><div class="parada-name"></div><div class="parada-sub" style="color:var(--orange);">Base &middot; fin ' + (rutaBuild.horaFin || '&#8212;') + '</div></div>';
+    d.querySelector('.parada-name').textContent = rutaBuild.final.nombre;
+    lista.appendChild(d);
+  }
+
+  // Dibujar mapa Leaflet
+  setTimeout(function() { trazarRutaResumen(); }, 200);
+}
+
+function trazarRutaResumen() {
+  const el = document.getElementById('res-map');
+  if (!el) return;
+  const loading = document.getElementById('res-map-loading');
+
+  if (!mapResumen) {
+    const centro = rutaBuild.inicio
+      ? [rutaBuild.inicio.lat, rutaBuild.inicio.lng]
+      : [19.4326, -99.1332];
+    mapResumen = L.map('res-map', { zoomControl: false, attributionControl: false }).setView(centro, 12);
+    L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+      maxZoom: 19, subdomains: 'abcd'
+    }).addTo(mapResumen);
+  }
+  mapResumen.invalidateSize();
+
+  resMarkers.forEach(function(m) { m.remove(); }); resMarkers = [];
+  if (resPolyline) { resPolyline.remove(); resPolyline = null; }
+
+  const puntos = [rutaBuild.inicio].concat(rutaBuild.paradas).concat([rutaBuild.final]).filter(Boolean);
+  if (!puntos.length) { if (loading) loading.style.display = 'none'; return; }
+
+  const coords = puntos.map(function(p) { return [p.lat, p.lng]; });
+  resPolyline = L.polyline(coords, { color: '#00d4ff', weight: 3, opacity: 0.85, dashArray: '6,4' }).addTo(mapResumen);
+
+  puntos.forEach(function(p, i) {
+    var size = 26, bg, txt;
+    if (i === 0)                                          { bg = '#00e676'; txt = '&#127968;'; }
+    else if (i === puntos.length - 1 && rutaBuild.final) { bg = '#ff9100'; txt = '&#127937;'; }
+    else                                                  { bg = '#00d4ff'; txt = String(i);  }
+    var html = '<div style="width:' + size + 'px;height:' + size + 'px;border-radius:50%;background:' + bg + ';border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#000;">' + txt + '</div>';
+    var m = L.marker([p.lat, p.lng], {
+      icon: L.divIcon({ html: html, className: '', iconSize: [size, size], iconAnchor: [size/2, size/2] })
+    }).addTo(mapResumen);
+    resMarkers.push(m);
+  });
+
+  mapResumen.fitBounds(L.latLngBounds(coords), { padding: [20, 20] });
+  if (loading) loading.style.display = 'none';
 }
 
 // ══════════════════════════════════════════════════════════════════
