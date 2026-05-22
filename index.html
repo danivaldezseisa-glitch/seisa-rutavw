@@ -2000,26 +2000,69 @@ function ordenarClustersCircular(clusters, depot) {
 // zona → unir en secuencia → refinamiento global 3-opt + Or-opt
 function optimizarPipeline(paradas, inicio, fin) {
   if (!paradas.length) return [];
-  if (paradas.length <= 2) return [...paradas];
+  if (paradas.length === 1) return [...paradas];
 
   const depotI = inicio || paradas[0];
   const depotF = fin    || depotI;
 
+  // ═══════════════════════════════════════════════════════════
+  // ANCLAS FIJAS: primer tiro = más cercano al inicio
+  //               último tiro = más cercano al fin (base)
+  // Las anclas quedan fijas; el medio se optimiza libremente
+  // ═══════════════════════════════════════════════════════════
+
+  // 1. Encontrar la parada más cercana al punto de inicio → ancla inicial
+  let idxPrimero = 0, minDI = Infinity;
+  paradas.forEach((p, i) => {
+    const d = distHaversine(depotI.lat, depotI.lng, p.lat, p.lng);
+    if (d < minDI) { minDI = d; idxPrimero = i; }
+  });
+  const anclaInicio = paradas[idxPrimero];
+  let restantes = paradas.filter((_, i) => i !== idxPrimero);
+
+  // 2. Encontrar la parada más cercana al punto final → ancla final
+  //    (buscar entre las restantes, no la misma que la primera)
+  let idxUltimo = 0, minDF = Infinity;
+  restantes.forEach((p, i) => {
+    const d = distHaversine(depotF.lat, depotF.lng, p.lat, p.lng);
+    if (d < minDF) { minDF = d; idxUltimo = i; }
+  });
+  const anclaFin = restantes.length ? restantes[idxUltimo] : null;
+  const medio = anclaFin ? restantes.filter((_, i) => i !== idxUltimo) : [];
+
+  // Si solo hay 2 paradas, ya están fijas
+  if (!medio.length) {
+    return anclaFin ? [anclaInicio, anclaFin] : [anclaInicio];
+  }
+
+  // 3. Optimizar las paradas del medio entre las dos anclas
+  //    usando el pipeline completo (clustering + 3-opt + or-opt)
+  const medioOptimizado = _optimizarMedio(medio, anclaInicio, anclaFin);
+
+  // 4. Ensamblar: anclaInicio → medio optimizado → anclaFin
+  return [anclaInicio, ...medioOptimizado, anclaFin];
+}
+
+// Pipeline interno para las paradas del medio (sin tocar las anclas)
+function _optimizarMedio(paradas, inicio, fin) {
+  if (!paradas.length) return [];
+  if (paradas.length <= 2) return [...paradas];
+
+  const depotI = inicio;
+  const depotF = fin;
+
   // === FASE 1: Clustering por zonas geográficas ===
-  // Número de clusters: raíz cuadrada del número de paradas (heurística urbana)
   let numClusters = Math.max(2, Math.round(Math.sqrt(paradas.length * 0.7)));
-  if (paradas.length <= 6) numClusters = 1; // pocas paradas: sin clusters
+  if (paradas.length <= 6) numClusters = 1;
 
   let paradaOrdenada;
 
   if (numClusters === 1) {
-    // Sin clustering: optimizar directo
     const rutaCI = cheapestInsertion(paradas, depotI, depotF);
     const rutaNN = nearestNeighborLocal(paradas, depotI);
     paradaOrdenada = calcDistRuta(rutaCI, depotI, depotF) <= calcDistRuta(rutaNN, depotI, depotF)
       ? rutaCI : rutaNN;
   } else {
-    // Asignar clusters con k-means
     const asignaciones = kMeansGeo(paradas, numClusters);
     const gruposMap = {};
     paradas.forEach((p, i) => {
@@ -2028,19 +2071,12 @@ function optimizarPipeline(paradas, inicio, fin) {
       gruposMap[c].push(p);
     });
     const grupos = Object.values(gruposMap);
-
-    // Ordenar los grupos en barrido circular alrededor del depot
-    // → la ruta hace un circuito por zonas sin regresar al centro
     const gruposOrdenados = ordenarClustersCircular(grupos, depotI);
-
-    // Optimizar el orden entre clusters (qué cluster visitar primero)
-    // usando Nearest Neighbor sobre los centroides
     const centroides = gruposOrdenados.map(g => ({
       lat: g.reduce((s,p)=>s+p.lat,0)/g.length,
       lng: g.reduce((s,p)=>s+p.lng,0)/g.length,
       grupo: g
     }));
-    // Greedy sobre centroides para definir el orden de zonas
     let sinVisitar = [...centroides];
     let actual = depotI;
     const gruposFinal = [];
@@ -2054,8 +2090,6 @@ function optimizarPipeline(paradas, inicio, fin) {
       actual = sinVisitar[minI];
       sinVisitar.splice(minI, 1);
     }
-
-    // Dentro de cada cluster, inserción más barata
     const seccionesOptimizadas = [];
     let puntoEntrada = depotI;
     gruposFinal.forEach((grupo, gi) => {
@@ -2070,11 +2104,10 @@ function optimizarPipeline(paradas, inicio, fin) {
     paradaOrdenada = seccionesOptimizadas;
   }
 
-  // === FASE 2: Refinamiento global — 3-opt elimina cruces entre zonas ===
-  let ruta = paradaOrdenada;
-  ruta = threeOpt(ruta, depotI, depotF);
+  // === FASE 2: 3-opt global ===
+  let ruta = threeOpt(paradaOrdenada, depotI, depotF);
 
-  // === FASE 3: Or-opt con segmentos de 1-3 + inversión ===
+  // === FASE 3: 2-opt + Or-opt iterados ===
   let distAnterior = Infinity;
   for (let round = 0; round < 5; round++) {
     ruta = twoOptLineal(ruta, depotI, depotF);
@@ -2084,7 +2117,7 @@ function optimizarPipeline(paradas, inicio, fin) {
     distAnterior = distActual;
   }
 
-  // === FASE 4: Comparar contra Cheapest Insertion global como seguro ===
+  // === FASE 4: Seguro contra Cheapest Insertion global ===
   const rutaCIGlobal = cheapestInsertion(paradas, depotI, depotF);
   let rutaBase2opt = twoOptLineal(rutaCIGlobal, depotI, depotF);
   rutaBase2opt = orOptDelta(rutaBase2opt, depotI, depotF);
