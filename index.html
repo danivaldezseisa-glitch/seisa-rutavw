@@ -1252,7 +1252,7 @@ async function resolverPlusCode(input) {
     for (const q of queries) {
       const url = 'https://nominatim.openstreetmap.org/search?' +
         q + '&format=json&limit=5&accept-language=es&addressdetails=1';
-      const res  = await fetch(url, { headers: { 'User-Agent': 'SEISA-App/1.0' } });
+      const res  = await fetch(url, { headers: { 'User-Agent': 'SEISA-App/1.0' }, signal: AbortSignal.timeout(6000) });
       const data = await res.json();
       if (!data.length) continue;
 
@@ -1292,7 +1292,7 @@ async function resolverPlusCode(input) {
 async function nominatimReverse(lat, lng) {
   try {
     const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=es&zoom=18`;
-    const r = await fetch(url, { headers: { 'User-Agent': 'SEISA-App/1.0' } });
+    const r = await fetch(url, { headers: { 'User-Agent': 'SEISA-App/1.0' }, signal: AbortSignal.timeout(5000) });
     const d = await r.json();
     const a = d.address || {};
     const calle  = a.road || a.pedestrian || a.path || '';
@@ -1422,9 +1422,38 @@ async function resolverPlusCodeUI() {
       });
     }
 
-    // ── Fallback: OLC + Nominatim ─────────────────────────────────────
+    // ── Fallback 1: Google Geocoding REST (no SDK, siempre disponible) ──────
+    if (!result && window.GOOGLE_API_KEY) {
+      try {
+        const parsed2 = parsearLineaPlusCode(raw);
+        const query2  = parsed2 ? parsed2.plusCode + ' ' + parsed2.ciudad : raw;
+        const url2 = 'https://maps.googleapis.com/maps/api/geocode/json'
+          + '?address=' + encodeURIComponent(query2)
+          + '&region=MX&language=es&key=' + window.GOOGLE_API_KEY;
+        const res2  = await fetch(url2, { signal: AbortSignal.timeout(8000) });
+        const data2 = await res2.json();
+        if (data2.status === 'OK' && data2.results[0]) {
+          const loc2 = data2.results[0].geometry.location;
+          const addr2 = data2.results[0].address_components || [];
+          const street2 = addr2.find(c => c.types.includes('route'))?.long_name || '';
+          const num2    = addr2.find(c => c.types.includes('street_number'))?.long_name || '';
+          const parsed2b = parsearLineaPlusCode(raw);
+          const nombreFinal2 = (parsed2b?.nombre && parsed2b.nombre !== parsed2b.plusCode)
+            ? parsed2b.nombre
+            : ([street2, num2].filter(Boolean).join(' ') || data2.results[0].formatted_address.split(',')[0]);
+          result = { lat: loc2.lat, lng: loc2.lng, nombre: nombreFinal2 };
+        }
+      } catch(e2) {
+        console.warn('[PlusCode] Google REST falló:', e2.message);
+      }
+    }
+
+    // ── Fallback 2: OLC + Nominatim (con timeout 8s) ──────────────────────
     if (!result) {
-      result = await resolverPlusCode(raw);
+      result = await Promise.race([
+        resolverPlusCode(raw),
+        new Promise((_r, rej) => setTimeout(() => rej(new Error('timeout')), 8000))
+      ]).catch(e => { console.warn('[PlusCode] Nominatim timeout/error:', e.message); return null; });
     }
 
     document.getElementById('pc-loading').style.display = 'none';
@@ -2596,7 +2625,26 @@ async function resolverPlusCodeEditar() {
       });
     });
   }
-  if (!result) result = await resolverPlusCode(raw);
+  // Google REST fallback con timeout
+  if (!result && window.GOOGLE_API_KEY) {
+    try {
+      const parsedE = parsearLineaPlusCode(raw);
+      const queryE  = parsedE ? parsedE.plusCode + ' ' + parsedE.ciudad : raw;
+      const urlE = 'https://maps.googleapis.com/maps/api/geocode/json'
+        + '?address=' + encodeURIComponent(queryE)
+        + '&region=MX&language=es&key=' + window.GOOGLE_API_KEY;
+      const resE  = await fetch(urlE, { signal: AbortSignal.timeout(8000) });
+      const dataE = await resE.json();
+      if (dataE.status === 'OK' && dataE.results[0]) {
+        const locE = dataE.results[0].geometry.location;
+        result = { lat: locE.lat, lng: locE.lng, nombre: dataE.results[0].formatted_address.split(',')[0] };
+      }
+    } catch(eE) { console.warn('[PlusCode editar] REST falló:', eE.message); }
+  }
+  if (!result) result = await Promise.race([
+    resolverPlusCode(raw),
+    new Promise((_,rej) => setTimeout(() => rej(new Error('timeout')), 8000))
+  ]).catch(() => null);
   if (!result) { showToast('⚠️ No se pudo resolver'); return; }
   editParadaData = { lat: result.lat, lng: result.lng, nombre: result.nombre };
   const prev = document.getElementById('editar-parada-preview');
