@@ -1390,7 +1390,7 @@ function parsearLineaPlusCode(linea) {
       break;
     }
   }
-  return { plusCode, ciudad: normalizarCiudad(ciudad), nombre: nombre || plusCode };
+  return { plusCode, ciudad, nombre: nombre || plusCode };
 }
 
 // Decodificar código OLC completo → {lat, lng}
@@ -1481,60 +1481,53 @@ async function resolverPlusCode(input) {
   if (!parsed) return null;
   const { plusCode, ciudad, nombre } = parsed;
   const pi = plusCode.indexOf('+');
+  // Usar la longitud real del prefijo (sin quitar ceros)
   const prefixLen = pi; // chars antes del '+'
 
   // ── Código COMPLETO (8+ chars antes del +) ────────────────────
   if (prefixLen >= 8) {
     const digits = plusCode.replace(/\+/g, '');
     const coords = olcDecodeCompleto(digits);
+    // Reverse geocode para obtener nombre de calle
     const rev = await nominatimReverse(coords.lat, coords.lng);
     return { lat: coords.lat, lng: coords.lng, nombre: rev || nombre };
   }
 
   // ── Código CORTO — buscar referencia de ciudad en Nominatim ───
   try {
-    // Estrategias de búsqueda en orden de precisión
-    // 1) Texto completo con "México" al final para dar contexto de país
-    // 2) Solo la primera parte antes de la coma
-    // 3) Texto original sin normalizar
-    const ciudadBase = ciudad.split(',')[0].trim();
+    // Buscar con tipo=municipality para mayor precisión
     const queries = [
-      'q=' + encodeURIComponent(ciudadBase + ' México') + '&countrycodes=mx',
-      'q=' + encodeURIComponent(ciudad) + '&countrycodes=mx',
-      'q=' + encodeURIComponent(ciudadBase) + '&countrycodes=mx',
+      'city=' + encodeURIComponent(ciudad.split(',')[0].trim()) +
+        '&state=' + encodeURIComponent(ciudad.split(',')[1]?.trim() || '') +
+        '&country=Mexico',
+      'q=' + encodeURIComponent(ciudad),
     ];
 
     let refLat = null, refLng = null;
     for (const q of queries) {
       const url = 'https://nominatim.openstreetmap.org/search?' +
-        q + '&format=json&limit=5&accept-language=es&addressdetails=1';
-      const res  = await fetch(url, { headers: { 'User-Agent': 'SEISA-App/1.0' } });
+        q + '&format=json&limit=3&accept-language=es&addressdetails=1';
+      const res  = await fetch(url, { headers: {'User-Agent':'SEISA-App/1.0'} });
       const data = await res.json();
       if (!data.length) continue;
 
-      // Preferir resultados de tipo ciudad/municipio sobre estado/país
-      const TIPOS_CIUDAD = ['city','town','municipality','village','suburb','borough','quarter','neighbourhood'];
+      // Preferir resultado de tipo municipality/city sobre state/country
       const best = data.find(d =>
-        TIPOS_CIUDAD.includes(d.type) || TIPOS_CIUDAD.includes(d.addresstype)
-      ) || data.find(d =>
-        // Evitar resultados de tipo state o country
-        !['state','country','administrative'].includes(d.type)
+        ['city','town','municipality','village','suburb'].includes(d.type) ||
+        ['city','town','municipality','village'].includes(d.addresstype)
       ) || data[0];
 
       refLat = parseFloat(best.lat);
       refLng = parseFloat(best.lon);
-      console.log('[PlusCode] Referencia encontrada:', best.display_name, refLat, refLng);
       break;
     }
 
-    if (refLat === null) {
-      console.warn('[PlusCode] No se encontró referencia para ciudad:', ciudad);
-      return null;
-    }
+    if (refLat === null) return null;
 
     const coords = olcRecoverShort(plusCode, refLat, refLng);
     if (!coords) return null;
 
+    // Reverse geocode para obtener nombre de calle real
     const nombreCalle = await nominatimReverse(coords.lat, coords.lng);
     return { lat: coords.lat, lng: coords.lng, nombre: nombre || nombreCalle || plusCode };
 
