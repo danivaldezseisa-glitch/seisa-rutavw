@@ -2194,14 +2194,41 @@ function _optimizarMedio(paradas, inicio, fin) {
     paradaOrdenada = calcDistRuta(rutaCI, depotI, depotF) <= calcDistRuta(rutaNN, depotI, depotF)
       ? rutaCI : rutaNN;
   } else {
-    const asignaciones = kMeansGeo(paradas, numClusters);
+    // --- NUEVO: Agrupación por Colonia ---
     const gruposMap = {};
-    paradas.forEach((p, i) => {
-      const c = asignaciones[i];
-      if (!gruposMap[c]) gruposMap[c] = [];
-      gruposMap[c].push(p);
+    paradas.forEach((p) => {
+      let nombreColonia = "ZONA GENERAL"; // Fallback
+      
+      // Intentamos extraer la colonia del nombre (formato habitual: "Calle, Colonia, Ciudad")
+      if (p.nombre && p.nombre.includes(',')) {
+          const partes = p.nombre.split(',');
+          // Usualmente la colonia está en el segundo fragmento
+          nombreColonia = partes.length > 2 ? partes[1].trim().toUpperCase() : partes[0].trim().toUpperCase();
+      }
+      
+      if (!gruposMap[nombreColonia]) gruposMap[nombreColonia] = [];
+      gruposMap[nombreColonia].push(p);
     });
-    const grupos = Object.values(gruposMap);
+
+    let grupos = [];
+    // Si una colonia tiene demasiadas entregas, la subdividimos geográficamente
+    // para no saturar el motor de optimización interno (límite sugerido: 12 paradas)
+    Object.values(gruposMap).forEach(grupo => {
+        if (grupo.length > 12) {
+            const subClusters = Math.ceil(grupo.length / 8);
+            const subAsig = kMeansGeo(grupo, subClusters);
+            const subMap = {};
+            grupo.forEach((gp, i) => {
+                if (!subMap[subAsig[i]]) subMap[subAsig[i]] = [];
+                subMap[subAsig[i]].push(gp);
+            });
+            grupos.push(...Object.values(subMap));
+        } else {
+            grupos.push(grupo);
+        }
+    });
+    // -------------------------------------
+
     const gruposOrdenados = ordenarClustersCircular(grupos, depotI);
     const centroides = gruposOrdenados.map(g => ({
       lat: g.reduce((s,p)=>s+p.lat,0)/g.length,
