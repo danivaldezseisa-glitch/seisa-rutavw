@@ -1884,7 +1884,6 @@ window.initGoogleMaps = function() {
     ['paradas-search',      'parada'],
     ['edit-ub-input',       'edicion'],
     ['editar-parada-input', 'editarParada'],
-    ['seg-agregar-input',    'segAgregar'],
   ].forEach(([id, tipo]) => {
     const el = document.getElementById(id);
     if (!el) return;
@@ -1933,13 +1932,7 @@ function onGooglePlaceSelected(tipo, lat, lng, nombre) {
       const pp = document.getElementById('editar-parada-preview');
       if (pp) { pp.textContent = '📍 ' + nombre; pp.style.display = 'block'; }
       break;
-    case 'segAgregar':
-      segAgregarData = { lat, lng, nombre };
-      const spv = document.getElementById('seg-agregar-preview');
-      if (spv) { spv.textContent = '📍 ' + nombre; spv.style.display = 'block'; }
-      const snom = document.getElementById('seg-agregar-nombre');
-      if (snom && !snom.value.trim()) snom.value = nombre;
-      break;
+
   }
 }
 
@@ -2189,6 +2182,8 @@ function finalizarRuta() {
 // ══════════════════════════════════════════════════════════════════
 let segAgregarData = null;
 
+let _segAgregarAC = null;
+
 function abrirAgregarParadaSeg() {
   segAgregarData = null;
   const inp = document.getElementById('seg-agregar-input');
@@ -2202,7 +2197,31 @@ function abrirAgregarParadaSeg() {
   if (prv) prv.style.display = 'none';
   if (box) { box.style.display = 'none'; box.innerHTML = ''; }
   document.getElementById('modal-seg-agregar').classList.remove('hidden');
-  setTimeout(() => inp && inp.focus(), 200);
+  // Inicializar autocomplete la primera vez que se abre el modal
+  setTimeout(() => {
+    if (inp) inp.focus();
+    if (googleMapsReady && inp && !_segAgregarAC) {
+      const mxBounds = new google.maps.LatLngBounds(
+        new google.maps.LatLng(14.5, -118.5),
+        new google.maps.LatLng(32.7, -86.7)
+      );
+      _segAgregarAC = new google.maps.places.Autocomplete(inp, {
+        bounds: mxBounds, strictBounds: false,
+        componentRestrictions: { country: 'mx' },
+        fields: ['geometry', 'name', 'formatted_address'],
+      });
+      _segAgregarAC.addListener('place_changed', () => {
+        const place = _segAgregarAC.getPlace();
+        if (!place.geometry?.location) return;
+        const nombre = place.formatted_address || place.name || inp.value;
+        segAgregarData = { lat: place.geometry.location.lat(), lng: place.geometry.location.lng(), nombre };
+        const spv = document.getElementById('seg-agregar-preview');
+        if (spv) { spv.textContent = '📍 ' + nombre; spv.style.display = 'block'; }
+        const snom = document.getElementById('seg-agregar-nombre');
+        if (snom && !snom.value.trim()) snom.value = nombre;
+      });
+    }
+  }, 250);
 }
 
 function buscarParadaSeg(q) {
