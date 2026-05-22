@@ -837,7 +837,7 @@ function crearUsuario() {
   const newUser = {
     id:     'u_' + Date.now(),
     nombre: nombre,
-    pin:    pin,  // en producción real debería ser hash, pero para uso interno está bien
+    pin:    String(pin), // siempre string para comparación consistente
     creado: new Date().toISOString(),
   };
   users.push(newUser);
@@ -852,7 +852,10 @@ function crearUsuario() {
 // Mostrar/ocultar form
 function mostrarFormNuevoUsuario() {
   const f = document.getElementById('form-nuevo-usuario');
-  if (f) { f.style.display = 'flex'; setTimeout(() => document.getElementById('nu-nombre')?.focus(), 100); }
+  if (!f) return;
+  f.style.display = 'flex';
+  f.style.flexDirection = 'column';
+  setTimeout(() => document.getElementById('nu-nombre')?.focus(), 100);
 }
 function ocultarFormNuevoUsuario() {
   const f = document.getElementById('form-nuevo-usuario');
@@ -911,7 +914,7 @@ function renderLoginScreen() {
       const btnDel = document.createElement('button');
       btnDel.style.cssText = 'background:rgba(255,82,82,.1);border:1px solid rgba(255,82,82,.3);color:var(--red);border-radius:8px;padding:6px 10px;font-size:12px;font-weight:700;cursor:pointer;flex-shrink:0;';
       btnDel.textContent = 'Borrar';
-      btnDel.onclick = (e) => { e.stopPropagation(); eliminarUsuario(user.id); };
+      btnDel.onclick = (e) => { e.stopPropagation(); e.preventDefault(); eliminarUsuario(user.id); };
       div.appendChild(btnDel);
     }
 
@@ -926,13 +929,13 @@ function renderLoginScreen() {
 function eliminarUsuario(userId) {
   const users = loadUsers();
   const user  = users.find(u => u.id === userId);
-  if (!user) return;
+  if (!user) { showToast('Usuario no encontrado'); return; }
   if (!confirm('¿Eliminar al operador "' + user.nombre + '"? Se borrarán sus datos.')) return;
   try { localStorage.removeItem(userAppKey(userId)); } catch(ee) {}
   try { localStorage.removeItem(userBaseKey(userId)); } catch(ee) {}
   saveUsers(users.filter(u => u.id !== userId));
-  renderLoginScreen();
-  showToast('Operador eliminado');
+  renderLoginScreen(); // re-renderizar lista
+  showToast('✅ Operador "' + user.nombre + '" eliminado');
 }
 
 // Pedir PIN
@@ -942,8 +945,10 @@ let _pinActual  = '';
 function pedirPIN(user) {
   _pinUsuario = user;
   _pinActual  = '';
-  document.getElementById('modal-pin-nombre').textContent = user.nombre;
-  document.getElementById('pin-error').textContent = '';
+  const nombreEl = document.getElementById('modal-pin-nombre');
+  const errorEl  = document.getElementById('pin-error');
+  if (nombreEl) nombreEl.textContent = user.nombre;
+  if (errorEl)  errorEl.textContent  = '';
   actualizarPinDots();
   document.getElementById('modal-pin').classList.remove('hidden');
 }
@@ -967,8 +972,11 @@ function actualizarPinDots() {
 
 function verificarPIN() {
   if (!_pinUsuario) return;
-  if (_pinActual === _pinUsuario.pin) {
+  // Comparar siempre como string
+  if (_pinActual === String(_pinUsuario.pin)) {
     closeModal('modal-pin');
+    _pinActual = '';
+    actualizarPinDots();
     iniciarSesion(_pinUsuario);
   } else {
     document.getElementById('pin-error').textContent = 'PIN incorrecto';
@@ -1011,21 +1019,6 @@ function cerrarSesion() {
   clearSession();
   showScreen('screen-login');
   renderLoginScreen();
-}
-
-function eliminarUsuario(e, userId) {
-  e.stopPropagation();
-  const users = loadUsers();
-  const user  = users.find(u => u.id === userId);
-  if (!user) return;
-  if (!confirm('¿Eliminar al usuario "' + user.nombre + '"? Se borrarán sus datos locales.')) return;
-  // Borrar datos del usuario
-  try { localStorage.removeItem(userAppKey(userId)); } catch(ee) {}
-  try { localStorage.removeItem(userBaseKey(userId)); } catch(ee) {}
-  const newUsers = users.filter(u => u.id !== userId);
-  saveUsers(newUsers);
-  renderLoginScreen();
-  showToast('Usuario eliminado');
 }
 
 // ══════════════════════════════════════════════════════════════════
