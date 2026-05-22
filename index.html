@@ -2167,46 +2167,85 @@ function optimizarPipeline(paradas, inicio, fin) {
 
 function _optimizarMedio(paradas, inicio, fin) {
   if (!paradas.length) return [];
-  if (paradas.length === 1) return [...paradas];
+  if (paradas.length <= 2) {
+    const d1 = distHaversine(inicio.lat, inicio.lng, paradas[0].lat, paradas[0].lng)
+             + (paradas[1] ? distHaversine(paradas[0].lat, paradas[0].lng, paradas[1].lat, paradas[1].lng) : 0)
+             + (paradas[1] ? distHaversine(paradas[1].lat, paradas[1].lng, fin.lat, fin.lng) : distHaversine(paradas[0].lat, paradas[0].lng, fin.lat, fin.lng));
+    const d2 = paradas[1] ? distHaversine(inicio.lat, inicio.lng, paradas[1].lat, paradas[1].lng)
+             + distHaversine(paradas[1].lat, paradas[1].lng, paradas[0].lat, paradas[0].lng)
+             + distHaversine(paradas[0].lat, paradas[0].lng, fin.lat, fin.lng) : Infinity;
+    return d1 <= d2 ? [...paradas] : [paradas[1], paradas[0]];
+  }
 
-  // Calculamos si la ruta empieza y termina en el mismo lugar (Circuito) o no
+  // 1. CREAR MICRO-ZONAS (Nivel Micro)
+  // Agrupamos de 5 en 5 para que el ahorro de KM actúe solo en corto alcance.
+  const numClusters = Math.max(1, Math.ceil(paradas.length / 5));
+  let grupos = [];
+
+  if (numClusters === 1) {
+    grupos = [{ grupo: paradas, lat: paradas.reduce((s,p)=>s+p.lat,0)/paradas.length, lng: paradas.reduce((s,p)=>s+p.lng,0)/paradas.length }];
+  } else {
+    const asignaciones = kMeansGeo(paradas, numClusters);
+    const gruposTemp = Array.from({length: numClusters}, () => []);
+    paradas.forEach((p, i) => gruposTemp[asignaciones[i]].push(p));
+    
+    grupos = gruposTemp.filter(g => g.length > 0).map(g => ({
+      grupo: g,
+      lat: g.reduce((s,p)=>s+p.lat,0)/g.length,
+      lng: g.reduce((s,p)=>s+p.lng,0)/g.length
+    }));
+  }
+
+  // 2. ORDENAR MICRO-ZONAS CON BARRIDO (Nivel Macro)
   const distCierre = distHaversine(inicio.lat, inicio.lng, fin.lat, fin.lng);
-
+  
   if (distCierre > 0.5) { 
-    // CASO 1: RUTA LINEAL (Ej. El punto Final está a más de 500m del Inicio)
-    // Trazamos un vector desde el Inicio hasta el Fin y proyectamos las paradas sobre él.
+    // Ruta Lineal: Proyectar sobre la flecha de Inicio a Fin
     const vLat = fin.lat - inicio.lat;
     const vLng = fin.lng - inicio.lng;
     const vMag = Math.sqrt(vLat * vLat + vLng * vLng);
 
-    return paradas.sort((a, b) => {
+    grupos.sort((a, b) => {
       const projA = ((a.lat - inicio.lat) * vLat + (a.lng - inicio.lng) * vLng) / vMag;
       const projB = ((b.lat - inicio.lat) * vLat + (b.lng - inicio.lng) * vLng) / vMag;
       return projA - projB;
     });
-
   } else {
-    // CASO 2: CIRCUITO (Ida y vuelta a la misma Base)
-    // Buscamos el centro de todas las paradas
+    // Circuito: Barrido de reloj
     let sumLat = 0, sumLng = 0;
     paradas.forEach(p => { sumLat += p.lat; sumLng += p.lng; });
-    const centro = { lat: sumLat / paradas.length, lng: sumLng / paradas.length };
-
-    // Calculamos el ángulo desde donde entra el chofer a la zona
-    const anguloInicio = Math.atan2(inicio.lng - centro.lng, inicio.lat - centro.lat);
-
-    // Hacemos un barrido como las manecillas del reloj a partir del punto de inicio
-    return paradas.sort((a, b) => {
-      let angA = Math.atan2(a.lng - centro.lng, a.lat - centro.lat) - anguloInicio;
-      let angB = Math.atan2(b.lng - centro.lng, b.lat - centro.lat) - anguloInicio;
-      
-      // Normalizamos a un círculo completo (0 a 360 grados)
+    const centroGlobal = { lat: sumLat / paradas.length, lng: sumLng / paradas.length };
+    const anguloInicio = Math.atan2(inicio.lng - centroGlobal.lng, inicio.lat - centroGlobal.lat);
+    
+    grupos.sort((a, b) => {
+      let angA = Math.atan2(a.lng - centroGlobal.lng, a.lat - centroGlobal.lat) - anguloInicio;
+      let angB = Math.atan2(b.lng - centroGlobal.lng, b.lat - centroGlobal.lat) - anguloInicio;
       if (angA < 0) angA += 2 * Math.PI;
       if (angB < 0) angB += 2 * Math.PI;
-
       return angA - angB;
     });
   }
+
+  // 3. CONECTAR Y AHORRAR KILÓMETROS
+  const rutaFinal = [];
+  let puntoEntrada = inicio;
+
+  grupos.forEach((c, i) => {
+    // Apuntamos la salida hacia el siguiente grupo
+    let puntoSalida = fin;
+    if (i < grupos.length - 1) {
+      puntoSalida = { lat: grupos[i+1].lat, lng: grupos[i+1].lng };
+    }
+
+    // Optimizamos por dentro del grupo: ahorra KM sin romper el barrido general
+    let rutaGrupo = cheapestInsertion(c.grupo, puntoEntrada, puntoSalida);
+    rutaGrupo = twoOptLineal(rutaGrupo, puntoEntrada, puntoSalida);
+    
+    rutaFinal.push(...rutaGrupo);
+    if (rutaGrupo.length > 0) puntoEntrada = rutaGrupo[rutaGrupo.length - 1];
+  });
+
+  return rutaFinal;
 }
 
 function optimizarRuta() {
