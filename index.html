@@ -166,7 +166,7 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
       <button class="btn btn-ghost" onclick="cambiarPINAdmin()" style="font-size:13px;">🔑 Cambiar PIN admin</button>
     </div>
     <div onclick="tapLogo()" style="cursor:pointer;margin-top:8px;">
-      <div style="font-size:11px;color:var(--border);text-align:center;">v1.1</div>
+      <div style="font-size:11px;color:var(--border);text-align:center;">v1.2</div>
     </div>
   </div>
 </div>
@@ -1743,11 +1743,9 @@ function eliminarParada(id) {
 }
 
 // ══════════════════════════════════════════════════════════════════
-//  OPTIMIZAR RUTA — Nearest Neighbor + 2-opt
-// ══════════════════════════════════════════════════════════════════
-// ══════════════════════════════════════════════════════════════════
-//  MOTOR DE OPTIMIZACIÓN v4 — Cheapest Insertion + 2-opt lineal + Or-opt
-//  Garantiza circuito compacto, sin zigzag, mínimos km
+//  MOTOR DE OPTIMIZACIÓN v5 — Circuito Geográfico por Zonas
+//  Clustering + Cheapest Insertion + 3-opt + Or-opt completo
+//  Sin zigzag · Sin puntos lejanos solos · Circuito compacto
 // ══════════════════════════════════════════════════════════════════
 
 function calcDistRuta(paradas, inicio, fin) {
@@ -1758,53 +1756,95 @@ function calcDistRuta(paradas, inicio, fin) {
   return d;
 }
 
-// ── Cheapest Insertion ────────────────────────────────────────────
-// Construye la ruta insertando cada parada en la posición que
-// menos aumenta la distancia total → produce rutas mucho más compactas
-// que Nearest Neighbor porque tiene visión global desde el inicio
+// ── Distancia como circuito cerrado (depot → paradas → depot) ────
+function calcDistCircuito(ruta, depot) {
+  if (!ruta.length) return 0;
+  let d = distHaversine(depot.lat, depot.lng, ruta[0].lat, ruta[0].lng);
+  for (let i = 0; i < ruta.length - 1; i++)
+    d += distHaversine(ruta[i].lat, ruta[i].lng, ruta[i+1].lat, ruta[i+1].lng);
+  d += distHaversine(ruta[ruta.length-1].lat, ruta[ruta.length-1].lng, depot.lat, depot.lng);
+  return d;
+}
+
+// ── Clustering k-means geográfico ─────────────────────────────────
+// Agrupa las paradas por zonas geográficas cercanas para que
+// el ruteo procese cada zona unida y no salte entre zonas lejanas
+function kMeansGeo(paradas, k, maxIter = 30) {
+  if (paradas.length <= k) return paradas.map((_, i) => i); // cada parada su propio cluster
+  // Inicializar centroides con k-means++ para mejor cobertura
+  const centroides = [];
+  centroides.push(paradas[Math.floor(Math.random() * paradas.length)]);
+  while (centroides.length < k) {
+    const dists = paradas.map(p => {
+      const minD = Math.min(...centroides.map(c => distHaversine(p.lat, p.lng, c.lat, c.lng)));
+      return minD * minD;
+    });
+    const total = dists.reduce((a, b) => a + b, 0);
+    let rand = Math.random() * total, acum = 0;
+    for (let i = 0; i < dists.length; i++) {
+      acum += dists[i];
+      if (acum >= rand) { centroides.push(paradas[i]); break; }
+    }
+  }
+  let asignaciones = new Array(paradas.length).fill(0);
+  for (let iter = 0; iter < maxIter; iter++) {
+    const nuevasAsig = paradas.map(p => {
+      let minD = Infinity, minC = 0;
+      centroides.forEach((c, ci) => {
+        const d = distHaversine(p.lat, p.lng, c.lat, c.lng);
+        if (d < minD) { minD = d; minC = ci; }
+      });
+      return minC;
+    });
+    if (nuevasAsig.every((a, i) => a === asignaciones[i])) break;
+    asignaciones = nuevasAsig;
+    // Recalcular centroides
+    for (let ci = 0; ci < k; ci++) {
+      const miembros = paradas.filter((_, i) => asignaciones[i] === ci);
+      if (miembros.length) {
+        centroides[ci] = {
+          lat: miembros.reduce((s, p) => s + p.lat, 0) / miembros.length,
+          lng: miembros.reduce((s, p) => s + p.lng, 0) / miembros.length
+        };
+      }
+    }
+  }
+  return asignaciones;
+}
+
+// ── Cheapest Insertion con circuito cerrado ───────────────────────
 function cheapestInsertion(paradas, inicio, fin) {
   if (!paradas.length) return [];
   if (paradas.length === 1) return [...paradas];
-
   const depotI = inicio || paradas[0];
   const depotF = fin    || depotI;
-
-  // Ruta inicial: depot-inicio → parada más cercana al inicio → depot-fin
   let sinVisitar = [...paradas];
+  // Arrancar con la parada más cercana al depot de inicio
   let mejorIdx = 0, mejorD = Infinity;
   for (let i = 0; i < sinVisitar.length; i++) {
     const d = distHaversine(depotI.lat, depotI.lng, sinVisitar[i].lat, sinVisitar[i].lng);
     if (d < mejorD) { mejorD = d; mejorIdx = i; }
   }
   let ruta = [sinVisitar.splice(mejorIdx, 1)[0]];
-
-  // Insertar cada parada restante en la posición de menor costo
   while (sinVisitar.length) {
     let mejorCosto = Infinity, mejorP = 0, mejorPos = 0;
-
     for (let pi = 0; pi < sinVisitar.length; pi++) {
       const p = sinVisitar[pi];
-      // Probar insertar p entre cada par de nodos consecutivos de la ruta actual
-      // (incluyendo los extremos depot-inicio y depot-fin)
       const puntos = [depotI, ...ruta, depotF];
       for (let pos = 0; pos < puntos.length - 1; pos++) {
         const a = puntos[pos], b = puntos[pos + 1];
-        // Costo de insertar p entre a y b
         const costo = distHaversine(a.lat, a.lng, p.lat, p.lng)
                     + distHaversine(p.lat, p.lng, b.lat, b.lng)
                     - distHaversine(a.lat, a.lng, b.lat, b.lng);
-        if (costo < mejorCosto) {
-          mejorCosto = costo; mejorP = pi; mejorPos = pos;
-        }
+        if (costo < mejorCosto) { mejorCosto = costo; mejorP = pi; mejorPos = pos; }
       }
     }
-    // Insertar la parada elegida en la posición elegida
     ruta.splice(mejorPos, 0, sinVisitar.splice(mejorP, 1)[0]);
   }
   return ruta;
 }
 
-// ── Nearest Neighbor (fallback y comparación) ────────────────────
+// ── Nearest Neighbor (fallback) ───────────────────────────────────
 function nearestNeighborLocal(paradas, inicio) {
   let sinVisitar = [...paradas];
   let actual = inicio || sinVisitar[0];
@@ -1823,30 +1863,23 @@ function nearestNeighborLocal(paradas, inicio) {
 }
 function nearestNeighbor(paradas, inicio) { return nearestNeighborLocal(paradas, inicio); }
 
-// ── 2-opt lineal con delta de aristas ────────────────────────────
-// Opera sobre la ruta inicio→paradas→fin (no circuito cerrado para
-// respetar el depot fijo) con cálculo O(1) por par → converge bien
+// ── 2-opt completo (circuito) ─────────────────────────────────────
 function twoOptLineal(paradas, inicio, fin) {
   if (paradas.length < 4) return [...paradas];
   const depotI = inicio || paradas[0];
   const depotF = fin    || depotI;
-  // Array completo incluyendo depots para calcular deltas correctos
   let r = [depotI, ...paradas, depotF];
   const n = r.length;
-  let mejorado = true;
-  let iter = 0;
-  while (mejorado && iter < 500) {
+  let mejorado = true, iter = 0;
+  while (mejorado && iter < 800) {
     mejorado = false; iter++;
     for (let i = 1; i < n - 2; i++) {
       for (let j = i + 1; j < n - 1; j++) {
-        // Delta: cambiar aristas (r[i-1]→r[i]) y (r[j]→r[j+1])
-        //        por aristas (r[i-1]→r[j]) y (r[i]→r[j+1])
-        const d_antes  = distHaversine(r[i-1].lat, r[i-1].lng, r[i].lat,   r[i].lng)
-                       + distHaversine(r[j].lat,   r[j].lng,   r[j+1].lat, r[j+1].lng);
+        const d_antes   = distHaversine(r[i-1].lat, r[i-1].lng, r[i].lat,   r[i].lng)
+                        + distHaversine(r[j].lat,   r[j].lng,   r[j+1].lat, r[j+1].lng);
         const d_despues = distHaversine(r[i-1].lat, r[i-1].lng, r[j].lat,   r[j].lng)
                         + distHaversine(r[i].lat,   r[i].lng,   r[j+1].lat, r[j+1].lng);
-        if (d_despues < d_antes - 0.0001) {
-          // Invertir segmento i..j
+        if (d_despues < d_antes - 1e-6) {
           let l = i, rr = j;
           while (l < rr) { [r[l], r[rr]] = [r[rr], r[l]]; l++; rr--; }
           mejorado = true;
@@ -1854,91 +1887,51 @@ function twoOptLineal(paradas, inicio, fin) {
       }
     }
   }
-  return r.slice(1, n - 1); // quitar depots
+  return r.slice(1, n - 1);
 }
 
-// ── Or-opt con delta exacto de aristas ───────────────────────────
-// Reubica segmentos de 1 y 2 paradas usando solo delta de aristas
-// afectadas → O(1) por movimiento, puede hacer miles de pruebas
-function orOptDelta(paradas, inicio, fin) {
-  if (paradas.length < 4) return [...paradas];
+// ── 3-opt simplificado — elimina cruces que 2-opt no ve ──────────
+// Evalúa los 8 tipos de reconexión de 3 aristas para rutas medianas
+function threeOpt(paradas, inicio, fin) {
+  if (paradas.length < 6) return twoOptLineal(paradas, inicio, fin);
   const depotI = inicio || paradas[0];
   const depotF = fin    || depotI;
   let r = [depotI, ...paradas, depotF];
-
-  let mejorado = true;
-  let iter = 0;
-  while (mejorado && iter < 400) {
+  const n = r.length;
+  const dist = (a, b) => distHaversine(a.lat, a.lng, b.lat, b.lng);
+  let mejorado = true, iter = 0;
+  while (mejorado && iter < 60) {
     mejorado = false; iter++;
-    const n = r.length;
-
-    for (let segLen = 1; segLen <= 2; segLen++) {
-      for (let i = 1; i < n - segLen - 1; i++) {
-        // Segmento a reubicar: r[i..i+segLen-1]
-        const prev = r[i - 1];
-        const segStart = r[i];
-        const segEnd   = r[i + segLen - 1];
-        const next = r[i + segLen];
-
-        // Costo de eliminar el segmento de su posición actual
-        const gainRemove =
-          distHaversine(prev.lat,     prev.lng,     segStart.lat, segStart.lng) +
-          distHaversine(segEnd.lat,   segEnd.lng,   next.lat,     next.lng)     -
-          distHaversine(prev.lat,     prev.lng,     next.lat,     next.lng);
-
-        // Probar insertar en cada otra posición
-        for (let j = 1; j < n - 1; j++) {
-          if (j >= i - 1 && j <= i + segLen) continue; // skip posiciones solapadas
-          const a = r[j], b = r[j + 1];
-
-          const costInsert =
-            distHaversine(a.lat,       a.lng,       segStart.lat, segStart.lng) +
-            distHaversine(segEnd.lat,  segEnd.lng,  b.lat,        b.lng)        -
-            distHaversine(a.lat,       a.lng,       b.lat,        b.lng);
-
-          if (costInsert - gainRemove < -0.0001) {
-            // Extraer segmento
-            const seg = r.splice(i, segLen);
-            // Recalcular j después del splice
-            const jNew = j > i ? j - segLen : j;
-            r.splice(jNew + 1, 0, ...seg);
-            mejorado = true;
-            break;
-          }
-        }
-        if (mejorado) break;
-      }
-      if (mejorado) break;
-    }
-  }
-  return r.slice(1, r.length - 1); // quitar depots
-}
-
-// ── Or-opt inversión de segmento ─────────────────────────────────
-// Prueba también invertir el segmento al reubicarlo (mejor para espagueti)
-function orOptInvertido(paradas, inicio, fin) {
-  if (paradas.length < 5) return [...paradas];
-  const depotI = inicio || paradas[0];
-  const depotF = fin    || depotI;
-  let r = [depotI, ...paradas, depotF];
-
-  let mejorado = true;
-  let iter = 0;
-  while (mejorado && iter < 200) {
-    mejorado = false; iter++;
-    const n = r.length;
-
-    for (let i = 1; i < n - 2; i++) {
-      for (let j = i + 1; j < n - 1; j++) {
-        // Probar invertir subsegmento i..j
-        const d_antes  = distHaversine(r[i-1].lat, r[i-1].lng, r[i].lat,   r[i].lng)
-                       + distHaversine(r[j].lat,   r[j].lng,   r[j+1].lat, r[j+1].lng);
-        const d_despues = distHaversine(r[i-1].lat, r[i-1].lng, r[j].lat,   r[j].lng)
-                        + distHaversine(r[i].lat,   r[i].lng,   r[j+1].lat, r[j+1].lng);
-        if (d_despues < d_antes - 0.0001) {
-          let l = i, rr = j;
-          while (l < rr) { [r[l], r[rr]] = [r[rr], r[l]]; l++; rr--; }
-          mejorado = true;
+    outer: for (let i = 1; i < n - 4; i++) {
+      for (let j = i + 1; j < n - 3; j++) {
+        for (let k = j + 1; k < n - 1; k++) {
+          const A=r[i-1], B=r[i], C=r[j-1], D=r[j], E=r[k-1], F=r[k];
+          const d0 = dist(A,B) + dist(C,D) + dist(E,F);
+          // Probar los 7 tipos de reconexión distintos a 0
+          const opts = [
+            dist(A,C)+dist(B,D)+dist(E,F), // 2-opt seg 1
+            dist(A,B)+dist(C,E)+dist(D,F), // 2-opt seg 2
+            dist(A,E)+dist(C,D)+dist(B,F), // 2-opt seg 3
+            dist(A,C)+dist(B,E)+dist(D,F), // 3-opt tipo 1
+            dist(A,D)+dist(E,B)+dist(C,F), // 3-opt tipo 2
+            dist(A,D)+dist(E,C)+dist(B,F), // 3-opt tipo 3
+            dist(A,E)+dist(D,B)+dist(C,F), // 3-opt tipo 4
+          ];
+          let minOpt = d0, minIdx = -1;
+          opts.forEach((v, idx) => { if (v < minOpt - 1e-6) { minOpt = v; minIdx = idx; } });
+          if (minIdx < 0) continue;
+          // Aplicar la reconexión ganadora
+          const seg1 = r.slice(i, j);
+          const seg2 = r.slice(j, k);
+          let nuevo;
+          if (minIdx === 0) nuevo = [...r.slice(0,i), ...seg1.reverse(), ...seg2, ...r.slice(k)];
+          else if (minIdx === 1) nuevo = [...r.slice(0,i), ...seg1, ...seg2.reverse(), ...r.slice(k)];
+          else if (minIdx === 2) nuevo = [...r.slice(0,i), ...seg2, ...seg1, ...r.slice(k)];
+          else if (minIdx === 3) nuevo = [...r.slice(0,i), ...seg1.reverse(), ...seg2.reverse(), ...r.slice(k)];
+          else if (minIdx === 4) nuevo = [...r.slice(0,i), ...seg2, ...seg1.reverse(), ...r.slice(k)];
+          else if (minIdx === 5) nuevo = [...r.slice(0,i), ...seg2.reverse(), ...seg1, ...r.slice(k)];
+          else nuevo = [...r.slice(0,i), ...seg2.reverse(), ...seg1.reverse(), ...r.slice(k)];
+          r = nuevo; mejorado = true; break outer;
         }
       }
     }
@@ -1946,7 +1939,65 @@ function orOptInvertido(paradas, inicio, fin) {
   return r.slice(1, r.length - 1);
 }
 
-// ── PIPELINE PRINCIPAL ────────────────────────────────────────────
+// ── Or-opt con delta exacto ───────────────────────────────────────
+function orOptDelta(paradas, inicio, fin) {
+  if (paradas.length < 4) return [...paradas];
+  const depotI = inicio || paradas[0];
+  const depotF = fin    || depotI;
+  let r = [depotI, ...paradas, depotF];
+  let mejorado = true, iter = 0;
+  while (mejorado && iter < 600) {
+    mejorado = false; iter++;
+    const n = r.length;
+    for (let segLen = 1; segLen <= 3; segLen++) {
+      for (let i = 1; i < n - segLen - 1; i++) {
+        const prev = r[i-1], segStart = r[i], segEnd = r[i+segLen-1], next = r[i+segLen];
+        const gainRemove =
+          distHaversine(prev.lat, prev.lng, segStart.lat, segStart.lng) +
+          distHaversine(segEnd.lat, segEnd.lng, next.lat, next.lng) -
+          distHaversine(prev.lat, prev.lng, next.lat, next.lng);
+        for (let j = 1; j < n - 1; j++) {
+          if (j >= i - 1 && j <= i + segLen) continue;
+          const a = r[j], b = r[j+1];
+          // Probar inserción normal e invertida
+          const costNormal = distHaversine(a.lat, a.lng, segStart.lat, segStart.lng)
+                           + distHaversine(segEnd.lat, segEnd.lng, b.lat, b.lng)
+                           - distHaversine(a.lat, a.lng, b.lat, b.lng);
+          const costInvert = distHaversine(a.lat, a.lng, segEnd.lat, segEnd.lng)
+                           + distHaversine(segStart.lat, segStart.lng, b.lat, b.lng)
+                           - distHaversine(a.lat, a.lng, b.lat, b.lng);
+          const bestCost = Math.min(costNormal, costInvert);
+          if (bestCost - gainRemove < -1e-6) {
+            const seg = r.splice(i, segLen);
+            if (costInvert < costNormal) seg.reverse();
+            const jNew = j > i ? j - segLen : j;
+            r.splice(jNew + 1, 0, ...seg);
+            mejorado = true; break;
+          }
+        }
+        if (mejorado) break;
+      }
+      if (mejorado) break;
+    }
+  }
+  return r.slice(1, r.length - 1);
+}
+
+// ── Ordenar clusters en sentido horario/antihorario al depot ─────
+// Para que la ruta barra zonas en círculo sin saltar de un lado al otro
+function ordenarClustersCircular(clusters, depot) {
+  return clusters.sort((a, b) => {
+    const centroA = { lat: a.reduce((s,p)=>s+p.lat,0)/a.length, lng: a.reduce((s,p)=>s+p.lng,0)/a.length };
+    const centroB = { lat: b.reduce((s,p)=>s+p.lat,0)/b.length, lng: b.reduce((s,p)=>s+p.lng,0)/b.length };
+    const angA = Math.atan2(centroA.lat - depot.lat, centroA.lng - depot.lng);
+    const angB = Math.atan2(centroB.lat - depot.lat, centroB.lng - depot.lng);
+    return angA - angB;
+  });
+}
+
+// ── PIPELINE PRINCIPAL v5 ─────────────────────────────────────────
+// Estrategia: Clustering geográfico → ordenar zonas → optimizar cada
+// zona → unir en secuencia → refinamiento global 3-opt + Or-opt
 function optimizarPipeline(paradas, inicio, fin) {
   if (!paradas.length) return [];
   if (paradas.length <= 2) return [...paradas];
@@ -1954,37 +2005,99 @@ function optimizarPipeline(paradas, inicio, fin) {
   const depotI = inicio || paradas[0];
   const depotF = fin    || depotI;
 
-  // === FASE 1: Construir 2 rutas candidatas ===
+  // === FASE 1: Clustering por zonas geográficas ===
+  // Número de clusters: raíz cuadrada del número de paradas (heurística urbana)
+  let numClusters = Math.max(2, Math.round(Math.sqrt(paradas.length * 0.7)));
+  if (paradas.length <= 6) numClusters = 1; // pocas paradas: sin clusters
 
-  // Candidato A: Cheapest Insertion (compacto por diseño)
-  const rutaCI = cheapestInsertion(paradas, depotI, depotF);
+  let paradaOrdenada;
 
-  // Candidato B: Nearest Neighbor (referencia clásica)
-  const rutaNN = nearestNeighborLocal(paradas, depotI);
+  if (numClusters === 1) {
+    // Sin clustering: optimizar directo
+    const rutaCI = cheapestInsertion(paradas, depotI, depotF);
+    const rutaNN = nearestNeighborLocal(paradas, depotI);
+    paradaOrdenada = calcDistRuta(rutaCI, depotI, depotF) <= calcDistRuta(rutaNN, depotI, depotF)
+      ? rutaCI : rutaNN;
+  } else {
+    // Asignar clusters con k-means
+    const asignaciones = kMeansGeo(paradas, numClusters);
+    const gruposMap = {};
+    paradas.forEach((p, i) => {
+      const c = asignaciones[i];
+      if (!gruposMap[c]) gruposMap[c] = [];
+      gruposMap[c].push(p);
+    });
+    const grupos = Object.values(gruposMap);
 
-  // Elegir la más corta como base
-  let ruta = calcDistRuta(rutaCI, depotI, depotF) <= calcDistRuta(rutaNN, depotI, depotF)
-    ? rutaCI : rutaNN;
+    // Ordenar los grupos en barrido circular alrededor del depot
+    // → la ruta hace un circuito por zonas sin regresar al centro
+    const gruposOrdenados = ordenarClustersCircular(grupos, depotI);
 
-  // === FASE 2: Refinar con 2-opt + Or-opt iterados ===
+    // Optimizar el orden entre clusters (qué cluster visitar primero)
+    // usando Nearest Neighbor sobre los centroides
+    const centroides = gruposOrdenados.map(g => ({
+      lat: g.reduce((s,p)=>s+p.lat,0)/g.length,
+      lng: g.reduce((s,p)=>s+p.lng,0)/g.length,
+      grupo: g
+    }));
+    // Greedy sobre centroides para definir el orden de zonas
+    let sinVisitar = [...centroides];
+    let actual = depotI;
+    const gruposFinal = [];
+    while (sinVisitar.length) {
+      let minD = Infinity, minI = 0;
+      sinVisitar.forEach((c, i) => {
+        const d = distHaversine(actual.lat, actual.lng, c.lat, c.lng);
+        if (d < minD) { minD = d; minI = i; }
+      });
+      gruposFinal.push(sinVisitar[minI].grupo);
+      actual = sinVisitar[minI];
+      sinVisitar.splice(minI, 1);
+    }
+
+    // Dentro de cada cluster, inserción más barata
+    const seccionesOptimizadas = [];
+    let puntoEntrada = depotI;
+    gruposFinal.forEach((grupo, gi) => {
+      const puntoBuf = gi < gruposFinal.length - 1
+        ? { lat: gruposFinal[gi+1].reduce((s,p)=>s+p.lat,0)/gruposFinal[gi+1].length,
+            lng: gruposFinal[gi+1].reduce((s,p)=>s+p.lng,0)/gruposFinal[gi+1].length }
+        : depotF;
+      const opt = cheapestInsertion(grupo, puntoEntrada, puntoBuf);
+      seccionesOptimizadas.push(...opt);
+      if (opt.length) puntoEntrada = opt[opt.length - 1];
+    });
+    paradaOrdenada = seccionesOptimizadas;
+  }
+
+  // === FASE 2: Refinamiento global — 3-opt elimina cruces entre zonas ===
+  let ruta = paradaOrdenada;
+  ruta = threeOpt(ruta, depotI, depotF);
+
+  // === FASE 3: Or-opt con segmentos de 1-3 + inversión ===
   let distAnterior = Infinity;
-  for (let round = 0; round < 4; round++) {
+  for (let round = 0; round < 5; round++) {
     ruta = twoOptLineal(ruta, depotI, depotF);
     ruta = orOptDelta(ruta, depotI, depotF);
     const distActual = calcDistRuta(ruta, depotI, depotF);
-    if (distAnterior - distActual < 0.01) break; // convergió
+    if (distAnterior - distActual < 0.005) break;
     distAnterior = distActual;
   }
 
-  // === FASE 3: Or-opt con inversión (elimina espagueti residual) ===
-  ruta = orOptInvertido(ruta, depotI, depotF);
+  // === FASE 4: Comparar contra Cheapest Insertion global como seguro ===
+  const rutaCIGlobal = cheapestInsertion(paradas, depotI, depotF);
+  let rutaBase2opt = twoOptLineal(rutaCIGlobal, depotI, depotF);
+  rutaBase2opt = orOptDelta(rutaBase2opt, depotI, depotF);
+  if (calcDistRuta(rutaBase2opt, depotI, depotF) < calcDistRuta(ruta, depotI, depotF)) {
+    ruta = rutaBase2opt;
+  }
 
   return ruta;
 }
 
 function optimizarRuta() {
   if (!rutaBuild.paradas.length) return;
-  showToast('⚡ Optimizando circuito...');
+  showToast('⚡ Optimizando por zonas...');
 
   const inicio = rutaBuild.inicio || rutaBuild.paradas[0];
   const fin    = rutaBuild.final  || rutaBuild.inicio || rutaBuild.paradas[0];
