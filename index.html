@@ -2181,71 +2181,80 @@ function _optimizarMedio(paradas, inicio, fin) {
   const depotI = inicio;
   const depotF = fin;
 
-  // 1. Agrupar en colonias (micro-zonas geográficas).
-  // Forzamos clusters de ~6 paradas para asegurar que las colonias se mantengan compactas.
-  let numClusters = Math.max(1, Math.ceil(paradas.length / 6));
-  let ruta = [];
+  // 1. CUADRÍCULA GEOGRÁFICA ESTRICTA
+  // Dividimos el mapa en celdas estáticas de ~800 metros (0.008 grados).
+  // Esto encapsula las colonias y evita que el chofer deje la zona a medias.
+  const GRID_SIZE = 0.008; 
+  const gruposMap = {};
 
-  if (numClusters === 1) {
-    ruta = cheapestInsertion(paradas, depotI, depotF);
-    ruta = twoOptLineal(ruta, depotI, depotF);
-  } else {
-    // Generar los grupos geográficos
-    const asignaciones = kMeansGeo(paradas, numClusters);
-    const grupos = Array.from({length: numClusters}, () => []);
-    paradas.forEach((p, i) => grupos[asignaciones[i]].push(p));
+  paradas.forEach(p => {
+    const gridLat = Math.floor(p.lat / GRID_SIZE);
+    const gridLng = Math.floor(p.lng / GRID_SIZE);
+    const key = `${gridLat}_${gridLng}`;
+    if (!gruposMap[key]) gruposMap[key] = [];
+    gruposMap[key].push(p);
+  });
+
+  const zonas = Object.values(gruposMap);
+
+  // 2. ORDENAR LOS SECTORES (De inicio a fin)
+  // El chofer irá barriendo sector por sector hacia su destino, sin retroceder.
+  const zonasOrdenadas = [];
+  let actual = depotI;
+  const zonasPendientes = [...zonas];
+
+  while(zonasPendientes.length > 0) {
+    let minD = Infinity;
+    let mejorIdx = -1;
     
-    // Filtrar grupos que hayan quedado vacíos
-    const gruposValidos = grupos.filter(g => g.length > 0);
-
-    // Calcular el centro de cada colonia
-    const centroides = gruposValidos.map(g => ({
-      lat: g.reduce((s,p)=>s+p.lat,0)/g.length,
-      lng: g.reduce((s,p)=>s+p.lng,0)/g.length,
-      grupo: g
-    }));
-
-    // 2. Ordenar las colonias por cercanía secuencial (Nearest Neighbor)
-    // Esto evita que el chofer cruce la ciudad de lado a lado (cero zigzags masivos).
-    let sinVisitar = [...centroides];
-    let actual = depotI;
-    const gruposOrdenados = [];
-    
-    while (sinVisitar.length) {
-      let minD = Infinity, minI = 0;
-      sinVisitar.forEach((c, i) => {
-        const d = distHaversine(actual.lat, actual.lng, c.lat, c.lng);
-        if (d < minD) { minD = d; minI = i; }
-      });
-      gruposOrdenados.push(sinVisitar[minI].grupo);
-      actual = sinVisitar[minI];
-      sinVisitar.splice(minI, 1);
-    }
-
-    // 3. Ruteo interno por colonia
-    let puntoEntrada = depotI;
-    gruposOrdenados.forEach((grupo, gi) => {
-      const puntoSalida = gi < gruposOrdenados.length - 1
-        ? { lat: gruposOrdenados[gi+1].reduce((s,p)=>s+p.lat,0)/gruposOrdenados[gi+1].length,
-            lng: gruposOrdenados[gi+1].reduce((s,p)=>s+p.lng,0)/gruposOrdenados[gi+1].length }
-        : depotF;
-        
-      // Deshace los nudos y cruces DENTRO de la colonia
-      let optLocal = cheapestInsertion(grupo, puntoEntrada, puntoSalida);
-      optLocal = twoOptLineal(optLocal, puntoEntrada, puntoSalida); 
+    for(let i = 0; i < zonasPendientes.length; i++) {
+      const zona = zonasPendientes[i];
+      // Buscamos el centroide de esta zona para medir la distancia
+      const cLat = zona.reduce((sum, p) => sum + p.lat, 0) / zona.length;
+      const cLng = zona.reduce((sum, p) => sum + p.lng, 0) / zona.length;
+      const d = distHaversine(actual.lat, actual.lng, cLat, cLng);
       
-      ruta.push(...optLocal);
-      if (optLocal.length) puntoEntrada = optLocal[optLocal.length - 1];
-    });
+      if (d < minD) { minD = d; mejorIdx = i; }
+    }
     
-    // 4. Suavizado final de costuras
-    // Solo quitamos cruces mínimos entre las fronteras de las colonias
-    ruta = twoOptLineal(ruta, depotI, depotF);
+    zonasOrdenadas.push(zonasPendientes[mejorIdx]);
+    const lastZ = zonasPendientes[mejorIdx];
+    // Actualizamos nuestra posición virtual al centro de la zona que acabamos de agregar
+    actual = {
+      lat: lastZ.reduce((sum, p) => sum + p.lat, 0) / lastZ.length,
+      lng: lastZ.reduce((sum, p) => sum + p.lng, 0) / lastZ.length
+    };
+    zonasPendientes.splice(mejorIdx, 1);
   }
 
-  // FASE 3 ELIMINADA: Ya no comparamos con el algoritmo global para proteger el ruteo por colonias.
+  // 3. RUTEO INTERNO POR SECTOR
+  // Resolvemos cada cuadro por separado y luego conectamos el hilo.
+  const rutaFinal = [];
+  let puntoEntrada = depotI;
 
-  return ruta;
+  zonasOrdenadas.forEach((zona, gi) => {
+    // Apuntamos la salida hacia el siguiente cuadro para no salir en la dirección equivocada
+    let puntoSalida = depotF;
+    if (gi < zonasOrdenadas.length - 1) {
+      const nextZ = zonasOrdenadas[gi+1];
+      puntoSalida = {
+        lat: nextZ.reduce((sum, p) => sum + p.lat, 0) / nextZ.length,
+        lng: nextZ.reduce((sum, p) => sum + p.lng, 0) / nextZ.length
+      };
+    }
+
+    // Ordenamos estrictamente el interior del cuadro
+    let rutaZona = cheapestInsertion(zona, puntoEntrada, puntoSalida);
+    rutaZona = twoOptLineal(rutaZona, puntoEntrada, puntoSalida);
+    
+    rutaFinal.push(...rutaZona);
+    if (rutaZona.length > 0) puntoEntrada = rutaZona[rutaZona.length - 1];
+  });
+
+  // 4. DESENREDAR CRUCES FINALES
+  // Hacemos una última limpieza rápida por si el algoritmo cruzó la línea
+  // al pasar de un bloque a otro, pero sin romper la estructura de las zonas.
+  return twoOptLineal(rutaFinal, depotI, depotF);
 }
 
 function optimizarRuta() {
