@@ -167,12 +167,87 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
 <!-- ════════════════════════════════
      SCREEN 1: HOME
 ════════════════════════════════ -->
-<div class="screen" id="screen-home">
+<!-- ════════════════════════════════
+     SCREEN: LOGIN
+════════════════════════════════ -->
+<div class="screen" id="screen-login" style="justify-content:center;align-items:center;background:var(--bg);">
+  <div style="width:100%;max-width:360px;padding:32px 24px;display:flex;flex-direction:column;gap:20px;">
+    <div style="text-align:center;">
+      <div style="font-size:48px;margin-bottom:8px;">🚛</div>
+      <div style="font-size:22px;font-weight:800;color:var(--text);">SEISA Rutas</div>
+      <div style="font-size:13px;color:var(--text3);margin-top:4px;">Inicia sesión para continuar</div>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;">
+      <input class="input" id="login-user" placeholder="Usuario" autocomplete="username"
+        style="font-size:15px;" onkeydown="if(event.key==='Enter')document.getElementById('login-pass').focus()">
+      <input class="input" id="login-pass" type="password" placeholder="Contraseña" autocomplete="current-password"
+        style="font-size:15px;" onkeydown="if(event.key==='Enter')hacerLogin()">
+    </div>
+    <button class="btn btn-accent" onclick="hacerLogin()" style="font-size:16px;padding:15px;">
+      Entrar →
+    </button>
+    <div id="login-error" style="display:none;text-align:center;font-size:13px;color:var(--red);
+      background:rgba(255,60,60,.1);border:1px solid rgba(255,60,60,.3);border-radius:10px;padding:10px;">
+    </div>
+  </div>
+</div>
+
+<!-- ════════════════════════════════
+     SCREEN: ADMIN
+════════════════════════════════ -->
+<div class="screen hidden" id="screen-admin">
   <div class="topbar">
-    <h2>🚛 SEISA Rutas</h2>
+    <button class="topbar-back" onclick="cerrarSesion()">⏻</button>
+    <h2>⚙️ Panel Admin</h2>
+    <span style="font-size:11px;color:var(--accent);font-weight:700;">ADMIN</span>
+  </div>
+  <div class="scroll" style="padding:16px;display:flex;flex-direction:column;gap:16px;">
+
+    <!-- Agregar usuario -->
+    <div class="card" style="display:flex;flex-direction:column;gap:10px;">
+      <div class="label">Agregar usuario</div>
+      <input class="input" id="admin-new-user" placeholder="Nombre de usuario"
+        style="font-size:14px;" onkeydown="if(event.key==='Enter')document.getElementById('admin-new-pass').focus()">
+      <input class="input" id="admin-new-pass" type="password" placeholder="Contraseña"
+        style="font-size:14px;" onkeydown="if(event.key==='Enter')adminAgregarUsuario()">
+      <div style="display:flex;gap:8px;">
+        <select class="input" id="admin-new-rol" style="font-size:14px;flex:1;">
+          <option value="usuario">👷 Usuario</option>
+          <option value="admin">🔑 Admin</option>
+        </select>
+        <button class="btn btn-green" onclick="adminAgregarUsuario()" style="width:auto;padding:10px 18px;font-size:14px;">
+          ＋ Agregar
+        </button>
+      </div>
+      <div id="admin-add-error" style="display:none;font-size:12px;color:var(--red);"></div>
+    </div>
+
+    <!-- Lista de usuarios -->
+    <div class="card" style="display:flex;flex-direction:column;gap:0;">
+      <div class="label" style="margin-bottom:10px;">Usuarios registrados</div>
+      <div id="admin-users-list" style="display:flex;flex-direction:column;gap:8px;"></div>
+    </div>
+
+    <!-- Ir a la app -->
+    <button class="btn btn-accent" onclick="showScreen('screen-home')" style="font-size:15px;padding:14px;">
+      🗺️ Ir a la App
+    </button>
+    <button class="btn btn-ghost" onclick="cerrarSesion()" style="font-size:13px;">
+      ⏻ Cerrar sesión
+    </button>
+  </div>
+</div>
+
+<div class="screen hidden" id="screen-home">
+  <div class="topbar">
+    <div style="display:flex;align-items:center;gap:8px;">
+      <h2 style="margin:0;">🚛 SEISA Rutas</h2>
+      <span id="home-user-badge" style="font-size:11px;color:var(--accent);font-weight:700;"></span>
+    </div>
     <div style="display:flex;gap:6px;">
       <button id="btn-gh-status" onclick="mostrarConfigGH()" style="width:auto;padding:6px 10px;font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text3);cursor:pointer;">⬡ GitHub</button>
       <button class="btn btn-ghost" onclick="showHistorial()" style="width:auto;padding:6px 12px;font-size:12px;">📋</button>
+      <button class="btn btn-ghost" onclick="cerrarSesion()" style="width:auto;padding:6px 10px;font-size:12px;" title="Cerrar sesión">⏻</button>
     </div>
   </div>
   <div class="scroll" style="padding:16px;display:flex;flex-direction:column;gap:12px;">
@@ -639,6 +714,181 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
 // ══════════════════════════════════════════════════════════════════
 //  GITHUB BACKEND
 // ══════════════════════════════════════════════════════════════════
+// ══════════════════════════════════════════════════════════════════
+//  SISTEMA DE AUTENTICACIÓN LOCAL
+//  - Admin hardcodeado: seisa / seisa2024  (puede cambiarse desde el panel)
+//  - Usuarios adicionales en localStorage
+//  - Sesión en sessionStorage (se cierra al cerrar la pestaña)
+// ══════════════════════════════════════════════════════════════════
+const AUTH_KEY    = 'seisa_users_v1';
+const SESSION_KEY = 'seisa_session_v1';
+
+// Usuarios por defecto — solo se usan la primera vez (si no hay nada en localStorage)
+const DEFAULT_USERS = [
+  { user: 'admin', pass: btoa('seisa2024'), rol: 'admin' }
+];
+
+function getUsers() {
+  try {
+    const raw = localStorage.getItem(AUTH_KEY);
+    return raw ? JSON.parse(raw) : [...DEFAULT_USERS];
+  } catch(e) { return [...DEFAULT_USERS]; }
+}
+
+function saveUsers(users) {
+  localStorage.setItem(AUTH_KEY, JSON.stringify(users));
+}
+
+// Inicializar: si no hay usuarios, crear los default
+(function initAuth() {
+  if (!localStorage.getItem(AUTH_KEY)) saveUsers([...DEFAULT_USERS]);
+})();
+
+function getSession() {
+  try { return JSON.parse(sessionStorage.getItem(SESSION_KEY)); } catch(e) { return null; }
+}
+function setSession(u) { sessionStorage.setItem(SESSION_KEY, JSON.stringify(u)); }
+function clearSession() { sessionStorage.removeItem(SESSION_KEY); }
+
+// ── Login ──────────────────────────────────────────────────────────
+function hacerLogin() {
+  const user = document.getElementById('login-user').value.trim();
+  const pass = document.getElementById('login-pass').value;
+  const errEl = document.getElementById('login-error');
+
+  if (!user || !pass) {
+    errEl.textContent = 'Ingresa usuario y contraseña.';
+    errEl.style.display = 'block'; return;
+  }
+
+  const users = getUsers();
+  const match = users.find(u => u.user.toLowerCase() === user.toLowerCase() && u.pass === btoa(pass));
+
+  if (!match) {
+    errEl.textContent = 'Usuario o contraseña incorrectos.';
+    errEl.style.display = 'block';
+    document.getElementById('login-pass').value = '';
+    return;
+  }
+
+  errEl.style.display = 'none';
+  setSession({ user: match.user, rol: match.rol });
+  postLogin(match);
+}
+
+function postLogin(match) {
+  if (match.rol === 'admin') {
+    renderAdminUsers();
+    showScreen('screen-admin');
+  } else {
+    const badge = document.getElementById('home-user-badge');
+    if (badge) badge.textContent = match.user;
+    showScreen('screen-home');
+  }
+}
+
+function cerrarSesion() {
+  clearSession();
+  document.getElementById('login-user').value  = '';
+  document.getElementById('login-pass').value  = '';
+  document.getElementById('login-error').style.display = 'none';
+  showScreen('screen-login');
+}
+
+// ── Admin: renderizar lista de usuarios ───────────────────────────
+function renderAdminUsers() {
+  const list  = document.getElementById('admin-users-list');
+  const users = getUsers();
+  if (!list) return;
+
+  if (users.length === 0) {
+    list.innerHTML = '<div style="font-size:13px;color:var(--text3);text-align:center;padding:10px;">Sin usuarios registrados</div>';
+    return;
+  }
+
+  list.innerHTML = users.map((u, i) => `
+    <div style="display:flex;align-items:center;gap:10px;padding:10px 12px;
+      background:var(--surface2);border-radius:10px;border:1px solid var(--border);">
+      <div style="font-size:20px;">${u.rol === 'admin' ? '🔑' : '👷'}</div>
+      <div style="flex:1;">
+        <div style="font-size:14px;font-weight:700;color:var(--text);">${u.user}</div>
+        <div style="font-size:11px;color:var(--text3);">${u.rol === 'admin' ? 'Administrador' : 'Usuario'}</div>
+      </div>
+      <button onclick="adminBorrarUsuario(${i})"
+        style="padding:6px 12px;border-radius:8px;border:1px solid rgba(255,60,60,.4);
+          background:rgba(255,60,60,.1);color:#ff6060;font-size:12px;font-weight:700;cursor:pointer;">
+        Borrar
+      </button>
+    </div>
+  `).join('');
+}
+
+// ── Admin: agregar usuario ─────────────────────────────────────────
+function adminAgregarUsuario() {
+  const newUser = document.getElementById('admin-new-user').value.trim();
+  const newPass = document.getElementById('admin-new-pass').value;
+  const newRol  = document.getElementById('admin-new-rol').value;
+  const errEl   = document.getElementById('admin-add-error');
+
+  if (!newUser || !newPass) {
+    errEl.textContent = 'Completa usuario y contraseña.';
+    errEl.style.display = 'block'; return;
+  }
+  if (newPass.length < 4) {
+    errEl.textContent = 'La contraseña debe tener al menos 4 caracteres.';
+    errEl.style.display = 'block'; return;
+  }
+
+  const users = getUsers();
+  if (users.find(u => u.user.toLowerCase() === newUser.toLowerCase())) {
+    errEl.textContent = 'Ya existe un usuario con ese nombre.';
+    errEl.style.display = 'block'; return;
+  }
+
+  users.push({ user: newUser, pass: btoa(newPass), rol: newRol });
+  saveUsers(users);
+
+  document.getElementById('admin-new-user').value = '';
+  document.getElementById('admin-new-pass').value = '';
+  document.getElementById('admin-new-rol').value  = 'usuario';
+  errEl.style.display = 'none';
+  renderAdminUsers();
+  showToast('✅ Usuario "' + newUser + '" creado');
+}
+
+// ── Admin: borrar usuario ─────────────────────────────────────────
+function adminBorrarUsuario(idx) {
+  const users = getUsers();
+  const u = users[idx];
+  if (!u) return;
+
+  // Evitar borrar el último admin
+  const admins = users.filter(x => x.rol === 'admin');
+  if (u.rol === 'admin' && admins.length <= 1) {
+    showToast('⚠️ No puedes borrar el único administrador'); return;
+  }
+
+  if (!confirm('¿Borrar al usuario "' + u.user + '"?')) return;
+  users.splice(idx, 1);
+  saveUsers(users);
+  renderAdminUsers();
+  showToast('🗑️ Usuario eliminado');
+}
+
+// ── Proteger la app: verificar sesión al cargar ───────────────────
+function verificarSesion() {
+  const session = getSession();
+  if (!session) {
+    // Sin sesión → mostrar login
+    document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+    document.getElementById('screen-login')?.classList.remove('hidden');
+    return false;
+  }
+  const badge = document.getElementById('home-user-badge');
+  if (badge) badge.textContent = session.user;
+  return true;
+}
+
 const GH_CONFIG_KEY = 'seisa_gh_config';
 const APP_KEY       = 'seisa_app_v1';
 const GH_FILE       = 'seisa-data.json';
@@ -825,6 +1075,11 @@ let editUbData    = null; // {lat,lng,nombre} para edición temporal
 //  NAVEGACIÓN DE PANTALLAS
 // ══════════════════════════════════════════════════════════════════
 function showScreen(id) {
+  // Pantallas libres (no requieren sesión)
+  const PUBLIC = ['screen-login', 'screen-admin'];
+  if (!PUBLIC.includes(id) && !getSession()) {
+    id = 'screen-login';
+  }
   document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
   const target = document.getElementById(id);
   if (target) {
@@ -835,6 +1090,7 @@ function showScreen(id) {
     if (id === 'screen-resumen') setTimeout(function() {
       if (mapResumen) { mapResumen.invalidateSize(); trazarRutaResumen(); }
     }, 150);
+    if (id === 'screen-admin')   renderAdminUsers();
   }
 }
 
@@ -2726,6 +2982,8 @@ async function procesarMasivo() {
   // Botón atrás físico
   history.replaceState({ s: 'screen-home' }, '');
   history.pushState({ s: 'screen-home' }, '');
+  // Verificar sesión al cargar
+  verificarSesion();
   window.addEventListener('popstate', () => {
     history.pushState({ s: 'screen-home' }, '');
   });
