@@ -2126,56 +2126,66 @@ function optimizarPipeline(paradas, inicio, fin) {
   const depotI = inicio || paradas[0];
   const depotF = fin    || depotI;
 
-  // ═══════════════════════════════════════════════════════════
-  // ANCLAS FIJAS: primer tiro = más cercano al inicio
-  //               último tiro = más cercano al fin (base)
-  // Las anclas quedan fijas; el medio se optimiza libremente
-  // ═══════════════════════════════════════════════════════════
+  // ═══════════════════════════════════════════════════════════════
+  // REGLA FIJA:
+  //   Parada #1   = la más cercana al punto de INICIO de ruta
+  //   Parada última = la más cercana al punto FINAL (base)
+  //   El resto se optimiza libremente entre esas dos anclas
+  // ═══════════════════════════════════════════════════════════════
 
-  // 1. Encontrar la parada más cercana al punto de inicio → ancla inicial
-  let idxPrimero = 0, minDI = Infinity;
+  // — Paso 1: ancla de inicio —
+  let idxA = 0, minDA = Infinity;
   paradas.forEach((p, i) => {
     const d = distHaversine(depotI.lat, depotI.lng, p.lat, p.lng);
-    if (d < minDI) { minDI = d; idxPrimero = i; }
+    if (d < minDA) { minDA = d; idxA = i; }
   });
-  const anclaInicio = paradas[idxPrimero];
-  let restantes = paradas.filter((_, i) => i !== idxPrimero);
+  const anclaInicio = paradas[idxA];
+  const tras1 = paradas.filter((_, i) => i !== idxA);
 
-  // 2. Encontrar la parada más cercana al punto final → ancla final
-  //    (buscar entre las restantes, no la misma que la primera)
-  let idxUltimo = 0, minDF = Infinity;
-  restantes.forEach((p, i) => {
+  // Caso: solo 1 parada
+  if (!tras1.length) return [anclaInicio];
+
+  // — Paso 2: ancla de fin (buscar solo entre las restantes) —
+  let idxB = 0, minDB = Infinity;
+  tras1.forEach((p, i) => {
     const d = distHaversine(depotF.lat, depotF.lng, p.lat, p.lng);
-    if (d < minDF) { minDF = d; idxUltimo = i; }
+    if (d < minDB) { minDB = d; idxB = i; }
   });
-  const anclaFin = restantes.length ? restantes[idxUltimo] : null;
-  const medio = anclaFin ? restantes.filter((_, i) => i !== idxUltimo) : [];
+  const anclaFin = tras1[idxB];
+  const medio    = tras1.filter((_, i) => i !== idxB);
 
-  // Si solo hay 2 paradas, ya están fijas
-  if (!medio.length) {
-    return anclaFin ? [anclaInicio, anclaFin] : [anclaInicio];
-  }
+  // Caso: solo 2 paradas — anclas directas, nada que optimizar
+  if (!medio.length) return [anclaInicio, anclaFin];
 
-  // 3. Optimizar las paradas del medio entre las dos anclas
-  //    usando el pipeline completo (clustering + 3-opt + or-opt)
-  const medioOptimizado = _optimizarMedio(medio, anclaInicio, anclaFin);
+  // — Paso 3: optimizar el bloque del medio
+  //   anclaInicio y anclaFin actúan como depots para ese sub-tramo
+  const medioOpt = _optimizarMedio(medio, anclaInicio, anclaFin);
 
-  // 4. Ensamblar: anclaInicio → medio optimizado → anclaFin
-  return [anclaInicio, ...medioOptimizado, anclaFin];
+  // — Paso 4: resultado final con anclas intocables en posición 0 y N-1
+  return [anclaInicio, ...medioOpt, anclaFin];
 }
 
-// Pipeline interno para las paradas del medio (sin tocar las anclas)
+// ── Optimizador interno del bloque medio (anclas ya fijadas fuera) ─
 function _optimizarMedio(paradas, inicio, fin) {
   if (!paradas.length) return [];
-  if (paradas.length <= 2) return [...paradas];
+  if (paradas.length === 1) return [...paradas];
+  if (paradas.length === 2) {
+    // Elegir el orden que sea más corto pasando por los dos puntos
+    const d1 = distHaversine(inicio.lat, inicio.lng, paradas[0].lat, paradas[0].lng)
+              + distHaversine(paradas[0].lat, paradas[0].lng, paradas[1].lat, paradas[1].lng)
+              + distHaversine(paradas[1].lat, paradas[1].lng, fin.lat, fin.lng);
+    const d2 = distHaversine(inicio.lat, inicio.lng, paradas[1].lat, paradas[1].lng)
+              + distHaversine(paradas[1].lat, paradas[1].lng, paradas[0].lat, paradas[0].lng)
+              + distHaversine(paradas[0].lat, paradas[0].lng, fin.lat, fin.lng);
+    return d1 <= d2 ? [...paradas] : [paradas[1], paradas[0]];
+  }
 
   const depotI = inicio;
   const depotF = fin;
 
-  // === FASE 1: Clustering por zonas geográficas ===
+  // FASE 1: construir ruta base con Cheapest Insertion y Nearest Neighbor
   let numClusters = Math.max(2, Math.round(Math.sqrt(paradas.length * 0.7)));
   if (paradas.length <= 6) numClusters = 1;
-
   let paradaOrdenada;
 
   if (numClusters === 1) {
@@ -2198,8 +2208,7 @@ function _optimizarMedio(paradas, inicio, fin) {
       lng: g.reduce((s,p)=>s+p.lng,0)/g.length,
       grupo: g
     }));
-    let sinVisitar = [...centroides];
-    let actual = depotI;
+    let sinVisitar = [...centroides], actual = depotI;
     const gruposFinal = [];
     while (sinVisitar.length) {
       let minD = Infinity, minI = 0;
@@ -2225,25 +2234,26 @@ function _optimizarMedio(paradas, inicio, fin) {
     paradaOrdenada = seccionesOptimizadas;
   }
 
-  // === FASE 2: 3-opt global ===
+  // FASE 2: refinamiento con 3-opt + 2-opt + Or-opt
+  // Importante: depotI = anclaInicio y depotF = anclaFin actúan como
+  // fronteras fijas — los algoritmos no pueden moverlos porque están
+  // fuera del array que reciben (solo optimizan el interior)
   let ruta = threeOpt(paradaOrdenada, depotI, depotF);
-
-  // === FASE 3: 2-opt + Or-opt iterados ===
   let distAnterior = Infinity;
   for (let round = 0; round < 5; round++) {
     ruta = twoOptLineal(ruta, depotI, depotF);
     ruta = orOptDelta(ruta, depotI, depotF);
-    const distActual = calcDistRuta(ruta, depotI, depotF);
-    if (distAnterior - distActual < 0.005) break;
-    distAnterior = distActual;
+    const d = calcDistRuta(ruta, depotI, depotF);
+    if (distAnterior - d < 0.005) break;
+    distAnterior = d;
   }
 
-  // === FASE 4: Seguro contra Cheapest Insertion global ===
-  const rutaCIGlobal = cheapestInsertion(paradas, depotI, depotF);
-  let rutaBase2opt = twoOptLineal(rutaCIGlobal, depotI, depotF);
-  rutaBase2opt = orOptDelta(rutaBase2opt, depotI, depotF);
-  if (calcDistRuta(rutaBase2opt, depotI, depotF) < calcDistRuta(ruta, depotI, depotF)) {
-    ruta = rutaBase2opt;
+  // FASE 3: comparar contra CI global como seguro
+  const rutaCI2 = cheapestInsertion(paradas, depotI, depotF);
+  let rutaCI2opt = twoOptLineal(rutaCI2, depotI, depotF);
+  rutaCI2opt = orOptDelta(rutaCI2opt, depotI, depotF);
+  if (calcDistRuta(rutaCI2opt, depotI, depotF) < calcDistRuta(ruta, depotI, depotF)) {
+    ruta = rutaCI2opt;
   }
 
   return ruta;
