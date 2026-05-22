@@ -2168,107 +2168,45 @@ function optimizarPipeline(paradas, inicio, fin) {
 function _optimizarMedio(paradas, inicio, fin) {
   if (!paradas.length) return [];
   if (paradas.length === 1) return [...paradas];
-  if (paradas.length === 2) {
-    const d1 = distHaversine(inicio.lat, inicio.lng, paradas[0].lat, paradas[0].lng)
-             + distHaversine(paradas[0].lat, paradas[0].lng, paradas[1].lat, paradas[1].lng)
-             + distHaversine(paradas[1].lat, paradas[1].lng, fin.lat, fin.lng);
-    const d2 = distHaversine(inicio.lat, inicio.lng, paradas[1].lat, paradas[1].lng)
-             + distHaversine(paradas[1].lat, paradas[1].lng, paradas[0].lat, paradas[0].lng)
-             + distHaversine(paradas[0].lat, paradas[0].lng, fin.lat, fin.lng);
-    return d1 <= d2 ? [...paradas] : [paradas[1], paradas[0]];
-  }
 
-  const depotI = inicio;
-  const depotF = fin;
+  // Calculamos si la ruta empieza y termina en el mismo lugar (Circuito) o no
+  const distCierre = distHaversine(inicio.lat, inicio.lng, fin.lat, fin.lng);
 
-  // 1. CUADRÍCULA GEOGRÁFICA ESTRICTA
-  // Dividimos el mapa en celdas estáticas de ~800 metros (0.008 grados).
-  // Esto encapsula las colonias y evita que el chofer deje la zona a medias.
-  const GRID_SIZE = 0.008; 
-  const gruposMap = {};
-
-  paradas.forEach(p => {
-    const gridLat = Math.floor(p.lat / GRID_SIZE);
-    const gridLng = Math.floor(p.lng / GRID_SIZE);
-    const key = `${gridLat}_${gridLng}`;
-    if (!gruposMap[key]) gruposMap[key] = [];
-    gruposMap[key].push(p);
-  });
-
-  const zonas = Object.values(gruposMap);
-
-  // 2. ORDENAR LOS SECTORES (De inicio a fin)
-  // El chofer irá barriendo sector por sector hacia su destino, sin retroceder.
-  const zonasOrdenadas = [];
-  let actual = depotI;
-  const zonasPendientes = [...zonas];
-
-  while(zonasPendientes.length > 0) {
-    let minD = Infinity;
-    let mejorIdx = -1;
-    
-    for(let i = 0; i < zonasPendientes.length; i++) {
-      const zona = zonasPendientes[i];
-      // Buscamos el centroide de esta zona para medir la distancia
-      const cLat = zona.reduce((sum, p) => sum + p.lat, 0) / zona.length;
-      const cLng = zona.reduce((sum, p) => sum + p.lng, 0) / zona.length;
-      const d = distHaversine(actual.lat, actual.lng, cLat, cLng);
-      
-      if (d < minD) { minD = d; mejorIdx = i; }
-    }
-    
-    zonasOrdenadas.push(zonasPendientes[mejorIdx]);
-    const lastZ = zonasPendientes[mejorIdx];
-    // Actualizamos nuestra posición virtual al centro de la zona que acabamos de agregar
-    actual = {
-      lat: lastZ.reduce((sum, p) => sum + p.lat, 0) / lastZ.length,
-      lng: lastZ.reduce((sum, p) => sum + p.lng, 0) / lastZ.length
-    };
-    zonasPendientes.splice(mejorIdx, 1);
-  }
-
-  // 3. RUTEO INTERNO POR SECTOR (Barrido Vectorial)
-  const rutaFinal = [];
-  let puntoEntrada = depotI;
-
-  zonasOrdenadas.forEach((zona, gi) => {
-    // Apuntamos la salida hacia el siguiente cuadro
-    let puntoSalida = depotF;
-    if (gi < zonasOrdenadas.length - 1) {
-      const nextZ = zonasOrdenadas[gi+1];
-      puntoSalida = {
-        lat: nextZ.reduce((sum, p) => sum + p.lat, 0) / nextZ.length,
-        lng: nextZ.reduce((sum, p) => sum + p.lng, 0) / nextZ.length
-      };
-    }
-
-    // Calculamos el vector direccional (la flecha invisible que cruza la colonia)
-    const vLat = puntoSalida.lat - puntoEntrada.lat;
-    const vLng = puntoSalida.lng - puntoEntrada.lng;
+  if (distCierre > 0.5) { 
+    // CASO 1: RUTA LINEAL (Ej. El punto Final está a más de 500m del Inicio)
+    // Trazamos un vector desde el Inicio hasta el Fin y proyectamos las paradas sobre él.
+    const vLat = fin.lat - inicio.lat;
+    const vLng = fin.lng - inicio.lng;
     const vMag = Math.sqrt(vLat * vLat + vLng * vLng);
 
-    // Si la entrada y salida son el mismo punto (ej. el destino final), ordenamos por cercanía lineal
-    if (vMag < 0.00001) {
-      zona.sort((a, b) => distHaversine(puntoEntrada.lat, puntoEntrada.lng, a.lat, a.lng) - distHaversine(puntoEntrada.lat, puntoEntrada.lng, b.lat, b.lng));
-    } else {
-      // Ordenamos proyectando cada parada sobre la flecha. 
-      // Esto obliga al sistema a entregar los paquetes "conforme se los va topando" hacia adelante.
-      zona.sort((a, b) => {
-        const projA = ((a.lat - puntoEntrada.lat) * vLat + (a.lng - puntoEntrada.lng) * vLng) / vMag;
-        const projB = ((b.lat - puntoEntrada.lat) * vLat + (b.lng - puntoEntrada.lng) * vLng) / vMag;
-        return projA - projB;
-      });
-    }
-    
-    // Ya no usamos cheapestInsertion ni twoOptLineal aquí adentro para no romper el barrido recto
-    rutaFinal.push(...zona);
-    if (zona.length > 0) puntoEntrada = zona[zona.length - 1];
-  });
+    return paradas.sort((a, b) => {
+      const projA = ((a.lat - inicio.lat) * vLat + (a.lng - inicio.lng) * vLng) / vMag;
+      const projB = ((b.lat - inicio.lat) * vLat + (b.lng - inicio.lng) * vLng) / vMag;
+      return projA - projB;
+    });
 
-  // 4. DESENREDAR CRUCES FINALES
-  // Hacemos una última limpieza rápida por si el algoritmo cruzó la línea
-  // al pasar de un bloque a otro, pero sin romper la estructura de las zonas.
-  return twoOptLineal(rutaFinal, depotI, depotF);
+  } else {
+    // CASO 2: CIRCUITO (Ida y vuelta a la misma Base)
+    // Buscamos el centro de todas las paradas
+    let sumLat = 0, sumLng = 0;
+    paradas.forEach(p => { sumLat += p.lat; sumLng += p.lng; });
+    const centro = { lat: sumLat / paradas.length, lng: sumLng / paradas.length };
+
+    // Calculamos el ángulo desde donde entra el chofer a la zona
+    const anguloInicio = Math.atan2(inicio.lng - centro.lng, inicio.lat - centro.lat);
+
+    // Hacemos un barrido como las manecillas del reloj a partir del punto de inicio
+    return paradas.sort((a, b) => {
+      let angA = Math.atan2(a.lng - centro.lng, a.lat - centro.lat) - anguloInicio;
+      let angB = Math.atan2(b.lng - centro.lng, b.lat - centro.lat) - anguloInicio;
+      
+      // Normalizamos a un círculo completo (0 a 360 grados)
+      if (angA < 0) angA += 2 * Math.PI;
+      if (angB < 0) angB += 2 * Math.PI;
+
+      return angA - angB;
+    });
+  }
 }
 
 function optimizarRuta() {
