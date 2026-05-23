@@ -21,11 +21,15 @@ self.addEventListener('notificationclick', e => {
         cs[0].postMessage(msg);
         cs[0].focus();
       } else {
-        // App cerrada → abrirla y mandar mensaje cuando cargue
-        clients.openWindow(url).then(c => {
+        // App cerrada → abrirla con la acción en la URL para que init() la procese
+        // (postMessage no es confiable cuando la app acaba de arrancar)
+        const openUrl = action
+          ? `${url}?notif_action=${action}&notif_idx=${idx}`
+          : url;
+        clients.openWindow(openUrl).then(c => {
           if (c) {
-            // Esperar a que cargue antes de enviar el mensaje
-            setTimeout(() => c.postMessage(msg), 1500);
+            // También mandamos el mensaje por si la app ya tenía el listener listo
+            setTimeout(() => c.postMessage(msg), 2000);
           }
         });
       }
