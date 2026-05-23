@@ -2480,22 +2480,33 @@ function eliminarParadaSeg(id) {
 
 // Abre Maps navegando SOLO a la siguiente parada pendiente
 // ── Abre Google Maps ─────────────────────────────────────────────
-// Crea un <a> y hace click — es el método más confiable en Android.
-// Evita que Chrome lo bloquee como popup (window.open falla en Netlify PWA).
+// Abre Google Maps app nativa usando el esquema de deep link oficial.
+// En Android: location.href con el esquema correcto lanza la app directamente.
+// Para rutas con waypoints se usa el mismo mecanismo con _self.
 function abrirMaps(latDest, lngDest) {
-  // window.open SÍNCRONO dentro del event handler — única forma
-  // que Chrome PWA no bloquea como popup
-  window.open(
-    `https://maps.google.com/maps?api=1&destination=${latDest},${lngDest}&travelmode=driving`,
-    '_blank'
-  );
+  // Esquema oficial de navegación — Android lo intercepta y abre Maps app
+  // Usamos location.href con _self para evitar el popup del navegador
+  const url = `google.navigation:q=${latDest},${lngDest}&mode=d`;
+  // Intentar abrir la app nativa primero
+  const t = Date.now();
+  window.location.href = url;
+  // Si la app no responde en 500ms (no instalada), abrir en navegador
+  setTimeout(() => {
+    if (Date.now() - t < 800) {
+      window.open(
+        `https://maps.google.com/maps?api=1&destination=${latDest},${lngDest}&travelmode=driving`,
+        '_blank'
+      );
+    }
+  }, 500);
 }
 
 function abrirMapsUrl(url) {
-  window.open(
-    url.replace('https://www.google.com/maps', 'https://maps.google.com'),
-    '_blank'
-  );
+  // Para rutas con waypoints usar _self para no abrir pestaña nueva
+  const mapsUrl = url
+    .replace('https://www.google.com/maps', 'https://maps.google.com')
+    .replace('https://maps.google.com/maps', 'https://maps.google.com');
+  window.location.href = mapsUrl;
 }
 
 function abrirSegmento(idx) {
