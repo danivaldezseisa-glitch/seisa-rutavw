@@ -10,6 +10,8 @@
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="application-name" content="SEISA Rutas">
 <meta name="description" content="Sistema de rutas y entregas SEISA Logística">
+<!-- Permitir que la PWA abra ventanas externas (Google Maps) -->
+<meta http-equiv="Cross-Origin-Opener-Policy" content="unsafe-none">
 
 <!-- Iconos para iOS (pantalla de inicio) -->
 <link rel="apple-touch-icon" href="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAxMjggMTI4Ij48cmVjdCB3aWR0aD0iMTI4IiBoZWlnaHQ9IjEyOCIgcng9IjIwIiBmaWxsPSIjMGExNjI4Ii8+PHRleHQgeD0iNjQiIHk9Ijg0IiBmb250LXNpemU9IjcyIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIj7wn5qbPC90ZXh0Pjwvc3ZnPg==">
@@ -2480,24 +2482,20 @@ function eliminarParadaSeg(id) {
 // ── Abre Google Maps ─────────────────────────────────────────────
 // Crea un <a> y hace click — es el método más confiable en Android.
 // Evita que Chrome lo bloquee como popup (window.open falla en Netlify PWA).
-function _abrirUrl(url) {
-  const a = document.createElement('a');
-  a.href   = url;
-  a.target = '_blank';
-  a.rel    = 'noopener';
-  document.body.appendChild(a);
-  a.click();
-  setTimeout(() => document.body.removeChild(a), 200);
-}
-
 function abrirMaps(latDest, lngDest) {
-  _abrirUrl(
-    `https://maps.google.com/maps?api=1&destination=${latDest},${lngDest}&travelmode=driving`
+  // window.open SÍNCRONO dentro del event handler — única forma
+  // que Chrome PWA no bloquea como popup
+  window.open(
+    `https://maps.google.com/maps?api=1&destination=${latDest},${lngDest}&travelmode=driving`,
+    '_blank'
   );
 }
 
 function abrirMapsUrl(url) {
-  _abrirUrl(url.replace('https://www.google.com/maps', 'https://maps.google.com'));
+  window.open(
+    url.replace('https://www.google.com/maps', 'https://maps.google.com'),
+    '_blank'
+  );
 }
 
 function abrirSegmento(idx) {
@@ -2578,7 +2576,10 @@ function mostrarSelectorSegmentos(segmentos, activo) {
 // ══════════════════════════════════════════════════════════════════
 //  NAVEGACIÓN AUTOMÁTICA PARADA POR PARADA
 // ══════════════════════════════════════════════════════════════════
-async function navegarSiguienteParada() {
+// IMPORTANTE: esta función debe ser SÍNCRONA (no async) para que
+// window.open no sea bloqueado por Chrome PWA como popup.
+// La notificación se manda con setTimeout para no bloquear el return.
+function navegarSiguienteParada() {
   const ruta = state.rutaActual;
   if (!ruta) return;
   const pendientes = ruta.paradas.filter(p => !p.hecha && !p.fallida);
@@ -2595,7 +2596,11 @@ async function navegarSiguienteParada() {
   const siguiente = pendientes[0];
   const idxReal   = ruta.paradas.indexOf(siguiente);
   const letra     = idxToLetra(idxReal);
+
+  // Abrir Maps PRIMERO de forma síncrona — así Chrome no lo bloquea
   abrirMaps(siguiente.lat, siguiente.lng);
+
+  // El resto puede ser asíncrono
   ruta._navAuto = true;
   saveState();
   actualizarBtnNavAuto();
