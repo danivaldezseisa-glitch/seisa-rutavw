@@ -2416,21 +2416,31 @@ function marcarEntregadaSeg(idx) {
   if (!ruta) return;
   const p = ruta.paradas[idx];
   if (!p || p.hecha) return;
+
   p.hecha = true; p.fallida = false; p.horaAccion = fmtHora(new Date());
+
+  const pendientes = ruta.paradas.filter((q, i) => i !== idx && !q.hecha && !q.fallida);
+
+  // Si nav automático activo: abrir Maps PRIMERO de forma síncrona
+  // antes de cualquier otra operación, así Chrome no lo bloquea
+  if (ruta._navAuto && pendientes.length > 0) {
+    const siguiente = pendientes[0];
+    saveStateLocal(); // guardar sin push a GitHub para no cortar el flujo
+    window.open(_urlMaps(siguiente.lat, siguiente.lng), '_blank');
+  }
+
+  // Resto de operaciones (ya no importa si son async)
   saveState();
   renderSeguimiento();
   showToast('✅ Entregada · ' + p.horaAccion);
-  const pendientes = ruta.paradas.filter(q => !q.hecha && !q.fallida);
-  if (pendientes.length > 0) {
-    if (ruta._navAuto) {
-      // Modo automático: abrir Maps con la siguiente parada directo
-      setTimeout(() => navegarSiguienteParada(), 700);
-    }
-  } else {
+
+  if (pendientes.length === 0) {
     showToast('🎉 ¡Todas las paradas completadas!');
     ruta._navAuto = false;
     saveState();
     actualizarBtnNavAuto();
+  } else if (ruta._navAuto) {
+    setTimeout(() => enviarNotificacionParada(), 1500);
   }
 }
 
@@ -2439,13 +2449,24 @@ function marcarFallidaSeg(idx) {
   if (!ruta) return;
   const p = ruta.paradas[idx];
   if (!p || p.hecha) return;
+
   p.hecha = true; p.fallida = true; p.horaAccion = fmtHora(new Date());
+
+  const pendientes = ruta.paradas.filter((q, i) => i !== idx && !q.hecha && !q.fallida);
+
+  // Abrir Maps PRIMERO síncronamente
+  if (ruta._navAuto && pendientes.length > 0) {
+    const siguiente = pendientes[0];
+    saveStateLocal();
+    window.open(_urlMaps(siguiente.lat, siguiente.lng), '_blank');
+  }
+
   saveState();
   renderSeguimiento();
   showToast('⚠️ Fallida · ' + p.horaAccion);
-  const pendientes = ruta.paradas.filter(q => !q.hecha && !q.fallida);
-  if (pendientes.length > 0 && ruta._navAuto) {
-    setTimeout(() => navegarSiguienteParada(), 700);
+
+  if (ruta._navAuto && pendientes.length > 0) {
+    setTimeout(() => enviarNotificacionParada(), 1500);
   }
 }
 
