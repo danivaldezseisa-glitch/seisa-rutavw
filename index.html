@@ -20,9 +20,9 @@
 <script>
 (function() {
   const manifest = {
-    name:             'Rutas Locas',
-    short_name:       'FLDSMDFR',
-    description:      'Sistema de rutas y entregas LOCAS',
+    name:             'SEISA Rutas',
+    short_name:       'SEISA',
+    description:      'Sistema de rutas y entregas SEISA Logística',
     start_url:        './',
     display:          'standalone',
     orientation:      'portrait',
@@ -66,7 +66,7 @@
 })();
 </script>
 
-<title>RUTAS LOCAS</title>
+<title>SEISA Rutas</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
@@ -3918,6 +3918,24 @@ async function instalarPWA() {
     if (labelEl) labelEl.textContent = '👤 ' + savedSession.nombre;
     showScreen('screen-home');
     renderHome();
+
+    // ── Detectar si la app fue abierta desde un botón de notificación ──
+    // El sw.js pasa ?notif_action=entregada|fallida&notif_idx=N en la URL
+    const _urlParams = new URLSearchParams(location.search);
+    const _notifAction = _urlParams.get('notif_action');
+    const _notifIdx    = parseInt(_urlParams.get('notif_idx'), 10);
+    if ((_notifAction === 'entregada' || _notifAction === 'fallida') && !isNaN(_notifIdx)) {
+      // Limpiar los params de la URL sin recargar la página
+      history.replaceState({}, '', location.pathname);
+      // Ejecutar la acción y navegar a conducción (con pequeño delay para que la UI esté lista)
+      setTimeout(() => {
+        if (state.rutaActual) {
+          if (_notifAction === 'entregada') marcarEntregadaSeg(_notifIdx);
+          if (_notifAction === 'fallida')   marcarFallidaSeg(_notifIdx);
+          mostrarPantallaConduccion();
+        }
+      }, 300);
+    }
   } else {
     renderLoginScreen();
   }
