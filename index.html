@@ -417,28 +417,28 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
     <button id="btn-nav-auto" onclick="toggleNavAuto()" style="width:auto;padding:6px 10px;font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text3);cursor:pointer;font-weight:700;">▶ Nav</button>
     <button id="btn-notif" onclick="activarNotificaciones()" style="width:auto;padding:6px 10px;font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text3);cursor:pointer;font-weight:700;" title="Activar notificaciones">🔔</button>
   </div>
-  <div style="background:var(--bg2);border-bottom:1px solid var(--border);padding:10px 16px;flex-shrink:0;">
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
-      <div style="display:flex;gap:10px;flex-wrap:wrap;">
-        <span id="seg-entregadas" style="font-size:11px;color:var(--green);font-weight:700;">✓ 0 entregadas</span>
-        <span id="seg-fallidas"   style="font-size:11px;color:var(--red);font-weight:700;">✗ 0 fallidas</span>
-        <span id="seg-pendientes" style="font-size:11px;color:var(--text3);">— 0 pendientes</span>
+  <div style="background:var(--bg2);border-bottom:1px solid var(--border);padding:12px 16px;flex-shrink:0;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <div style="display:flex;gap:14px;align-items:center;">
+        <span id="seg-entregadas" style="font-size:14px;color:var(--green);font-weight:800;">✓ 0</span>
+        <span id="seg-fallidas"   style="font-size:14px;color:var(--red);font-weight:800;">✗ 0</span>
+        <span id="seg-pendientes" style="font-size:14px;color:var(--text3);font-weight:700;">— 0</span>
       </div>
-      <span id="seg-pct" style="font-size:13px;font-weight:800;color:var(--accent);">0%</span>
+      <span id="seg-pct" style="font-size:20px;font-weight:900;color:var(--accent);">0%</span>
     </div>
-    <div style="height:5px;background:var(--surface2);border-radius:6px;overflow:hidden;">
+    <div style="height:6px;background:var(--surface2);border-radius:6px;overflow:hidden;">
       <div id="seg-bar" style="height:100%;background:linear-gradient(90deg,var(--accent),var(--green));border-radius:6px;width:0%;transition:width .4s;"></div>
     </div>
-    <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap;align-items:center;">
-      <span id="seg-nombre-ruta" style="font-size:12px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">—</span>
-      <div style="display:flex;gap:8px;flex-shrink:0;">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px;">
+      <span id="seg-nombre-ruta" style="font-size:13px;font-weight:700;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2);">—</span>
+      <div style="display:flex;gap:10px;flex-shrink:0;margin-left:10px;">
         <div style="text-align:center;">
-          <div id="seg-eta-km" style="font-size:12px;font-weight:800;color:var(--accent);font-family:var(--mono);">—</div>
+          <div id="seg-eta-km" style="font-size:13px;font-weight:800;color:var(--accent);font-family:var(--mono);">—</div>
           <div style="font-size:9px;color:var(--text3);text-transform:uppercase;">km rest.</div>
         </div>
         <div style="width:1px;background:var(--border);"></div>
         <div style="text-align:center;">
-          <div id="seg-eta-hora" style="font-size:12px;font-weight:800;color:var(--yellow);font-family:var(--mono);">—</div>
+          <div id="seg-eta-hora" style="font-size:13px;font-weight:800;color:var(--yellow);font-family:var(--mono);">—</div>
           <div style="font-size:9px;color:var(--text3);text-transform:uppercase;">ETA fin</div>
         </div>
       </div>
@@ -446,10 +446,10 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
   </div>
   <div class="scroll" style="flex:1;">
     <div style="padding:10px 12px;display:flex;gap:8px;background:var(--bg2);border-bottom:1px solid var(--border);">
-      <button class="btn btn-accent" onclick="abrirRutaCompleta()" style="font-size:12px;padding:9px 10px;flex:2;" id="btn-ir-siguiente">🗺️ Abrir ruta en Maps</button>
-      <button onclick="mostrarPantallaConduccion()" style="width:44px;height:40px;flex-shrink:0;border-radius:10px;border:1.5px solid rgba(255,215,0,.5);background:rgba(255,215,0,.1);color:#ffd740;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="Modo conducción">🚗</button>
-      <button class="btn btn-ghost" onclick="reoptimizarPendientes()" style="font-size:12px;padding:9px 10px;flex:1;">⚡ Re-opt.</button>
-      <button onclick="abrirAgregarParadaSeg()" style="width:40px;height:40px;flex-shrink:0;border-radius:10px;border:1.5px solid rgba(0,212,255,.5);background:rgba(0,212,255,.1);color:var(--accent);font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;">＋</button>
+      <button class="btn btn-accent" onclick="abrirRutaCompleta()" style="font-size:15px;padding:12px 10px;flex:2;" id="btn-ir-siguiente">🗺️ Abrir en Maps</button>
+      <button onclick="mostrarPantallaConduccion()" style="width:52px;height:52px;flex-shrink:0;border-radius:12px;border:2px solid rgba(255,215,0,.5);background:rgba(255,215,0,.1);color:#ffd740;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="Modo conducción">🚗</button>
+      <button class="btn btn-ghost" onclick="reoptimizarPendientes()" style="font-size:13px;padding:12px 10px;flex:1;">⚡</button>
+      <button onclick="abrirAgregarParadaSeg()" style="width:52px;height:52px;flex-shrink:0;border-radius:12px;border:2px solid rgba(0,212,255,.5);background:rgba(0,212,255,.1);color:var(--accent);font-size:26px;cursor:pointer;display:flex;align-items:center;justify-content:center;">＋</button>
     </div>
 
     <!-- MAPA DE RUTA COLAPSABLE -->
@@ -473,14 +473,14 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
       <div style="position:relative;">
         <input id="seg-buscador"
           class="input"
-          placeholder="🔍 Buscar parada registrada..."
+          placeholder="🔍 Buscar parada..."
           oninput="filtrarParadasSeg(this.value)"
-          style="padding-right:36px;font-size:14px;">
+          style="padding-right:40px;font-size:16px;padding-top:13px;padding-bottom:13px;">
         <button onclick="limpiarBuscadorSeg()"
           id="seg-buscador-clear"
-          style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text3);font-size:18px;cursor:pointer;line-height:1;">✕</button>
+          style="display:none;position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;line-height:1;">✕</button>
       </div>
-      <div id="seg-buscador-info" style="font-size:11px;color:var(--text3);margin-top:5px;display:none;text-align:center;"></div>
+      <div id="seg-buscador-info" style="font-size:12px;color:var(--text3);margin-top:5px;display:none;text-align:center;"></div>
     </div>
     <div id="seg-paradas-list"></div>
     <div style="padding:12px 16px 24px;">
@@ -2301,8 +2301,8 @@ function renderSeguimiento() {
   const pctEl = document.getElementById('seg-pct');
   if (barEl) barEl.style.width = pct + '%';
   if (pctEl) pctEl.textContent = pct + '%';
-  const eEl = document.getElementById('seg-entregadas'); if(eEl) eEl.textContent = '✓ ' + entregadas + ' entregadas';
-  const fEl = document.getElementById('seg-fallidas');   if(fEl) fEl.textContent = '✗ ' + fallidas + ' fallidas';
+  const eEl = document.getElementById('seg-entregadas'); if(eEl) eEl.textContent = '✓ ' + entregadas;
+  const fEl = document.getElementById('seg-fallidas');   if(fEl) fEl.textContent = '✗ ' + fallidas;
   const pEl = document.getElementById('seg-pendientes'); if(pEl) pEl.textContent = '— ' + pendientes + ' pend.';
 
   const { kmRest, etaHora } = calcEtaSeguimiento(ruta);
@@ -2324,78 +2324,135 @@ function renderSeguimiento() {
   ruta.paradas.forEach((p, i) => {
     const entregada = p.hecha && !p.fallida;
     const fallida   = p.fallida;
-    const color = entregada ? 'var(--green)' : fallida ? 'var(--red)' : 'var(--accent)';
-    const icono = entregada ? '✓' : fallida ? '✗' : idxToLetra(i);
 
-    let etaStr = '';
-    if (!entregada && !fallida) {
-      const prev = pendIdx === 0 ? puntoActual : ruta.paradas.filter(q => !q.hecha && !q.fallida)[pendIdx - 1];
-      if (prev) distAcumPend += distHaversine(prev.lat, prev.lng, p.lat, p.lng) * 1.35;
-      const minsConduccion = Math.round((distAcumPend / 35) * 60);
-      const minsTotal = minsConduccion + pendIdx * 9;
-      const eta = new Date(ahora.getTime() + minsTotal * 60000);
-      const hh = eta.getHours() % 12 || 12;
-      const mm = String(eta.getMinutes()).padStart(2, '0');
-      const ap = eta.getHours() >= 12 ? 'PM' : 'AM';
-      etaStr = `ETA: ${hh}:${mm} ${ap}`;
-      pendIdx++;
-    }
+    // Paradas completadas: fila compacta
+    if (entregada || fallida) {
+      const div = document.createElement('div');
+      div.dataset.paradaIdx    = i;
+      div.dataset.paradaNombre = p.nombre;
+      div.dataset.paradaLetra  = idxToLetra(i).toLowerCase();
+      div.style.cssText = 'display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid rgba(30,53,96,.5);opacity:.6;' +
+        (entregada ? 'background:rgba(0,230,118,.03);' : 'background:rgba(255,82,82,.03);');
 
-    const div = document.createElement('div');
-    div.style.cssText = 'padding:11px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;' +
-      (entregada ? 'background:rgba(0,230,118,.04);' : fallida ? 'background:rgba(255,82,82,.04);' : '');
-    div.dataset.paradaIdx    = i;
-    div.dataset.paradaNombre = p.nombre;
-    div.dataset.paradaLetra  = idxToLetra(i).toLowerCase();
+      const badge = document.createElement('div');
+      badge.style.cssText = 'width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;' +
+        (entregada ? 'background:rgba(0,230,118,.2);color:var(--green);' : 'background:rgba(255,82,82,.2);color:var(--red);');
+      badge.textContent = entregada ? '✓' : '✗';
 
-    const badge = document.createElement('div');
-    badge.style.cssText = 'width:28px;height:28px;border-radius:50%;border:2px solid ' + color + ';color:' + color + ';display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;';
-    badge.textContent = icono;
+      const nameEl2 = document.createElement('div');
+      nameEl2.style.cssText = 'flex:1;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--text2);';
+      nameEl2.textContent = p.nombre;
 
-    const info = document.createElement('div');
-    info.style.cssText = 'flex:1;min-width:0;';
-    const nameEl2 = document.createElement('div');
-    nameEl2.style.cssText = 'font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
-    nameEl2.textContent = p.nombre;
-    const subEl2 = document.createElement('div');
-    subEl2.style.cssText = 'font-size:11px;margin-top:2px;color:' + (p.horaAccion ? color : (etaStr ? 'var(--text2)' : 'var(--text3)')) + ';';
-    subEl2.textContent = p.horaAccion ? (entregada ? '✓ ' : '✗ ') + p.horaAccion : (etaStr || '');
-    info.appendChild(nameEl2); info.appendChild(subEl2);
+      const hora = document.createElement('div');
+      hora.style.cssText = 'font-size:11px;color:var(--text3);flex-shrink:0;';
+      hora.textContent = p.horaAccion || '';
 
-    if (!entregada && !fallida) {
-      const btnWrap = document.createElement('div');
-      btnWrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;flex-shrink:0;align-items:flex-end;';
-      const actionRow = document.createElement('div');
-      actionRow.style.cssText = 'display:flex;gap:4px;';
-      const btnE = document.createElement('button');
-      btnE.style.cssText = 'padding:5px 8px;border-radius:7px;border:1px solid rgba(0,230,118,.4);background:rgba(0,230,118,.1);color:var(--green);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;';
-      btnE.textContent = '✓ OK';
-      btnE.setAttribute('onclick', `marcarEntregadaSeg(${i})`);
-      const btnF = document.createElement('button');
-      btnF.style.cssText = 'padding:5px 8px;border-radius:7px;border:1px solid rgba(255,82,82,.4);background:rgba(255,82,82,.1);color:var(--red);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;';
-      btnF.textContent = '✗';
-      btnF.setAttribute('onclick', `marcarFallidaSeg(${i})`);
-      const btnEd = document.createElement('button');
-      btnEd.style.cssText = 'padding:5px 7px;border-radius:7px;border:1px solid rgba(0,212,255,.3);background:rgba(0,212,255,.08);color:var(--accent);font-size:11px;cursor:pointer;';
-      btnEd.textContent = '✏️';
-      btnEd.title = 'Editar parada';
-      btnEd.onclick = (ev) => { ev.stopPropagation(); abrirEditarParada(p.id); };
-      const btnDel = document.createElement('button');
-      btnDel.style.cssText = 'padding:5px 8px;border-radius:7px;border:1px solid rgba(255,82,82,.35);background:rgba(255,82,82,.1);color:var(--red);font-size:13px;font-weight:700;cursor:pointer;line-height:1;';
-      btnDel.textContent = '✕';
-      btnDel.title = 'Eliminar parada';
-      btnDel.onclick = (ev) => { ev.stopPropagation(); eliminarParadaSeg(p.id); };
-      actionRow.appendChild(btnE); actionRow.appendChild(btnF); actionRow.appendChild(btnEd); actionRow.appendChild(btnDel);
-      btnWrap.appendChild(actionRow);
-      div.appendChild(badge); div.appendChild(info); div.appendChild(btnWrap);
-    } else {
       const btnUndo = document.createElement('button');
-      btnUndo.style.cssText = 'background:none;border:none;color:var(--text3);font-size:15px;cursor:pointer;padding:4px;flex-shrink:0;';
+      btnUndo.style.cssText = 'background:none;border:none;color:var(--text3);font-size:14px;cursor:pointer;padding:4px 6px;flex-shrink:0;';
       btnUndo.textContent = '↩';
       btnUndo.title = 'Deshacer';
       btnUndo.onclick = (ev) => { ev.stopPropagation(); deshacerSeg(i); };
-      div.appendChild(badge); div.appendChild(info); div.appendChild(btnUndo);
+
+      div.appendChild(badge); div.appendChild(nameEl2); div.appendChild(hora); div.appendChild(btnUndo);
+      lista.appendChild(div);
+      return;
     }
+
+    // Paradas pendientes: tarjeta grande y fácil de tocar
+    const esPrimera = pendIdx === 0;
+    const prev = pendIdx === 0 ? puntoActual : ruta.paradas.filter(q => !q.hecha && !q.fallida)[pendIdx - 1];
+    if (prev) distAcumPend += distHaversine(prev.lat, prev.lng, p.lat, p.lng) * 1.35;
+    const minsConduccion = Math.round((distAcumPend / 35) * 60);
+    const minsTotal = minsConduccion + pendIdx * 9;
+    const eta = new Date(ahora.getTime() + minsTotal * 60000);
+    const hh = eta.getHours() % 12 || 12;
+    const mm = String(eta.getMinutes()).padStart(2, '0');
+    const ap = eta.getHours() >= 12 ? 'PM' : 'AM';
+    const etaStr = `${hh}:${mm} ${ap}`;
+    pendIdx++;
+
+    const div = document.createElement('div');
+    div.dataset.paradaIdx    = i;
+    div.dataset.paradaNombre = p.nombre;
+    div.dataset.paradaLetra  = idxToLetra(i).toLowerCase();
+    div.style.cssText = 'border-bottom:2px solid var(--border);' +
+      (esPrimera
+        ? 'background:rgba(0,212,255,.06);border-left:4px solid var(--accent);'
+        : 'background:var(--bg);');
+
+    // Fila superior: letra + nombre + ETA
+    const top = document.createElement('div');
+    top.style.cssText = 'display:flex;align-items:center;gap:14px;padding:16px 16px 10px;';
+
+    const badge = document.createElement('div');
+    badge.style.cssText = 'width:' + (esPrimera ? '48px' : '36px') + ';height:' + (esPrimera ? '48px' : '36px') + ';border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:900;flex-shrink:0;' +
+      (esPrimera
+        ? 'font-size:22px;background:rgba(0,212,255,.2);border:2.5px solid var(--accent);color:var(--accent);'
+        : 'font-size:14px;background:var(--surface2);border:1.5px solid var(--border);color:var(--text2);');
+    badge.textContent = idxToLetra(i);
+
+    const info = document.createElement('div');
+    info.style.cssText = 'flex:1;min-width:0;';
+
+    const nameEl2 = document.createElement('div');
+    nameEl2.style.cssText = 'font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;' +
+      (esPrimera ? 'font-size:20px;color:var(--text);' : 'font-size:15px;color:var(--text2);');
+    nameEl2.textContent = p.nombre;
+
+    const etaEl = document.createElement('div');
+    etaEl.style.cssText = 'margin-top:3px;' + (esPrimera ? 'font-size:13px;color:var(--accent);' : 'font-size:12px;color:var(--text3);');
+    etaEl.textContent = 'ETA ' + etaStr;
+
+    info.appendChild(nameEl2); info.appendChild(etaEl);
+    top.appendChild(badge); top.appendChild(info);
+    div.appendChild(top);
+
+    // Botones grandes solo para parada actual (primera pendiente)
+    if (esPrimera) {
+      const btnRow = document.createElement('div');
+      btnRow.style.cssText = 'display:flex;gap:10px;padding:0 16px 16px;';
+
+      const btnF = document.createElement('button');
+      btnF.style.cssText = 'flex:1;padding:18px 10px;border-radius:14px;border:none;background:#ff5252;color:#fff;font-size:18px;font-weight:900;cursor:pointer;-webkit-tap-highlight-color:transparent;';
+      btnF.textContent = '✗ Fallida';
+      btnF.setAttribute('onclick', `marcarFallidaSeg(${i})`);
+
+      const btnE = document.createElement('button');
+      btnE.style.cssText = 'flex:2;padding:18px 10px;border-radius:14px;border:none;background:#00e676;color:#000;font-size:18px;font-weight:900;cursor:pointer;-webkit-tap-highlight-color:transparent;';
+      btnE.textContent = '✓ Entregada';
+      btnE.setAttribute('onclick', `marcarEntregadaSeg(${i})`);
+
+      btnRow.appendChild(btnF); btnRow.appendChild(btnE);
+      div.appendChild(btnRow);
+    } else {
+      // Paradas siguientes: solo botones pequeños
+      const btnRow = document.createElement('div');
+      btnRow.style.cssText = 'display:flex;gap:6px;padding:0 16px 12px;align-items:center;';
+
+      const btnE = document.createElement('button');
+      btnE.style.cssText = 'padding:7px 14px;border-radius:9px;border:1px solid rgba(0,230,118,.4);background:rgba(0,230,118,.1);color:var(--green);font-size:13px;font-weight:700;cursor:pointer;';
+      btnE.textContent = '✓ OK';
+      btnE.setAttribute('onclick', `marcarEntregadaSeg(${i})`);
+
+      const btnF = document.createElement('button');
+      btnF.style.cssText = 'padding:7px 12px;border-radius:9px;border:1px solid rgba(255,82,82,.4);background:rgba(255,82,82,.1);color:var(--red);font-size:13px;font-weight:700;cursor:pointer;';
+      btnF.textContent = '✗';
+      btnF.setAttribute('onclick', `marcarFallidaSeg(${i})`);
+
+      const btnEd = document.createElement('button');
+      btnEd.style.cssText = 'padding:7px 10px;border-radius:9px;border:1px solid rgba(0,212,255,.3);background:rgba(0,212,255,.08);color:var(--accent);font-size:13px;cursor:pointer;';
+      btnEd.textContent = '✏️';
+      btnEd.onclick = (ev) => { ev.stopPropagation(); abrirEditarParada(p.id); };
+
+      const btnDel = document.createElement('button');
+      btnDel.style.cssText = 'padding:7px 10px;border-radius:9px;border:1px solid rgba(255,82,82,.3);background:rgba(255,82,82,.08);color:var(--red);font-size:13px;cursor:pointer;';
+      btnDel.textContent = '✕';
+      btnDel.onclick = (ev) => { ev.stopPropagation(); eliminarParadaSeg(p.id); };
+
+      btnRow.appendChild(btnE); btnRow.appendChild(btnF); btnRow.appendChild(btnEd); btnRow.appendChild(btnDel);
+      div.appendChild(btnRow);
+    }
+
     lista.appendChild(div);
   });
 
@@ -3334,8 +3391,13 @@ async function registrarSW() {
     navigator.serviceWorker.addEventListener('message', e => {
       const { tipo, action, idx } = e.data || {};
       if (tipo === 'notif_accion' && typeof idx === 'number') {
+        // Marcar la parada directamente, sin abrir Maps
         if (action === 'entregada') marcarEntregadaSeg(idx);
         if (action === 'fallida')   marcarFallidaSeg(idx);
+      }
+      if (tipo === 'ir_seguimiento') {
+        // Toque en el cuerpo de la notificación → ir a pantalla de seguimiento
+        showScreen('screen-seguimiento');
       }
     });
     console.log('✅ SW registrado desde sw.js — notificaciones con botones activas');
@@ -3383,6 +3445,7 @@ async function notificarParada(parada, idxReal, letra) {
           { action: 'entregada', title: '✅ Entregada' },
           { action: 'fallida',   title: '❌ Fallida'   },
         ],
+        // Sin botón "Abrir siguiente" — solo marcar entregada o fallida
       });
     } else {
       // ── Modo file:// o sin SW: notificación básica ─────────────
@@ -3399,8 +3462,8 @@ async function notificarParada(parada, idxReal, letra) {
       n.onclick = () => {
         window.focus();
         n.close();
-        // Mostrar mini-modal de acción rápida al volver a la app
-        mostrarAccionRapida(idxReal, letra, parada.nombre);
+        // Volver a pantalla de seguimiento para marcar entregada o fallida
+        showScreen('screen-seguimiento');
       };
     }
   } catch(err) {
@@ -3568,17 +3631,14 @@ function accionConduccion(idx, accion) {
   p.horaAccion = fmtHora(new Date());
   saveState();
 
-  // Siguiente parada pendiente
-  const pendientes = ruta.paradas.filter(q => !q.hecha && !q.fallida);
+  // Siempre cerrar pantalla de conducción y volver a seguimiento
+  cerrarPantallaConduccion();
 
-  if (pendientes.length > 0) {
-    // Abrir la siguiente parada en la pantalla de conducción
-    const idxSig = ruta.paradas.indexOf(pendientes[0]);
-    mostrarPantallaConduccion(idxSig);
-  } else {
-    // Todas completadas
-    cerrarPantallaConduccion();
+  const pendientes = ruta.paradas.filter(q => !q.hecha && !q.fallida);
+  if (pendientes.length === 0) {
     showToast('🎉 ¡Todas las paradas completadas!');
+  } else {
+    showToast(accion === 'entregada' ? '✅ Marcada como entregada' : '⚠️ Marcada como fallida');
   }
 }
 
