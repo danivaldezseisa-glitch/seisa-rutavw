@@ -2104,7 +2104,7 @@ function iniciarRutaGoogleMaps() {
     saveStateLocal();
     window.open(_urlMaps(primera.lat, primera.lng), '_blank');
     const letra = idxToLetra(ruta.paradas.indexOf(primera));
-    showToast(\`🗺️ Parada \${letra} — \${primera.nombre}\`);
+    showToast(`🗺️ Parada ${letra} — ${primera.nombre}`);
     setTimeout(() => enviarNotificacionParada(), 1500);
   }
 }
