@@ -2517,6 +2517,189 @@ function cerrarSelectorSegmentos() {
   if (modal) modal.classList.add('hidden');
 }
 
+// ══════════════════════════════════════════════════════════════════
+//  SEGMENTOS — divide paradas en URLs de ≤23 waypoints
+// ══════════════════════════════════════════════════════════════════
+function construirSegmentos(paradas, inicio, fin, maxWP) {
+  const enc = (p) => encodeURIComponent(p.lat + ',' + p.lng);
+  const segmentos = [];
+  let desde = 0;
+  while (desde < paradas.length) {
+    const bloque   = paradas.slice(desde, desde + maxWP);
+    const esUltimo = (desde + maxWP) >= paradas.length;
+    const puntoOrigen = desde === 0 ? inicio : paradas[desde - 1];
+    const puntoFin    = esUltimo   ? fin     : paradas[desde + maxWP] || fin;
+    const wps = bloque.map(enc).join('/');
+    const url = 'https://www.google.com/maps/dir/'
+      + enc(puntoOrigen) + '/' + wps + '/' + enc(puntoFin);
+    const letraInicio = idxToLetra(desde);
+    const letraFin    = idxToLetra(Math.min(desde + maxWP - 1, paradas.length - 1));
+    segmentos.push({
+      idx:    segmentos.length,
+      url,
+      label:  bloque.length === 1
+                ? `Parada ${letraInicio}`
+                : `Paradas ${letraInicio} → ${letraFin}`,
+      count:  bloque.length,
+      esUltimo,
+    });
+    desde += maxWP;
+  }
+  return segmentos;
+}
+
+function mostrarSelectorSegmentos(segmentos, activo) {
+  let modal = document.getElementById('modal-segmentos');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'modal-segmentos';
+    modal.className = 'modal-overlay';
+    document.body.appendChild(modal);
+  }
+  const items = segmentos.map((seg, i) => `
+    <button onclick="abrirSegmento(${i})"
+      style="width:100%;text-align:left;padding:14px 16px;border-radius:12px;border:1.5px solid ${i === activo ? 'var(--accent)' : 'var(--border)'};background:${i === activo ? 'rgba(0,212,255,.1)' : 'var(--surface)'};color:var(--text);font-size:14px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:4px;">
+      <span>${seg.label}</span>
+      <span style="font-size:11px;color:${i === activo ? 'var(--accent)' : 'var(--text3)'};font-weight:600;white-space:nowrap;">${seg.count} paradas ${i === activo ? '▶' : ''}</span>
+    </button>`).join('');
+  modal.innerHTML = `
+    <div class="modal-sheet" style="gap:10px;">
+      <div class="modal-title">🗺️ Selecciona segmento de ruta</div>
+      <div style="font-size:12px;color:var(--text3);text-align:center;margin-top:-4px;">
+        Google Maps acepta máx. 23 paradas por viaje.<br>
+        Tu ruta tiene <b style="color:var(--accent);">${segmentos.reduce((s,g)=>s+g.count,0)} paradas</b> — completa cada segmento en orden.
+      </div>
+      <div style="display:flex;flex-direction:column;margin-top:4px;">${items}</div>
+      <button class="btn btn-ghost" onclick="cerrarSelectorSegmentos()" style="margin-top:4px;">Cerrar</button>
+    </div>`;
+  modal.classList.remove('hidden');
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  NAVEGACIÓN AUTOMÁTICA PARADA POR PARADA
+// ══════════════════════════════════════════════════════════════════
+async function navegarSiguienteParada() {
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+  const pendientes = ruta.paradas.filter(p => !p.hecha && !p.fallida);
+  if (!pendientes.length) {
+    const fin = ruta.final;
+    if (fin) {
+      abrirMaps(fin.lat, fin.lng);
+      showToast('🏁 Navegando a la base de regreso');
+    } else {
+      showToast('✅ Todas las paradas completadas');
+    }
+    return;
+  }
+  const siguiente = pendientes[0];
+  const idxReal   = ruta.paradas.indexOf(siguiente);
+  const letra     = idxToLetra(idxReal);
+  abrirMaps(siguiente.lat, siguiente.lng);
+  ruta._navAuto = true;
+  saveState();
+  actualizarBtnNavAuto();
+  showToast(`🗺️ Navegando a parada ${letra} — ${siguiente.nombre}`);
+  setTimeout(() => enviarNotificacionParada(), 1500);
+}
+
+function toggleNavAuto() {
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+  ruta._navAuto = !ruta._navAuto;
+  saveState();
+  actualizarBtnNavAuto();
+  showToast(ruta._navAuto ? '▶ Nav automática activada' : '⏸ Nav automática pausada');
+}
+
+async function activarNotificaciones() {
+  if (!('Notification' in window)) {
+    showToast('⚠️ Este navegador no soporta notificaciones');
+    return;
+  }
+  if (Notification.permission === 'granted') {
+    await registrarSW();
+    const esHTTPS = location.protocol === 'https:' || location.hostname === 'localhost';
+    if (esHTTPS && _swListo) {
+      showToast('🔔 Notificaciones con botones activas (HTTPS ✓)');
+    } else {
+      showToast('🔔 Notificaciones activas — modo básico');
+      if (navigator.vibrate) navigator.vibrate([300, 150, 300]);
+      try {
+        const n = new Notification('🔔 SEISA Rutas — Notificaciones activas', {
+          body: 'Al llegar a cada parada verás este aviso',
+          tag: 'seisa-test', requireInteraction: false,
+        });
+        setTimeout(() => n.close(), 4000);
+      } catch(e) {}
+    }
+    actualizarBtnNotif();
+    return;
+  }
+  const perm = await Notification.requestPermission();
+  if (perm === 'granted') {
+    await registrarSW();
+    const esHTTPS = location.protocol === 'https:' || location.hostname === 'localhost';
+    if (esHTTPS && _swListo) {
+      showToast('🔔 Activadas con botones ✅/❌ en la cortina');
+    } else {
+      showToast('🔔 Activadas — aparecerá un aviso en cada parada');
+      if (navigator.vibrate) navigator.vibrate([300, 150, 300]);
+    }
+  } else {
+    showToast('🔕 Permiso denegado — ve a Ajustes del navegador');
+  }
+  actualizarBtnNotif();
+}
+
+function actualizarBtnNotif() {
+  const btn = document.getElementById('btn-notif');
+  if (!btn) return;
+  const perm = ('Notification' in window) ? Notification.permission : 'denied';
+  if (perm === 'granted') {
+    btn.textContent = '🔔';
+    btn.style.color = 'var(--green)';
+    btn.style.borderColor = 'rgba(0,230,118,.5)';
+    btn.style.background  = 'rgba(0,230,118,.1)';
+    btn.title = 'Notificaciones activas';
+  } else if (perm === 'denied') {
+    btn.textContent = '🔕';
+    btn.style.color = 'var(--red)';
+    btn.style.borderColor = 'rgba(255,82,82,.4)';
+    btn.style.background  = 'var(--surface2)';
+    btn.title = 'Notificaciones bloqueadas';
+  } else {
+    btn.textContent = '🔔';
+    btn.style.color = 'var(--text3)';
+    btn.style.borderColor = 'var(--border)';
+    btn.style.background  = 'var(--surface2)';
+    btn.title = 'Toca para activar notificaciones';
+  }
+}
+
+function actualizarBtnNavAuto() {
+  const ruta  = state.rutaActual;
+  const btn   = document.getElementById('btn-nav-auto');
+  const btnIr = document.getElementById('btn-ir-siguiente');
+  if (!btn) return;
+  const activo = ruta?._navAuto;
+  btn.textContent       = activo ? '⏸ Nav' : '▶ Nav';
+  btn.style.color       = activo ? 'var(--green)' : 'var(--text3)';
+  btn.style.borderColor = activo ? 'rgba(0,230,118,.5)' : 'var(--border)';
+  btn.style.background  = activo ? 'rgba(0,230,118,.1)' : 'var(--surface2)';
+  if (btnIr) {
+    const pendientes = ruta?.paradas?.filter(p => !p.hecha && !p.fallida) || [];
+    const siguiente  = pendientes[0];
+    if (siguiente) {
+      const idxReal = ruta.paradas.indexOf(siguiente);
+      btnIr.textContent = `🗺️ Ir a parada ${idxToLetra(idxReal)}`;
+    } else {
+      btnIr.textContent = '🏁 Ir a la base';
+    }
+  }
+  actualizarBtnNotif();
+}
+
 function abrirGoogleMaps() {
   const ruta = state.rutaActual;
   if (!ruta) return;
