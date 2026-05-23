@@ -1323,6 +1323,18 @@ function nuevaRuta() {
   const mm = String(hoy.getMonth()+1).padStart(2,'0');
   const crFecha = document.getElementById('cr-fecha');
   if (crFecha) crFecha.value = `${hoy.getFullYear()}-${mm}-${dd}`;
+  // Destruir el mapa de paradas para que se recree limpio con los nuevos puntos
+  if (mapParadas) {
+    paradaMarkers.forEach(m => m.remove());
+    paradaMarkers = [];
+    mapParadas.remove();
+    mapParadas = null;
+  }
+  // Limpiar también el input de parada y el Plus Code
+  const paradaSearch = document.getElementById('paradas-search');
+  const paradaPC     = document.getElementById('paradas-pluscode');
+  if (paradaSearch) paradaSearch.value = '';
+  if (paradaPC)     paradaPC.value     = '';
   showScreen('screen-crear');
 }
 
@@ -1344,6 +1356,7 @@ function enviarNotificacionParada() {
   notificarParada(siguiente, idxReal, letra);
 }
 
+function continuarRuta() {
   if (!state.rutaActual) return;
   rutaBuild = { ...state.rutaActual };
   showScreen('screen-seguimiento');
