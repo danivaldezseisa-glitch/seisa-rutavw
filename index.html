@@ -446,7 +446,7 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
   </div>
   <div class="scroll" style="flex:1;">
     <div style="padding:10px 12px;display:flex;gap:8px;background:var(--bg2);border-bottom:1px solid var(--border);">
-      <button class="btn btn-accent" onclick="abrirRutaCompleta()" style="font-size:15px;padding:12px 10px;flex:2;" id="btn-ir-siguiente">🗺️ Abrir en Maps</button>
+      <button class="btn btn-accent" onclick="abrirRutaCompleta()" style="font-size:15px;padding:12px 10px;flex:2;" id="btn-ir-siguiente">🗺️ Ir a siguiente</button>
       <button onclick="mostrarPantallaConduccion()" style="width:52px;height:52px;flex-shrink:0;border-radius:12px;border:2px solid rgba(255,215,0,.5);background:rgba(255,215,0,.1);color:#ffd740;font-size:22px;cursor:pointer;display:flex;align-items:center;justify-content:center;" title="Modo conducción">🚗</button>
       <button class="btn btn-ghost" onclick="reoptimizarPendientes()" style="font-size:13px;padding:12px 10px;flex:1;">⚡</button>
       <button onclick="abrirAgregarParadaSeg()" style="width:52px;height:52px;flex-shrink:0;border-radius:12px;border:2px solid rgba(0,212,255,.5);background:rgba(0,212,255,.1);color:var(--accent);font-size:26px;cursor:pointer;display:flex;align-items:center;justify-content:center;">＋</button>
@@ -1940,40 +1940,112 @@ function orOpt(paradas, inicio, fin) {
 }
 
 // ─────────────────────────────────────────────────────────────────
-//  PIPELINE PRINCIPAL v6
+//  PIPELINE PRINCIPAL v7 — cluster final inteligente
+//
+//  Detecta todas las paradas que están "cerca" del punto final
+//  (dentro del radio del 15% de la diagonal total de la ruta) y
+//  las mantiene juntas al final del recorrido, optimizando el
+//  interior de ese cluster para que el último tramo sea natural.
 // ─────────────────────────────────────────────────────────────────
+function _calcRadioCluster(paradas, fin) {
+  // Radio = 15% de la distancia máxima entre el depot final y cualquier parada
+  // con un mínimo de 2 km para rutas muy cortas
+  if (!paradas.length) return 2;
+  let maxD = 0;
+  paradas.forEach(p => {
+    const d = distHaversine(fin.lat, fin.lng, p.lat, p.lng);
+    if (d > maxD) maxD = d;
+  });
+  return Math.max(maxD * 0.18, 2);
+}
+
 function optimizarPipeline(paradas, inicio, fin) {
   if (!paradas.length) return [];
   if (paradas.length === 1) return [...paradas];
+  if (paradas.length <= 3) {
+    // Para rutas muy cortas simplemente 2-opt
+    let r = sweepSort(paradas, inicio, fin);
+    r = twoOpt(r, inicio, fin);
+    return r;
+  }
 
   const depotI = inicio || paradas[0];
   const depotF = fin    || depotI;
 
-  let idxA = 0, minDA = Infinity;
-  paradas.forEach((p, i) => {
-    const d = distHaversine(depotI.lat, depotI.lng, p.lat, p.lng);
-    if (d < minDA) { minDA = d; idxA = i; }
-  });
-  const anclaInicio = paradas[idxA];
-  const tras1 = paradas.filter((_, i) => i !== idxA);
+  // ── Paso 1: separar cluster final ────────────────────────────────
+  // Todas las paradas dentro del radio al punto final forman el cluster
+  const radio = _calcRadioCluster(paradas, depotF);
+  const clusterFin = paradas.filter(p =>
+    distHaversine(depotF.lat, depotF.lng, p.lat, p.lng) <= radio
+  );
+  const resto = paradas.filter(p =>
+    distHaversine(depotF.lat, depotF.lng, p.lat, p.lng) > radio
+  );
 
-  if (!tras1.length) return [anclaInicio];
+  // Si todo o casi todo cayó en cluster, reducir radio a la mitad
+  let clusterFinal = clusterFin;
+  let restoFinal   = resto;
+  if (clusterFin.length >= paradas.length * 0.7 && paradas.length > 4) {
+    const radioReducido = radio * 0.5;
+    clusterFinal = paradas.filter(p =>
+      distHaversine(depotF.lat, depotF.lng, p.lat, p.lng) <= radioReducido
+    );
+    restoFinal = paradas.filter(p =>
+      distHaversine(depotF.lat, depotF.lng, p.lat, p.lng) > radioReducido
+    );
+  }
 
-  let idxB = 0, minDB = Infinity;
-  tras1.forEach((p, i) => {
-    const d = distHaversine(depotF.lat, depotF.lng, p.lat, p.lng);
-    if (d < minDB) { minDB = d; idxB = i; }
-  });
-  const anclaFin = tras1[idxB];
-  const medio    = tras1.filter((_, i) => i !== idxB);
+  // ── Paso 2: optimizar el "cuerpo" principal (resto) ──────────────
+  let cuerpo = [];
+  if (restoFinal.length === 0) {
+    // Todas las paradas están en el cluster → optimizar todo junto
+    cuerpo = [];
+    clusterFinal = paradas;
+  } else if (restoFinal.length === 1) {
+    cuerpo = restoFinal;
+  } else {
+    // Ancla de inicio: la parada más cercana al depotI dentro del resto
+    let idxA = 0, minDA = Infinity;
+    restoFinal.forEach((p, i) => {
+      const d = distHaversine(depotI.lat, depotI.lng, p.lat, p.lng);
+      if (d < minDA) { minDA = d; idxA = i; }
+    });
+    const anclaInicio = restoFinal[idxA];
+    const interiorResto = restoFinal.filter((_, i) => i !== idxA);
 
-  if (!medio.length) return [anclaInicio, anclaFin];
+    // Punto de "entrega" al cluster final: la parada del cluster más cercana al depot final
+    let puntoEntrada = depotF;
+    if (clusterFinal.length > 0) {
+      let minDC = Infinity;
+      clusterFinal.forEach(p => {
+        const d = distHaversine(depotF.lat, depotF.lng, p.lat, p.lng);
+        if (d < minDC) { minDC = d; puntoEntrada = p; }
+      });
+    }
 
-  let medioOpt = sweepSort(medio, anclaInicio, anclaFin);
-  medioOpt = twoOpt(medioOpt, anclaInicio, anclaFin);
-  medioOpt = orOpt(medioOpt, anclaInicio, anclaFin);
+    if (!interiorResto.length) {
+      cuerpo = [anclaInicio];
+    } else {
+      let medio = sweepSort(interiorResto, anclaInicio, puntoEntrada);
+      medio = twoOpt(medio, anclaInicio, puntoEntrada);
+      medio = orOpt(medio, anclaInicio, puntoEntrada);
+      cuerpo = [anclaInicio, ...medio];
+    }
+  }
 
-  return [anclaInicio, ...medioOpt, anclaFin];
+  // ── Paso 3: optimizar el cluster final internamente ───────────────
+  let clusterOpt = clusterFinal;
+  if (clusterFinal.length > 1) {
+    // El cluster se recorre desde el último punto del cuerpo hacia el depotF
+    const entradaCluster = cuerpo.length > 0 ? cuerpo[cuerpo.length - 1] : depotI;
+    clusterOpt = sweepSort(clusterFinal, entradaCluster, depotF);
+    if (clusterOpt.length > 3) {
+      clusterOpt = twoOpt(clusterOpt, entradaCluster, depotF);
+      clusterOpt = orOpt(clusterOpt, entradaCluster, depotF);
+    }
+  }
+
+  return [...cuerpo, ...clusterOpt];
 }
 
 function optimizarRuta() {
@@ -2019,34 +2091,22 @@ function iniciarRutaGoogleMaps() {
   saveState();
 
   const ruta = state.rutaActual;
-  const inicio  = ruta.inicio;
-  const fin     = ruta.final;
-  const paradas = (ruta.paradas || []).filter(p => !p.hecha && !p.fallida);
+  if (!ruta.inicio || !ruta.final) { showToast('Faltan puntos de inicio o final'); return; }
+  if (!ruta.paradas.length) { showToast('No hay paradas pendientes'); return; }
 
-  if (!inicio || !fin) { showToast('Faltan puntos de inicio o final'); return; }
-  if (!paradas.length) { showToast('No hay paradas pendientes'); return; }
-
-  const enc = (p) => encodeURIComponent(p.lat + ',' + p.lng);
-  const MAX_WP = 23; // límite de Google Maps por URL
-
-  // Construir todos los segmentos necesarios
-  const segmentos = construirSegmentos(paradas, inicio, fin, MAX_WP);
-
-  if (segmentos.length === 1) {
-    saveStateLocal();
-    window.open(segmentos[0].url, '_blank');
-    showToast('🗺️ Abriendo ruta completa en Google Maps...');
-  } else {
-    // Guardar segmentos en state y mostrar selector
-    state.rutaActual._segmentos = segmentos;
-    state.rutaActual._segActual = 0;
-    saveState();
-    mostrarSelectorSegmentos(segmentos, 0);
-    return; // el selector maneja la navegación
-  }
-
+  // Ir a seguimiento primero, luego abrir la primera parada en Maps
   showScreen('screen-seguimiento');
   renderSeguimiento();
+
+  // Abrir Maps en la primera parada pendiente (síncrono desde el evento del usuario)
+  const primera = ruta.paradas.find(p => !p.hecha && !p.fallida);
+  if (primera) {
+    saveStateLocal();
+    window.open(_urlMaps(primera.lat, primera.lng), '_blank');
+    const letra = idxToLetra(ruta.paradas.indexOf(primera));
+    showToast(\`🗺️ Parada \${letra} — \${primera.nombre}\`);
+    setTimeout(() => enviarNotificacionParada(), 1500);
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -2480,25 +2540,28 @@ function marcarEntregadaSeg(idx) {
 
   const pendientes = ruta.paradas.filter((q, i) => i !== idx && !q.hecha && !q.fallida);
 
-  // Si nav automático activo: abrir Maps PRIMERO de forma síncrona
-  // antes de cualquier otra operación, así Chrome no lo bloquea
-  if (ruta._navAuto && pendientes.length > 0) {
+  // Siempre abrir la siguiente parada automáticamente (una por una)
+  // window.open SÍNCRONO para que Chrome PWA no lo bloquee
+  if (pendientes.length > 0) {
     const siguiente = pendientes[0];
-    saveStateLocal(); // guardar sin push a GitHub para no cortar el flujo
+    saveStateLocal();
     window.open(_urlMaps(siguiente.lat, siguiente.lng), '_blank');
+  } else if (ruta.final) {
+    // Última parada entregada → navegar a la base
+    saveStateLocal();
+    window.open(_urlMaps(ruta.final.lat, ruta.final.lng), '_blank');
   }
 
-  // Resto de operaciones (ya no importa si son async)
   saveState();
   renderSeguimiento();
   showToast('✅ Entregada · ' + p.horaAccion);
 
   if (pendientes.length === 0) {
-    showToast('🎉 ¡Todas las paradas completadas!');
+    showToast('🎉 ¡Todas las paradas completadas! Regresando a la base...');
     ruta._navAuto = false;
     saveState();
     actualizarBtnNavAuto();
-  } else if (ruta._navAuto) {
+  } else {
     setTimeout(() => enviarNotificacionParada(), 1500);
   }
 }
@@ -2513,19 +2576,25 @@ function marcarFallidaSeg(idx) {
 
   const pendientes = ruta.paradas.filter((q, i) => i !== idx && !q.hecha && !q.fallida);
 
-  // Abrir Maps PRIMERO síncronamente
-  if (ruta._navAuto && pendientes.length > 0) {
+  // Siempre abrir la siguiente parada automáticamente (una por una)
+  if (pendientes.length > 0) {
     const siguiente = pendientes[0];
     saveStateLocal();
     window.open(_urlMaps(siguiente.lat, siguiente.lng), '_blank');
+  } else if (ruta.final) {
+    // Última parada procesada → navegar a la base
+    saveStateLocal();
+    window.open(_urlMaps(ruta.final.lat, ruta.final.lng), '_blank');
   }
 
   saveState();
   renderSeguimiento();
   showToast('⚠️ Fallida · ' + p.horaAccion);
 
-  if (ruta._navAuto && pendientes.length > 0) {
+  if (pendientes.length > 0) {
     setTimeout(() => enviarNotificacionParada(), 1500);
+  } else {
+    showToast('🎉 ¡Todas las paradas procesadas! Regresando a la base...');
   }
 }
 
@@ -2676,19 +2745,20 @@ function mostrarSelectorSegmentos(segmentos, activo) {
 //  y la abre directamente. Maps maneja toda la navegación.
 //  El chofer solo regresa a la app al terminar para marcar entregas.
 // ══════════════════════════════════════════════════════════════════
+// Abre SOLO la siguiente parada pendiente en Maps.
+// Al marcar entregada/fallida se llama automáticamente a la siguiente.
+// Cuando ya no hay pendientes, navega al punto final (base).
 function abrirRutaCompleta() {
   const ruta = state.rutaActual;
   if (!ruta) return;
 
   const pendientes = ruta.paradas.filter(p => !p.hecha && !p.fallida);
+
   if (!pendientes.length) {
-    // Todas completadas — ir a la base
+    // Todas completadas — navegar a la base de regreso
     if (ruta.final) {
       saveStateLocal();
-      window.open(
-        `https://www.google.com/maps/dir/?api=1&destination=${ruta.final.lat},${ruta.final.lng}&travelmode=driving&dir_action=navigate`,
-        '_blank'
-      );
+      window.open(_urlMaps(ruta.final.lat, ruta.final.lng), '_blank');
       showToast('🏁 Navegando a la base de regreso');
     } else {
       showToast('✅ Todas las paradas completadas');
@@ -2696,66 +2766,20 @@ function abrirRutaCompleta() {
     return;
   }
 
-  const enc     = p => encodeURIComponent(p.lat + ',' + p.lng);
-  const inicio  = ruta.inicio;
-  const fin     = ruta.final;
-  const MAX_WP  = 23;
-
-  saveStateLocal();
-
-  if (pendientes.length <= MAX_WP) {
-    // Caben todas en una sola URL
-    const wps = pendientes.map(enc).join('/');
-    const url = `https://www.google.com/maps/dir/${enc(inicio)}/${wps}/${enc(fin)}`;
-    window.open(url, '_blank');
-    showToast(`🗺️ Abriendo ${pendientes.length} paradas en Maps`);
-  } else {
-    // Más de 23 — abrir el primer segmento y mostrar selector para los demás
-    const segmentos = construirSegmentos(pendientes, inicio, fin, MAX_WP);
-    const segActual = ruta._segActual || 0;
-    ruta._segmentos = segmentos;
-    saveState();
-    // Abrir el segmento activo directamente
-    window.open(segmentos[segActual].url, '_blank');
-    showToast(`🗺️ Segmento ${segActual + 1}/${segmentos.length} — ${segmentos[segActual].label}`);
-    // Si hay más segmentos, mostrar selector después de un momento
-    if (segmentos.length > 1) {
-      setTimeout(() => mostrarSelectorSegmentos(segmentos, segActual), 300);
-    }
-  }
-}
-
-function navegarSiguienteParada() {
-  const ruta = state.rutaActual;
-  if (!ruta) return;
-  const pendientes = ruta.paradas.filter(p => !p.hecha && !p.fallida);
-
-  if (!pendientes.length) {
-    const fin = ruta.final;
-    if (fin) {
-      // window.open directo — no pasar por abrirMaps para que Chrome lo permita
-      window.open(_urlMaps(fin.lat, fin.lng), '_blank');
-      showToast('🏁 Navegando a la base de regreso');
-    } else {
-      showToast('✅ Todas las paradas completadas');
-    }
-    return;
-  }
-
+  // Abrir SOLO la siguiente parada
   const siguiente = pendientes[0];
   const idxReal   = ruta.paradas.indexOf(siguiente);
   const letra     = idxToLetra(idxReal);
 
-  // window.open DIRECTO aquí — Chrome solo lo permite cuando está
-  // en el primer nivel del handler del evento del usuario
   saveStateLocal();
   window.open(_urlMaps(siguiente.lat, siguiente.lng), '_blank');
-
-  ruta._navAuto = true;
-  saveState();
-  actualizarBtnNavAuto();
-  showToast(`🗺️ Navegando a parada ${letra} — ${siguiente.nombre}`);
+  showToast('🗺️ Parada ' + letra + ' — ' + siguiente.nombre);
   setTimeout(() => enviarNotificacionParada(), 1500);
+}
+
+// navegarSiguienteParada: alias de abrirRutaCompleta (ya abre una por una)
+function navegarSiguienteParada() {
+  abrirRutaCompleta();
 }
 
 function toggleNavAuto() {
@@ -2845,7 +2869,9 @@ function actualizarBtnNavAuto() {
   if (btnIr) {
     const pendientes = ruta?.paradas?.filter(p => !p.hecha && !p.fallida) || [];
     if (pendientes.length > 0) {
-      btnIr.textContent = `🗺️ Abrir ${pendientes.length} paradas en Maps`;
+      const sig = pendientes[0];
+      const letraSig = idxToLetra(ruta.paradas.indexOf(sig));
+      btnIr.textContent = '🗺️ Ir a ' + letraSig + ' (' + pendientes.length + ' restantes)';
     } else {
       btnIr.textContent = '🏁 Ir a la base';
     }
