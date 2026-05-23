@@ -2464,7 +2464,7 @@ async function activarNotificaciones() {
   }
   const perm = await Notification.requestPermission();
   if (perm === 'granted') {
-    await registrarServiceWorker();
+    await registrarSW();
     showToast('🔔 Notificaciones activadas — aparecerán al navegar a cada parada');
   } else {
     showToast('🔕 Permiso denegado — actívalo en Ajustes del navegador');
@@ -3118,114 +3118,105 @@ function renderResumen() {
 //  con acciones en Android Chrome). En iOS solo muestra la
 //  notificación sin botones (limitación del sistema).
 // ══════════════════════════════════════════════════════════════════
+//  SISTEMA DE NOTIFICACIONES
+//
+//  Android Chrome en HTTPS (Netlify): Service Worker con botones
+//  de acción ✅ Entregada / ❌ Fallida desde la cortina.
+//  Android Chrome local (file://): Notificación simple, toca para
+//  abrir la app.
+//  iOS Safari: No soporta notificaciones web, se omite.
+// ══════════════════════════════════════════════════════════════════
 
-// ── Service Worker inline (registrado como Blob URL) ──────────────
-const SW_CODE = `
-self.addEventListener('notificationclick', (event) => {
-  event.notification.close();
-  const { action, data } = event;
-  const idx = data?.idx;
+let _swReg        = null;
+let _swListo      = false;
+let _swIntentando = false;
 
-  if (action === 'entregada' || action === 'fallida') {
-    // Enviar mensaje a la app para procesar la acción
-    event.waitUntil(
-      self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
-        for (const client of clients) {
-          client.postMessage({ tipo: 'accion_parada', action, idx });
-        }
-        // Si la app no está abierta, abrirla
-        if (!clients.length) {
-          return self.clients.openWindow('/');
-        }
-      })
-    );
-  } else {
-    // Click en el cuerpo de la notificación → abrir/enfocar la app
-    event.waitUntil(
-      self.clients.matchAll({ type: 'window' }).then(clients => {
-        if (clients.length) { clients[0].focus(); }
-        else { self.clients.openWindow('/'); }
-      })
-    );
-  }
-});
-`;
-
-let _swRegistrado = false;
-let _swRegistration = null;
-
-async function registrarServiceWorker() {
-  if (_swRegistrado || !('serviceWorker' in navigator)) return;
-  try {
-    const blob = new Blob([SW_CODE], { type: 'application/javascript' });
-    const swUrl = URL.createObjectURL(blob);
-    _swRegistration = await navigator.serviceWorker.register(swUrl, { scope: '/' });
-    _swRegistrado = true;
-
-    // Escuchar mensajes del Service Worker (acciones de notificación)
-    navigator.serviceWorker.addEventListener('message', (event) => {
-      const { tipo, action, idx } = event.data || {};
-      if (tipo === 'accion_parada' && typeof idx === 'number') {
-        if (action === 'entregada') marcarEntregadaSeg(idx);
-        if (action === 'fallida')   marcarFallidaSeg(idx);
-      }
+async function registrarSW() {
+  if (_swListo || _swIntentando || !('serviceWorker' in navigator)) return;
+  _swIntentando = true;
+  const swCode = `
+    self.addEventListener('notificationclick', e => {
+      e.notification.close();
+      const action = e.action;
+      const data   = e.notification.data || {};
+      e.waitUntil(
+        clients.matchAll({ type: 'window', includeUncontrolled: true }).then(cs => {
+          const msg = { tipo: 'notif_accion', action, idx: data.idx };
+          if (cs.length) { cs[0].postMessage(msg); cs[0].focus(); }
+          else { clients.openWindow(data.url || '/').then(c => c && c.postMessage(msg)); }
+        })
+      );
     });
-    console.log('✅ Service Worker registrado para notificaciones');
-  } catch(e) {
-    console.warn('SW registro falló:', e.message);
+    self.addEventListener('install',  () => self.skipWaiting());
+    self.addEventListener('activate', e => e.waitUntil(clients.claim()));
+  `;
+  try {
+    if (location.protocol === 'https:' || location.hostname === 'localhost') {
+      const blob  = new Blob([swCode], { type: 'text/javascript' });
+      const swUrl = URL.createObjectURL(blob);
+      _swReg   = await navigator.serviceWorker.register(swUrl, { scope: './' });
+      _swListo = true;
+      navigator.serviceWorker.addEventListener('message', e => {
+        const { tipo, action, idx } = e.data || {};
+        if (tipo === 'notif_accion' && typeof idx === 'number') {
+          if (action === 'entregada') marcarEntregadaSeg(idx);
+          if (action === 'fallida')   marcarFallidaSeg(idx);
+        }
+      });
+      console.log('✅ SW notificaciones listo');
+    }
+  } catch(err) {
+    console.warn('SW no disponible:', err.message);
+    _swListo = false;
   }
+  _swIntentando = false;
 }
 
 async function pedirPermisoNotificaciones() {
   if (!('Notification' in window)) return false;
   if (Notification.permission === 'granted') return true;
   if (Notification.permission === 'denied')  return false;
-  const perm = await Notification.requestPermission();
-  return perm === 'granted';
+  return (await Notification.requestPermission()) === 'granted';
 }
 
-// Envía la notificación con botones Entregada / Fallida
 async function notificarParada(parada, idxReal, letra) {
-  const permiso = await pedirPermisoNotificaciones();
-  if (!permiso) return;
-
-  await registrarServiceWorker();
-
-  const reg = _swRegistration
-    || (await navigator.serviceWorker.getRegistration())
-    || null;
-
+  const ok = await pedirPermisoNotificaciones();
+  if (!ok) return;
+  if (!_swListo) await registrarSW();
+  const urlApp = location.href;
   const opts = {
     body:    parada.nombre,
     icon:    'https://cdn.jsdelivr.net/npm/twemoji@14/assets/72x72/1f4e6.png',
     badge:   'https://cdn.jsdelivr.net/npm/twemoji@14/assets/72x72/1f69a.png',
-    tag:     'seisa-parada-' + idxReal,
+    tag:     'seisa-' + idxReal,
     renotify: true,
-    requireInteraction: true,   // no desaparece hasta que el usuario actúe
-    silent:  false,
-    data:    { idx: idxReal },
+    requireInteraction: true,
+    vibrate: [200, 100, 200],
+    data:    { idx: idxReal, url: urlApp },
     actions: [
       { action: 'entregada', title: '✅ Entregada' },
       { action: 'fallida',   title: '❌ Fallida'   },
     ],
   };
-
-  if (reg && reg.showNotification) {
-    // Notificación desde Service Worker (con botones de acción)
-    await reg.showNotification(`📦 Parada ${letra}`, opts);
-  } else {
-    // Fallback: notificación básica sin botones (iOS / sin SW)
-    new Notification(`📦 Parada ${letra} — ${parada.nombre}`, {
-      body: 'Toca para abrir la app y marcar la entrega',
-      icon: opts.icon,
-      tag:  opts.tag,
-    });
+  try {
+    if (_swListo && _swReg) {
+      const reg = await navigator.serviceWorker.ready;
+      await reg.showNotification('📦 Parada ' + letra, opts);
+    } else {
+      const n = new Notification('📦 Parada ' + letra + ' — ' + parada.nombre, {
+        body:    'Toca para abrir la app y marcar la entrega',
+        icon:    opts.icon,
+        tag:     opts.tag,
+        requireInteraction: true,
+        vibrate: opts.vibrate,
+      });
+      n.onclick = () => { window.focus(); n.close(); };
+    }
+  } catch(err) {
+    console.warn('Error al mostrar notificación:', err.message);
   }
 }
 
-// ── Integración con navegarSiguienteParada ────────────────────────
-// Se llama DESPUÉS de abrir Maps para que la notificación aparezca
-// mientras el chofer navega con la pantalla en Maps
 async function enviarNotificacionParada() {
   const ruta = state.rutaActual;
   if (!ruta) return;
