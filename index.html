@@ -2369,11 +2369,11 @@ function renderSeguimiento() {
       const btnE = document.createElement('button');
       btnE.style.cssText = 'padding:5px 8px;border-radius:7px;border:1px solid rgba(0,230,118,.4);background:rgba(0,230,118,.1);color:var(--green);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;';
       btnE.textContent = '✓ OK';
-      btnE.onclick = (ev) => { ev.stopPropagation(); marcarEntregadaSeg(i); };
+      btnE.setAttribute('onclick', `marcarEntregadaSeg(${i})`);
       const btnF = document.createElement('button');
       btnF.style.cssText = 'padding:5px 8px;border-radius:7px;border:1px solid rgba(255,82,82,.4);background:rgba(255,82,82,.1);color:var(--red);font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap;';
       btnF.textContent = '✗';
-      btnF.onclick = (ev) => { ev.stopPropagation(); marcarFallidaSeg(i); };
+      btnF.setAttribute('onclick', `marcarFallidaSeg(${i})`);
       const btnEd = document.createElement('button');
       btnEd.style.cssText = 'padding:5px 7px;border-radius:7px;border:1px solid rgba(0,212,255,.3);background:rgba(0,212,255,.08);color:var(--accent);font-size:11px;cursor:pointer;';
       btnEd.textContent = '✏️';
@@ -3389,8 +3389,40 @@ function mostrarAccionRapida(idxReal, letra, nombre) {
 function accionRapida(idx, accion) {
   const modal = document.getElementById('modal-accion-rapida');
   if (modal) modal.classList.add('hidden');
-  if (accion === 'entregada') marcarEntregadaSeg(idx);
-  if (accion === 'fallida')   marcarFallidaSeg(idx);
+
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+  const p = ruta.paradas[idx];
+  if (!p) return;
+
+  // Marcar la parada
+  p.hecha    = true;
+  p.fallida  = accion === 'fallida';
+  p.horaAccion = fmtHora(new Date());
+
+  // Calcular siguiente parada ANTES de guardar
+  const pendientes = ruta.paradas.filter(q => !q.hecha && !q.fallida);
+
+  // Abrir Maps DIRECTO aquí — el onclick del modal es evento de usuario real
+  if (ruta._navAuto && pendientes.length > 0) {
+    const siguiente = pendientes[0];
+    saveStateLocal();
+    window.open(_urlMaps(siguiente.lat, siguiente.lng), '_blank');
+  }
+
+  // Guardar y actualizar UI
+  saveState();
+  renderSeguimiento();
+  showToast(accion === 'entregada' ? '✅ Entregada · ' + p.horaAccion : '⚠️ Fallida · ' + p.horaAccion);
+
+  if (pendientes.length === 0) {
+    showToast('🎉 ¡Todas las paradas completadas!');
+    ruta._navAuto = false;
+    saveState();
+    actualizarBtnNavAuto();
+  } else if (ruta._navAuto) {
+    setTimeout(() => enviarNotificacionParada(), 1500);
+  }
 }
 
 // ── Llamada desde navegarSiguienteParada ──────────────────────────
