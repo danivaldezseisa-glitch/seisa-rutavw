@@ -269,7 +269,7 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
         <div style="font-size:11px;color:var(--green);font-weight:700;">▶ Continuar</div>
       </div>
     </div>
-    <button class="btn btn-accent" onclick="showScreen('screen-crear')" style="font-size:17px;padding:18px;">
+    <button class="btn btn-accent" onclick="nuevaRuta()" style="font-size:17px;padding:18px;">
       🗺️ Crear Nueva Ruta
     </button>
     <div id="home-rutas-list"></div>
@@ -329,8 +329,7 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
 <!-- SCREEN 3: PARADAS -->
 <div class="screen hidden" id="screen-paradas">
   <div class="topbar">
-    <button class="topbar-back" onclick="showScreen('screen-crear')">←</button>
-    <h2>📍 Paradas</h2>
+    <button class="topbar-back" onclick="volverACrear()">←</button>
     <span id="paradas-count-label" style="font-size:12px;color:var(--accent);font-weight:700;">0</span>
   </div>
   <div id="paradas-map" style="height:260px;flex-shrink:0;"></div>
@@ -811,11 +810,17 @@ async function ghPush() {
     if (localUsers.length) shared.usuarios = localUsers;
     shared.adminPin = getAdminPIN();
     const ok = await ghWriteShared(shared);
-    if (ok) { showToast('☁️ Sincronizado'); }
-    else { showToast('⚠️ Error al sincronizar'); }
+    if (ok) {
+      // Toast silencioso — solo actualiza el botón
+      actualizarBtnGH(false);
+    } else {
+      // Falló pero no mostramos toast para no interrumpir al chofer
+      // El botón GH cambiará de color para indicar el problema
+      console.warn('[SEISA] ghPush: fallo al escribir en GitHub');
+    }
   } catch(e) {
-    console.error('ghPush:', e);
-    showToast('⚠️ Sin conexión — guardado local');
+    console.warn('[SEISA] ghPush sin conexión:', e.message);
+    // Guardar localmente ya está hecho en saveStateLocal(), no hace falta toast
   }
   ghSyncing = false;
   actualizarBtnGH(false);
@@ -842,7 +847,7 @@ async function ghPull() {
       state = { ...defaultState(), ...shared.estados[currentUser.id] };
       saveStateLocal();
     }
-    showToast('☁️ Datos sincronizados (' + (shared.usuarios?.length || 0) + ' operadores)');
+    // Toast solo en la sincronización inicial, no en cada poll
     return true;
   } catch(e) { console.warn('ghPull:', e); return false; }
 }
@@ -1292,7 +1297,53 @@ function renderHome() {
     }).join('');
 }
 
-function continuarRuta() {
+function nuevaRuta() {
+  // Resetear rutaBuild completamente
+  rutaBuild = {
+    nombre: '', fecha: '', peajes: false,
+    inicio: null, final: null,
+    paradas: []
+  };
+  // Limpiar campos del formulario
+  const crNombre = document.getElementById('cr-nombre');
+  const crInicio = document.getElementById('cr-inicio');
+  const crFinal  = document.getElementById('cr-final');
+  const crPeajes = document.getElementById('cr-peajes');
+  const crInicioLabel = document.getElementById('cr-inicio-label');
+  const crFinalLabel  = document.getElementById('cr-final-label');
+  if (crNombre) crNombre.value = '';
+  if (crInicio) crInicio.value = '';
+  if (crFinal)  crFinal.value  = '';
+  if (crPeajes) crPeajes.checked = false;
+  if (crInicioLabel) { crInicioLabel.style.display = 'none'; crInicioLabel.textContent = ''; }
+  if (crFinalLabel)  { crFinalLabel.style.display  = 'none'; crFinalLabel.textContent  = ''; }
+  // Restaurar fecha de hoy
+  const hoy = new Date();
+  const dd = String(hoy.getDate()).padStart(2,'0');
+  const mm = String(hoy.getMonth()+1).padStart(2,'0');
+  const crFecha = document.getElementById('cr-fecha');
+  if (crFecha) crFecha.value = `${hoy.getFullYear()}-${mm}-${dd}`;
+  showScreen('screen-crear');
+}
+
+// Alias que se llama cuando se vuelve atrás desde pantalla de paradas
+// — en ese caso sí queremos conservar los datos del formulario
+function volverACrear() {
+  showScreen('screen-crear');
+}
+
+// Wrapper para enviar notificación de la parada actual (siguiente pendiente)
+function enviarNotificacionParada() {
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+  const pendientes = ruta.paradas.filter(p => !p.hecha && !p.fallida);
+  if (!pendientes.length) return;
+  const siguiente = pendientes[0];
+  const idxReal   = ruta.paradas.indexOf(siguiente);
+  const letra     = idxToLetra(idxReal);
+  notificarParada(siguiente, idxReal, letra);
+}
+
   if (!state.rutaActual) return;
   rutaBuild = { ...state.rutaActual };
   showScreen('screen-seguimiento');
@@ -3710,13 +3761,26 @@ function condEntregada() {
   if (!ruta) return;
   const pendientes = ruta.paradas.filter(p => !p.hecha && !p.fallida);
   if (!pendientes.length) return;
-  const p = pendientes[0];
+  const p   = pendientes[0];
   const idx = ruta.paradas.indexOf(p);
 
   p.hecha = true; p.fallida = false; p.horaAccion = fmtHora(new Date());
   saveState();
   if (navigator.vibrate) navigator.vibrate(100);
+
+  // Asegurar botones visibles antes de re-renderizar
+  const bOk   = document.getElementById('cond-btn-ok');
+  const bFall = document.getElementById('cond-btn-fallida');
+  if (bOk)   bOk.style.display   = '';
+  if (bFall) bFall.style.display = '';
+
   renderPantallaConduccion();
+
+  // Enviar notificación de la siguiente parada si hay nav automática
+  if (ruta._navAuto) {
+    const restantes = ruta.paradas.filter(q => !q.hecha && !q.fallida);
+    if (restantes.length) setTimeout(() => enviarNotificacionParada(), 1200);
+  }
 }
 
 // Botón ✗ Fallida en modo conducción
@@ -3730,7 +3794,20 @@ function condFallida() {
   p.hecha = true; p.fallida = true; p.horaAccion = fmtHora(new Date());
   saveState();
   if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+
+  // Asegurar botones visibles antes de re-renderizar
+  const bOk   = document.getElementById('cond-btn-ok');
+  const bFall = document.getElementById('cond-btn-fallida');
+  if (bOk)   bOk.style.display   = '';
+  if (bFall) bFall.style.display = '';
+
   renderPantallaConduccion();
+
+  // Enviar notificación de la siguiente parada si hay nav automática
+  if (ruta._navAuto) {
+    const restantes = ruta.paradas.filter(q => !q.hecha && !q.fallida);
+    if (restantes.length) setTimeout(() => enviarNotificacionParada(), 1200);
+  }
 }
 
 
@@ -3898,7 +3975,6 @@ async function instalarPWA() {
   ghConfig = loadGHConfig();
   actualizarBtnGH(false);
   if (ghConfig) {
-    showToast('🔄 Sincronizando con GitHub...');
     await ghPull();
     iniciarPollGH();
   } else {
