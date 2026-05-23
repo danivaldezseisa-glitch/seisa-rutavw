@@ -2483,31 +2483,30 @@ function eliminarParadaSeg(id) {
 // Abre Google Maps app nativa usando el esquema de deep link oficial.
 // En Android: location.href con el esquema correcto lanza la app directamente.
 // Para rutas con waypoints se usa el mismo mecanismo con _self.
-function abrirMaps(latDest, lngDest) {
-  // Esquema oficial de navegación — Android lo intercepta y abre Maps app
-  // Usamos location.href con _self para evitar el popup del navegador
-  const url = `google.navigation:q=${latDest},${lngDest}&mode=d`;
-  // Intentar abrir la app nativa primero
-  const t = Date.now();
-  window.location.href = url;
-  // Si la app no responde en 500ms (no instalada), abrir en navegador
-  setTimeout(() => {
-    if (Date.now() - t < 800) {
-      window.open(
-        `https://maps.google.com/maps?api=1&destination=${latDest},${lngDest}&travelmode=driving`,
-        '_blank'
-      );
-    }
-  }, 500);
+function _urlMaps(latDest, lngDest) {
+  // URL con coordenadas como destino + query visible para Maps
+  // Formato probado que abre navegación con dirección en Maps app
+  return `https://www.google.com/maps/dir/?api=1` +
+    `&destination=${latDest},${lngDest}` +
+    `&travelmode=driving` +
+    `&dir_action=navigate`;
 }
 
-function abrirMapsUrl(url) {
-  // Para rutas con waypoints usar _self para no abrir pestaña nueva
-  const mapsUrl = url
-    .replace('https://www.google.com/maps', 'https://maps.google.com')
-    .replace('https://maps.google.com/maps', 'https://maps.google.com');
-  window.location.href = mapsUrl;
+function abrirMaps(latDest, lngDest) {
+  // Guardar estado antes de salir para evitar "error al sincronizar"
+  saveStateLocal();
+  window.open(_urlMaps(latDest, lngDest), '_blank');
 }
+
+function abrirMapsUrl(urlOrig) {
+  // Guardar estado antes de salir
+  saveStateLocal();
+  // Asegurar que la URL tenga dir_action=navigate para abrir navegación
+  let url = urlOrig;
+  if (!url.includes('dir_action')) url += '&dir_action=navigate';
+  window.open(url, '_blank');
+}
+
 
 function abrirSegmento(idx) {
   const ruta = state.rutaActual;
