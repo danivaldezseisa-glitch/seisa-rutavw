@@ -2210,27 +2210,17 @@ function iniciarRutaGoogleMaps() {
   if (!inicio || !fin) { showToast('Faltan puntos de inicio o final'); return; }
   if (!paradas.length) { showToast('No hay paradas pendientes'); return; }
 
-  const enc = (p) => encodeURIComponent(p.lat + ',' + p.lng);
-  const MAX_WP = 23; // límite de Google Maps por URL
-
-  // Construir todos los segmentos necesarios
-  const segmentos = construirSegmentos(paradas, inicio, fin, MAX_WP);
-
-  if (segmentos.length === 1) {
-    saveStateLocal();
-    window.open(segmentos[0].url, '_blank');
-    showToast('🗺️ Abriendo ruta completa en Google Maps...');
-  } else {
-    // Guardar segmentos en state y mostrar selector
-    state.rutaActual._segmentos = segmentos;
-    state.rutaActual._segActual = 0;
-    saveState();
-    mostrarSelectorSegmentos(segmentos, 0);
-    return; // el selector maneja la navegación
-  }
+  // Abrir SOLO la primera parada en Maps — el chofer irá de una en una
+  const primera = paradas[0];
+  saveStateLocal();
+  window.open(_urlMaps(primera.lat, primera.lng), '_blank');
+  showToast('🗺️ Navegando a parada A — ' + primera.nombre);
 
   showScreen('screen-seguimiento');
   renderSeguimiento();
+
+  // Notificación de la primera parada (aparece al volver de Maps)
+  setTimeout(() => enviarNotificacionParada(), 2000);
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -4124,6 +4114,11 @@ async function instalarPWA() {
   const dd = String(hoy.getDate()).padStart(2,'0');
   const mm = String(hoy.getMonth()+1).padStart(2,'0');
   document.getElementById('cr-fecha').value = `${hoy.getFullYear()}-${mm}-${dd}`;
+
+  // Registrar SW al arrancar si ya tiene permiso (para notificaciones)
+  if ('Notification' in window && Notification.permission === 'granted') {
+    registrarSW().catch(() => {});
+  }
 
   ghConfig = loadGHConfig();
   actualizarBtnGH(false);
