@@ -622,8 +622,8 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
 <div class="modal-overlay hidden" id="modal-masivo">
   <div class="modal-sheet">
     <div class="modal-title">📋 Pegado masivo de Plus Codes</div>
-    <div style="font-size:12px;color:var(--text3);margin-bottom:8px;">Un código por línea. El nombre entre paréntesis al final es el nombre de la parada:</div>
-    <div style="font-size:11px;font-family:var(--mono);color:var(--accent);background:var(--surface2);padding:8px 12px;border-radius:8px;margin-bottom:10px;line-height:1.8;">JR5Q+MR Buenavista, Estado de México (Jacarandas 12)<br>GP3P+538 Naucalpan de Juárez (Morelos 45)<br>GQ8J+FFH Tlalnepantla, Estado de México (Hidalgo 2)</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:8px;">Un código por línea. Lo que va después de la <b style="color:var(--accent);">,</b> es el nombre de la parada:</div>
+    <div style="font-size:11px;font-family:var(--mono);color:var(--accent);background:var(--surface2);padding:8px 12px;border-radius:8px;margin-bottom:10px;line-height:1.8;">HRMF+2HQ Buenavista, guerrero 160<br>JR5Q+MR Naucalpan, morelos 45<br>GQ8J+FFH Tlalnepantla, hidalgo 2</div>
     <textarea id="masivo-textarea" class="input" style="height:150px;resize:none;font-family:var(--mono);font-size:13px;line-height:1.7;" placeholder="Pega aquí los Plus Codes o direcciones..."></textarea>
     <div id="masivo-status" style="font-size:12px;color:var(--text3);min-height:18px;text-align:center;"></div>
     <button class="btn btn-green" onclick="procesarMasivo()" id="btn-masivo-procesar">⚡ Procesar y agregar</button>
@@ -3364,15 +3364,44 @@ async function procesarMasivo() {
     try {
       let lat, lng, nombre;
 
-      // ── Extraer nombre entre paréntesis ──────────────────────────
-      // Formato: JR5Q+MR Ciudad, Estado (jacarandas 12)
-      // El texto entre ( ) se usa como nombre de la parada.
-      // Se elimina de la línea antes de geocodificar.
-      let nombreParentesis = null;
+      // ── Extraer nombre de la parada ───────────────────────────────
+      // Soporta DOS formatos:
+      //
+      // 1. Paréntesis (formato anterior):
+      //    JR5Q+MR Ciudad, Estado (Jacarandas 12)
+      //    → nombre = "Jacarandas 12"
+      //
+      // 2. Coma (formato nuevo, más rápido de escribir):
+      //    HRMF+2HQ Buenavista, guerrero 160
+      //    → nombre = "guerrero 160"
+      //    El geocoder recibe solo: "HRMF+2HQ Buenavista"
+      //
+      // Si hay paréntesis, tiene prioridad sobre la coma.
+
+      let nombreExtraido = null;
+
       const matchParen = linea.match(/\(([^)]+)\)\s*$/);
       if (matchParen) {
-        nombreParentesis = matchParen[1].trim();
+        // Formato con paréntesis
+        nombreExtraido = matchParen[1].trim();
         linea = linea.slice(0, matchParen.index).trim();
+      } else if (isPlusCode(linea.split(' ')[0])) {
+        // Formato con coma: buscar la primera coma después del Plus Code
+        const primerEspacio = linea.indexOf(' ');
+        const restoSinCode  = linea.slice(primerEspacio + 1); // "Buenavista, guerrero 160"
+        const idxComa       = restoSinCode.indexOf(',');
+        if (idxComa >= 0) {
+          const despuesDeComa = restoSinCode.slice(idxComa + 1).trim(); // "guerrero 160"
+          const anteDeComa    = restoSinCode.slice(0, idxComa).trim();  // "Buenavista"
+          // Solo extraer si lo que viene después de la coma NO parece un estado de México
+          // (evitar confundir "Buenavista, Estado de México" con nombre)
+          const ESTADOS_RX = /estado de m[eé]xico|ciudad de m[eé]xico|cdmx|nuevo le[oó]n|jalisco|puebla|veracruz|guerrero|hidalgo|oaxaca|chiapas|michoac[aá]n|guanajuato|sonora|chihuahua|tamaulipas|sinaloa|tabasco|yucat[aá]n|campeche|colima|tlaxcala|morelos|nayarit|durango|zacatecas|aguascalientes|quer[eé]taro|quintana roo|san luis potos[ií]|coahuila|baja california/i;
+          if (despuesDeComa && !ESTADOS_RX.test(despuesDeComa)) {
+            nombreExtraido = despuesDeComa;
+            // Dejar en linea solo: "PLUSCODE anteDeComa"
+            linea = linea.slice(0, primerEspacio + 1) + anteDeComa;
+          }
+        }
       }
 
       if (isPlusCode(linea.split(' ')[0])) {
@@ -3384,7 +3413,7 @@ async function procesarMasivo() {
         lat  = r.lat;
         lng  = r.lng;
         // Prioridad: paréntesis > después del estado > geocoder
-        nombre = nombreParentesis || nombreEstado || r.nombre;
+        nombre = nombreExtraido || nombreEstado || r.nombre;
       } else {
         const resultado = await new Promise((resolve) => {
           geocode(linea, {
@@ -3398,7 +3427,7 @@ async function procesarMasivo() {
         if (!resultado) throw new Error('Sin resultado');
         lat    = resultado.lat;
         lng    = resultado.lng;
-        nombre = nombreParentesis || resultado.nombre;
+        nombre = nombreExtraido || resultado.nombre;
       }
 
       if (lat && lng) {
