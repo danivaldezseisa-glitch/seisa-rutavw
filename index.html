@@ -493,100 +493,77 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
      Diseñada para usarse al volante: botones máximos, cero ruido.
      Se activa desde notificación o botón 🚗 Conducir.
      ════════════════════════════════════════════════════════════════ -->
-<div class="screen hidden" id="screen-conduccion">
+<div class="screen hidden" id="screen-conduccion" style="background:#060e1a;">
 
-  <!-- ── MAPA ocupa toda la pantalla ─────────────────────────── -->
-  <div id="cond-mapa" style="position:absolute;inset:0;z-index:1;"></div>
+  <!-- Topbar mínima: solo progreso y acciones críticas -->
+  <div style="display:flex;align-items:center;gap:10px;padding:max(14px,env(safe-area-inset-top)) 14px 8px;background:#060e1a;flex-shrink:0;">
 
-  <!-- ── TOPBAR flotante sobre el mapa ───────────────────────── -->
-  <div style="position:absolute;top:0;left:0;right:0;z-index:10;
-              padding:max(12px,env(safe-area-inset-top)) 12px 8px;
-              background:linear-gradient(180deg,rgba(255,255,255,.95) 0%,rgba(255,255,255,0) 100%);
-              pointer-events:none;">
-    <div style="display:flex;gap:8px;pointer-events:all;">
-      <button onclick="ocultarPantallaConduccion()"
-        style="height:40px;padding:0 14px;border-radius:12px;border:none;
-               background:rgba(255,255,255,.95);color:#333;font-size:13px;font-weight:700;
-               cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15);flex-shrink:0;">
-        ☰ Lista
-      </button>
-      <div style="flex:1;background:rgba(255,255,255,.95);border-radius:12px;
-                  padding:6px 12px;box-shadow:0 2px 8px rgba(0,0,0,.15);
-                  display:flex;align-items:center;gap:8px;">
-        <div style="flex:1;">
-          <div style="height:5px;background:#e0e0e0;border-radius:4px;overflow:hidden;">
-            <div id="cond-bar" style="height:100%;background:linear-gradient(90deg,#1a73e8,#34a853);border-radius:4px;width:0%;transition:width .5s;"></div>
-          </div>
-          <div style="display:flex;justify-content:space-between;font-size:10px;margin-top:2px;">
-            <span id="cond-contadores" style="color:#666;">— / —</span>
-            <span id="cond-pct" style="color:#1a73e8;font-weight:800;">0%</span>
-          </div>
-        </div>
+    <!-- Botón lista paradas (lleva a seguimiento para seleccionar) -->
+    <button onclick="ocultarPantallaConduccion()"
+      style="height:44px;padding:0 16px;border-radius:12px;border:1.5px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#8aabcc;font-size:14px;font-weight:700;cursor:pointer;flex-shrink:0;white-space:nowrap;">
+      ☰ Lista
+    </button>
+
+    <!-- Barra de progreso -->
+    <div style="flex:1;display:flex;flex-direction:column;gap:3px;">
+      <div style="height:7px;background:rgba(255,255,255,.08);border-radius:6px;overflow:hidden;">
+        <div id="cond-bar" style="height:100%;background:linear-gradient(90deg,#00d4ff,#00e676);border-radius:6px;width:0%;transition:width .5s;"></div>
       </div>
-      <button onclick="abrirMapsDesdeConduccion()"
-        style="height:40px;padding:0 12px;border-radius:12px;border:none;
-               background:rgba(255,255,255,.95);color:#1a73e8;font-size:13px;font-weight:800;
-               cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15);flex-shrink:0;">
-        🗺 Nav
-      </button>
+      <div style="display:flex;justify-content:space-between;font-size:10px;">
+        <span id="cond-contadores" style="color:#4a6a8a;">— / —</span>
+        <span id="cond-pct" style="color:#00d4ff;font-weight:800;">0%</span>
+      </div>
     </div>
+
+    <!-- Botón Maps -->
+    <button onclick="abrirMapsDesdeConduccion()"
+      style="height:44px;padding:0 14px;border-radius:12px;border:1.5px solid rgba(0,212,255,.35);background:rgba(0,212,255,.1);color:#00d4ff;font-size:14px;font-weight:800;cursor:pointer;flex-shrink:0;">
+      🗺
+    </button>
   </div>
 
-  <!-- ── PANEL INFERIOR flotante ──────────────────────────────── -->
-  <div id="cond-panel" style="position:absolute;bottom:0;left:0;right:0;z-index:10;
-              padding:0 12px calc(env(safe-area-inset-bottom,0px)+12px);">
+  <!-- Zona central: parada actual — ocupa todo el espacio -->
+  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:8px 16px;gap:8px;overflow:hidden;">
 
-    <!-- Tarjeta de parada actual -->
-    <div style="background:rgba(255,255,255,.97);border-radius:20px 20px 0 0;
-                padding:14px 16px 12px;box-shadow:0 -4px 24px rgba(0,0,0,.15);
-                margin-bottom:-1px;">
-
-      <!-- ETA y parada siguiente -->
-      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
-        <div style="display:flex;align-items:center;gap:8px;">
-          <div id="cond-letra"
-            style="width:40px;height:40px;border-radius:50%;background:#1a73e8;
-                   color:#fff;font-size:18px;font-weight:900;display:flex;
-                   align-items:center;justify-content:center;flex-shrink:0;">A</div>
-          <div style="min-width:0;">
-            <div id="cond-nombre"
-              style="font-size:16px;font-weight:800;color:#1a1a1a;
-                     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px;">—</div>
-            <div style="font-size:11px;color:#666;margin-top:1px;display:flex;gap:6px;">
-              <span id="cond-eta" style="color:#1a73e8;font-weight:700;">—</span>
-              <span>·</span>
-              <span id="cond-dist" style="color:#666;">—</span>
-            </div>
-          </div>
-        </div>
-        <!-- Siguiente parada -->
-        <div style="text-align:right;max-width:110px;">
-          <div style="font-size:9px;color:#999;text-transform:uppercase;letter-spacing:.06em;">Siguiente</div>
-          <div id="cond-siguiente" style="font-size:11px;color:#555;font-weight:600;
-               white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">—</div>
-        </div>
-      </div>
-
-      <!-- Botones ✓ / ✗ -->
-      <div style="display:flex;gap:8px;">
-        <button id="cond-btn-fallida" onclick="condFallida()"
-          style="flex:1;height:72px;border-radius:16px;border:none;
-                 background:#ea4335;color:#fff;font-size:15px;font-weight:900;
-                 cursor:pointer;-webkit-tap-highlight-color:transparent;
-                 display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;">
-          <span style="font-size:24px;">✗</span>
-          <span style="font-size:11px;opacity:.9;">Fallida</span>
-        </button>
-        <button id="cond-btn-ok" onclick="condEntregada()"
-          style="flex:2;height:72px;border-radius:16px;border:none;
-                 background:#34a853;color:#fff;font-size:15px;font-weight:900;
-                 cursor:pointer;-webkit-tap-highlight-color:transparent;
-                 display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;">
-          <span style="font-size:28px;">✓</span>
-          <span style="font-size:12px;">Entregada</span>
-        </button>
-      </div>
+    <!-- Letra grande -->
+    <div id="cond-letra"
+      style="font-size:80px;font-weight:900;color:#00d4ff;line-height:1;font-family:'SF Mono','Fira Code',monospace;text-shadow:0 0 40px rgba(0,212,255,.4);">
+      A
     </div>
+
+    <!-- Nombre de la parada -->
+    <div id="cond-nombre"
+      style="font-size:24px;font-weight:800;color:#ffffff;text-align:center;line-height:1.25;max-width:100%;padding:0 4px;word-break:break-word;">
+      —
+    </div>
+
+    <!-- Siguiente (referencia discreta) -->
+    <div style="margin-top:4px;padding:8px 14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:10px;text-align:center;width:100%;max-width:320px;">
+      <div style="font-size:9px;color:#2a4a6a;text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px;">Siguiente</div>
+      <div id="cond-siguiente" style="font-size:13px;color:#4a6a8a;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">—</div>
+    </div>
+
+  </div>
+
+  <!-- Botones de acción — ENORMES, fáciles de tocar manejando -->
+  <div style="padding:8px 12px calc(env(safe-area-inset-bottom,0px)+12px);flex-shrink:0;display:flex;flex-direction:column;gap:8px;">
+
+    <div style="display:flex;gap:10px;">
+      <!-- Fallida -->
+      <button id="cond-btn-fallida" onclick="condFallida()"
+        style="flex:1;padding:0;height:88px;border-radius:20px;border:none;background:#c0392b;color:#fff;font-size:20px;font-weight:900;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 4px 24px rgba(192,57,43,.45);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;">
+        <span style="font-size:28px;">✗</span>
+        <span style="font-size:12px;font-weight:700;opacity:.9;">Fallida</span>
+      </button>
+
+      <!-- Entregada — más ancho y verde brillante -->
+      <button id="cond-btn-ok" onclick="condEntregada()"
+        style="flex:2;padding:0;height:88px;border-radius:20px;border:none;background:#00c853;color:#000;font-size:20px;font-weight:900;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 4px 28px rgba(0,200,83,.45);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;">
+        <span style="font-size:34px;">✓</span>
+        <span style="font-size:13px;font-weight:800;">Entregada</span>
+      </button>
+    </div>
+
   </div>
 
 </div>
@@ -622,8 +599,8 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
 <div class="modal-overlay hidden" id="modal-masivo">
   <div class="modal-sheet">
     <div class="modal-title">📋 Pegado masivo de Plus Codes</div>
-    <div style="font-size:12px;color:var(--text3);margin-bottom:8px;">Un código por línea. Lo que va después de la <b style="color:var(--accent);">,</b> es el nombre de la parada:</div>
-    <div style="font-size:11px;font-family:var(--mono);color:var(--accent);background:var(--surface2);padding:8px 12px;border-radius:8px;margin-bottom:10px;line-height:1.8;">HRMF+2HQ Buenavista, guerrero 160<br>JR5Q+MR Naucalpan, morelos 45<br>GQ8J+FFH Tlalnepantla, hidalgo 2</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:8px;">Un código por línea. El texto después del estado es el nombre de la parada:</div>
+    <div style="font-size:11px;font-family:var(--mono);color:var(--accent);background:var(--surface2);padding:8px 12px;border-radius:8px;margin-bottom:10px;line-height:1.8;">GQ8J+FFH Tlalnepantla, Estado de México Hidalgo 2<br>GP3P+538 Naucalpan de Juárez Morelos 45<br>76F2CVM8+QQ Ciudad de México López 8</div>
     <textarea id="masivo-textarea" class="input" style="height:150px;resize:none;font-family:var(--mono);font-size:13px;line-height:1.7;" placeholder="Pega aquí los Plus Codes o direcciones..."></textarea>
     <div id="masivo-status" style="font-size:12px;color:var(--text3);min-height:18px;text-align:center;"></div>
     <button class="btn btn-green" onclick="procesarMasivo()" id="btn-masivo-procesar">⚡ Procesar y agregar</button>
@@ -1223,15 +1200,12 @@ function saveStateLocal() {
   } catch(e) {}
 }
 
-let _ghPushTimer = null;
+let _ghDebounce = null;
 function saveState() {
   saveStateLocal();
-  // Debounce: esperar 3s antes de sincronizar con GitHub
-  // Evita el "error al sincronizar" cuando se guardan múltiples
-  // acciones seguidas (marcar entregada, siguiente parada, etc.)
   if (ghConfig) {
-    clearTimeout(_ghPushTimer);
-    _ghPushTimer = setTimeout(() => ghPush(), 3000);
+    clearTimeout(_ghDebounce);
+    _ghDebounce = setTimeout(() => ghPush(), 4000);
   }
 }
 
@@ -1804,8 +1778,9 @@ async function resolverPlusCodeUI() {
     _pcCoordsTemp = { lat: result.lat, lng: result.lng };
     const coordsStr = result.lat.toFixed(6) + ', ' + result.lng.toFixed(6);
     document.getElementById('pc-coords-label').textContent = coordsStr;
+    const parsedRaw = parsearLineaPlusCode(raw);
     document.getElementById('pc-nombre-input').value = '';
-    document.getElementById('pc-nombre-input').placeholder = 'Escribe el nombre de la parada...';
+    document.getElementById('pc-nombre-input').placeholder = 'Escribe el nombre o referencia...';
     document.getElementById('pc-confirm-box').style.display = 'block';
     if (mapParadas) mapParadas.setView([result.lat, result.lng], 16);
     setTimeout(() => document.getElementById('pc-nombre-input')?.focus(), 150);
@@ -2217,17 +2192,27 @@ function iniciarRutaGoogleMaps() {
   if (!inicio || !fin) { showToast('Faltan puntos de inicio o final'); return; }
   if (!paradas.length) { showToast('No hay paradas pendientes'); return; }
 
-  // Abrir SOLO la primera parada en Maps — el chofer irá de una en una
-  const primera = paradas[0];
-  saveStateLocal();
-  window.open(_urlMaps(primera.lat, primera.lng), '_blank');
-  showToast('🗺️ Navegando a parada A — ' + primera.nombre);
+  const enc = (p) => encodeURIComponent(p.lat + ',' + p.lng);
+  const MAX_WP = 23; // límite de Google Maps por URL
+
+  // Construir todos los segmentos necesarios
+  const segmentos = construirSegmentos(paradas, inicio, fin, MAX_WP);
+
+  if (segmentos.length === 1) {
+    saveStateLocal();
+    window.open(segmentos[0].url, '_blank');
+    showToast('🗺️ Abriendo ruta completa en Google Maps...');
+  } else {
+    // Guardar segmentos en state y mostrar selector
+    state.rutaActual._segmentos = segmentos;
+    state.rutaActual._segActual = 0;
+    saveState();
+    mostrarSelectorSegmentos(segmentos, 0);
+    return; // el selector maneja la navegación
+  }
 
   showScreen('screen-seguimiento');
   renderSeguimiento();
-
-  // Notificación de la primera parada (aparece al volver de Maps)
-  setTimeout(() => enviarNotificacionParada(), 2000);
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -2623,8 +2608,6 @@ function marcarEntregadaSeg(idx) {
     saveState();
     actualizarBtnNavAuto();
   } else {
-    // Siempre enviar notificación de la siguiente parada
-    // independientemente del modo nav automático
     setTimeout(() => enviarNotificacionParada(), 1500);
   }
 }
@@ -2796,44 +2779,6 @@ function mostrarSelectorSegmentos(segmentos, activo) {
 // IMPORTANTE: esta función debe ser SÍNCRONA (no async) para que
 // window.open no sea bloqueado por Chrome PWA como popup.
 // La notificación se manda con setTimeout para no bloquear el return.
-// ── Botones ✓/✗ en pantalla de conducción ────────────────────────
-function condEntregada() {
-  const ruta = state.rutaActual;
-  if (!ruta) return;
-  const pendientes = ruta.paradas.filter(p => !p.hecha && !p.fallida);
-  if (!pendientes.length) return;
-  const p = pendientes[0];
-  p.hecha = true; p.fallida = false; p.horaAccion = fmtHora(new Date());
-  saveState();
-  if (navigator.vibrate) navigator.vibrate(80);
-  _renderCondPanel();
-  _renderCondMap();
-  const sig = ruta.paradas.filter(q => !q.hecha && !q.fallida);
-  if (sig.length > 0) setTimeout(() => enviarNotificacionParada(), 1500);
-  else showToast('🎉 ¡Todas las paradas completadas!');
-}
-
-function condFallida() {
-  const ruta = state.rutaActual;
-  if (!ruta) return;
-  const pendientes = ruta.paradas.filter(p => !p.hecha && !p.fallida);
-  if (!pendientes.length) return;
-  const p = pendientes[0];
-  p.hecha = true; p.fallida = true; p.horaAccion = fmtHora(new Date());
-  saveState();
-  if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
-  _renderCondPanel();
-  _renderCondMap();
-  const sig = ruta.paradas.filter(q => !q.hecha && !q.fallida);
-  if (sig.length > 0) setTimeout(() => enviarNotificacionParada(), 1500);
-  else showToast('🎉 ¡Todas las paradas completadas!');
-}
-
-// Alias para el botón 🗺 Nav de la pantalla de conducción
-function abrirMapsDesdeConduccion() {
-  abrirSiguienteParadaMaps();
-}
-
 // ══════════════════════════════════════════════════════════════════
 //  ABRIR RUTA COMPLETA EN MAPS
 //  Construye URL con todas las paradas pendientes (máx 23 por URL)
@@ -3198,7 +3143,7 @@ async function resolverPlusCodeSegAgregar() {
   const prv = document.getElementById('seg-agregar-preview');
   if (prv) { prv.textContent = '📍 ' + segAgregarData.nombre + ' · ' + result.lat.toFixed(5) + ', ' + result.lng.toFixed(5); prv.style.display = 'block'; }
   const nom = document.getElementById('seg-agregar-nombre');
-  if (nom) { nom.value = ''; nom.placeholder = 'Escribe el nombre de la parada...'; nom.focus(); }
+  if (nom) nom.value = segAgregarData.nombre;
   showToast('✅ Ubicación encontrada');
 }
 
@@ -3332,7 +3277,7 @@ async function resolverPlusCodeEditar() {
   const prv = document.getElementById('editar-parada-preview');
   if (prv) { prv.textContent = '📍 ' + result.nombre + ' · ' + result.lat.toFixed(5) + ', ' + result.lng.toFixed(5); prv.style.display = 'block'; }
   const nom = document.getElementById('editar-parada-nombre');
-  if (nom) { nom.value = ''; nom.placeholder = 'Escribe el nombre de la parada...'; nom.focus(); }
+  if (nom) nom.value = result.nombre;
   showToast('✅ Ubicación encontrada');
 }
 
@@ -3406,61 +3351,24 @@ async function procesarMasivo() {
   btn.disabled = true;
   let ok = 0, err = 0;
   for (let i = 0; i < lineas.length; i++) {
-    let linea = lineas[i];
+    const linea = lineas[i];
     statusEl.textContent = `Procesando ${i+1}/${lineas.length}...`;
     try {
       let lat, lng, nombre;
-
-      // ── Extraer nombre de la parada ───────────────────────────────
-      // Soporta DOS formatos:
-      //
-      // 1. Paréntesis (formato anterior):
-      //    JR5Q+MR Ciudad, Estado (Jacarandas 12)
-      //    → nombre = "Jacarandas 12"
-      //
-      // 2. Coma (formato nuevo, más rápido de escribir):
-      //    HRMF+2HQ Buenavista, guerrero 160
-      //    → nombre = "guerrero 160"
-      //    El geocoder recibe solo: "HRMF+2HQ Buenavista"
-      //
-      // Si hay paréntesis, tiene prioridad sobre la coma.
-
-      let nombreExtraido = null;
-
-      const matchParen = linea.match(/\(([^)]+)\)\s*$/);
-      if (matchParen) {
-        // Formato con paréntesis
-        nombreExtraido = matchParen[1].trim();
-        linea = linea.slice(0, matchParen.index).trim();
-      } else if (isPlusCode(linea.split(' ')[0])) {
-        // Formato con coma: buscar la primera coma después del Plus Code
-        const primerEspacio = linea.indexOf(' ');
-        const restoSinCode  = linea.slice(primerEspacio + 1); // "Buenavista, guerrero 160"
-        const idxComa       = restoSinCode.indexOf(',');
-        if (idxComa >= 0) {
-          const despuesDeComa = restoSinCode.slice(idxComa + 1).trim(); // "guerrero 160"
-          const anteDeComa    = restoSinCode.slice(0, idxComa).trim();  // "Buenavista"
-          // Solo extraer si lo que viene después de la coma NO parece un estado de México
-          // (evitar confundir "Buenavista, Estado de México" con nombre)
-          const ESTADOS_RX = /estado de m[eé]xico|ciudad de m[eé]xico|cdmx|nuevo le[oó]n|jalisco|puebla|veracruz|guerrero|hidalgo|oaxaca|chiapas|michoac[aá]n|guanajuato|sonora|chihuahua|tamaulipas|sinaloa|tabasco|yucat[aá]n|campeche|colima|tlaxcala|morelos|nayarit|durango|zacatecas|aguascalientes|quer[eé]taro|quintana roo|san luis potos[ií]|coahuila|baja california/i;
-          if (despuesDeComa && !ESTADOS_RX.test(despuesDeComa)) {
-            nombreExtraido = despuesDeComa;
-            // Dejar en linea solo: "PLUSCODE anteDeComa"
-            linea = linea.slice(0, primerEspacio + 1) + anteDeComa;
-          }
-        }
-      }
-
       if (isPlusCode(linea.split(' ')[0])) {
+        // Extraer nombre personalizado antes de geocodificar
+        // Formato: PLUSCODE Ciudad, Estado NombrePersonalizado
+        // "NombrePersonalizado" es todo lo que viene después del estado
         const parsed = parsearLineaPlusCode(linea);
-        const nombreEstado = (parsed?.nombre && parsed.nombre !== parsed?.plusCode)
-          ? parsed.nombre : null;
+        const nombrePersonalizado = (parsed?.nombre && parsed.nombre !== parsed?.plusCode)
+          ? parsed.nombre
+          : null;
         const r = await resolverPlusCode(linea);
         if (!r) throw new Error('Plus code no resuelto');
-        lat  = r.lat;
-        lng  = r.lng;
-        // Prioridad: paréntesis > después del estado > geocoder
-        nombre = nombreExtraido || nombreEstado || r.nombre;
+        lat    = r.lat;
+        lng    = r.lng;
+        // Prioridad: lo que escribió el usuario > nombre del geocoder
+        nombre = nombrePersonalizado || r.nombre;
       } else {
         const resultado = await new Promise((resolve) => {
           geocode(linea, {
@@ -3472,11 +3380,8 @@ async function procesarMasivo() {
           setTimeout(() => resolve(null), 5000);
         });
         if (!resultado) throw new Error('Sin resultado');
-        lat    = resultado.lat;
-        lng    = resultado.lng;
-        nombre = nombreExtraido || resultado.nombre;
+        lat = resultado.lat; lng = resultado.lng; nombre = resultado.nombre;
       }
-
       if (lat && lng) {
         const id = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,5);
         rutaBuild.paradas.push({ id, nombre, lat, lng, hecha: false, fallida: false, horaAccion: null });
@@ -3484,7 +3389,7 @@ async function procesarMasivo() {
       } else throw new Error('Coords inválidas');
       if (i < lineas.length - 1) await new Promise(r => setTimeout(r, 1100));
     } catch(e) {
-      console.warn('masivo error:', lineas[i], e.message);
+      console.warn('masivo error:', linea, e.message);
       err++;
     }
   }
@@ -3588,102 +3493,24 @@ function renderResumen() {
 
 // ══════════════════════════════════════════════════════════════════
 //  SISTEMA DE NOTIFICACIONES
-//  Usa Service Worker real (sw.js) para botones en la cortina.
-//  Funciona en GitHub Pages, Netlify y cualquier HTTPS.
+//
+//  Funciona en TRES escenarios:
+//
+//  1. HTTPS (Netlify): Service Worker real → botones ✅/❌ en la
+//     cortina de notificaciones, sin abrir la app.
+//
+//  2. file:// (archivo local): Notificación básica con vibración.
+//     Al tocarla enfoca la app. Sin botones de acción (limitación
+//     de Chrome por seguridad en file://).
+//
+//  3. iOS Safari: No soporta Notification API → se omite.
 // ══════════════════════════════════════════════════════════════════
 
 let _swReg        = null;
 let _swListo      = false;
 let _swIntentando = false;
 
-async function registrarSW() {
-  if (_swListo || _swIntentando) return;
-  if (!('serviceWorker' in navigator)) return;
-  // Solo en HTTPS (incluye GitHub Pages y Netlify)
-  if (location.protocol !== 'https:' && location.hostname !== 'localhost') return;
-
-  _swIntentando = true;
-  try {
-    // Usar la URL base correcta aunque la app esté en subdirectorio
-    const swUrl   = new URL('./sw.js', location.href).href;
-    const swScope = new URL('./',      location.href).href;
-
-    _swReg = await navigator.serviceWorker.register(swUrl, { scope: swScope });
-    await navigator.serviceWorker.ready;
-    _swListo = true;
-
-    navigator.serviceWorker.addEventListener('message', e => {
-      const { tipo, action, idx } = e.data || {};
-      if (tipo !== 'notif_accion' || typeof idx !== 'number') return;
-      const ruta = state.rutaActual;
-      if (!ruta) return;
-      if (action === 'entregada' || action === 'fallida') {
-        accionConduccion(idx, action);
-      } else {
-        mostrarPantallaConduccion(idx);
-      }
-    });
-
-    console.log('✅ SW listo:', swUrl);
-  } catch(err) {
-    console.warn('SW error:', err.message);
-    _swListo = false;
-  }
-  _swIntentando = false;
-}
-
-async function pedirPermisoNotificaciones() {
-  if (!('Notification' in window)) return false;
-  if (Notification.permission === 'granted') return true;
-  if (Notification.permission === 'denied')  return false;
-  return (await Notification.requestPermission()) === 'granted';
-}
-
-async function notificarParada(parada, idxReal, letra) {
-  const ok = await pedirPermisoNotificaciones();
-  if (!ok) { console.warn('Notif: sin permiso'); return; }
-
-  if (!_swListo) await registrarSW();
-
-  const titulo = '📦 Parada ' + letra;
-  const cuerpo = parada.nombre;
-  const urlApp = location.href;
-
-  try {
-    if (_swListo && _swReg) {
-      // HTTPS con SW — botones en la cortina
-      const reg = await navigator.serviceWorker.ready;
-      await reg.showNotification(titulo, {
-        body:     cuerpo,
-        icon:     'https://cdn.jsdelivr.net/npm/twemoji@14/assets/72x72/1f4e6.png',
-        badge:    'https://cdn.jsdelivr.net/npm/twemoji@14/assets/72x72/1f69a.png',
-        tag:      'seisa-' + idxReal,
-        renotify: true,
-        requireInteraction: true,
-        vibrate:  [300, 150, 300],
-        data:     { idx: idxReal, url: urlApp },
-        actions:  [
-          { action: 'entregada', title: '✅ Entregada' },
-          { action: 'fallida',   title: '❌ Fallida'   },
-        ],
-      });
-      console.log('🔔 Notificación enviada:', titulo);
-    } else {
-      // Sin SW — notificación básica, al tocar abre la app
-      if (navigator.vibrate) navigator.vibrate([400, 200, 400]);
-      const n = new Notification(titulo + ' — ' + cuerpo, {
-        body:    'Toca para marcar la entrega',
-        icon:    'https://cdn.jsdelivr.net/npm/twemoji@14/assets/72x72/1f4e6.png',
-        tag:     'seisa-' + idxReal,
-        requireInteraction: true,
-      });
-      n.onclick = () => { window.focus(); n.close(); mostrarPantallaConduccion(); };
-    }
-  } catch(err) {
-    console.warn('Error notificación:', err.message);
-  }
-}
-
+// ── Registrar Service Worker (solo en HTTPS o localhost) ──────────
 async function enviarNotificacionParada() {
   const ruta = state.rutaActual;
   if (!ruta) return;
@@ -3695,73 +3522,237 @@ async function enviarNotificacionParada() {
   await notificarParada(siguiente, idxReal, letra);
 }
 
-async function activarNotificaciones() {
-  if (!('Notification' in window)) {
-    showToast('⚠️ Este navegador no soporta notificaciones'); return;
-  }
+async function registrarSW() {
+  if (_swListo || _swIntentando || !('serviceWorker' in navigator)) return;
+  if (location.protocol !== 'https:' && location.hostname !== 'localhost') return;
+  _swIntentando = true;
 
-  const esHTTPS = location.protocol === 'https:' || location.hostname === 'localhost';
+  try {
+    // Registrar desde sw.js (mismo origen que index.html en Netlify)
+    _swReg   = await navigator.serviceWorker.register('./sw.js', { scope: './' });
+    _swListo = true;
 
-  if (Notification.permission === 'granted') {
-    if (esHTTPS) await registrarSW();
-    // Enviar notificación de prueba para confirmar que funciona
-    try {
-      const swOk = _swListo && _swReg;
-      if (swOk) {
-        const reg = await navigator.serviceWorker.ready;
-        await reg.showNotification('🔔 SEISA Rutas — Notificaciones activas', {
-          body:    'Los botones ✅/❌ aparecerán aquí durante las entregas',
-          tag:     'seisa-test',
-          icon:    'https://cdn.jsdelivr.net/npm/twemoji@14/assets/72x72/1f69a.png',
-          requireInteraction: false,
-        });
-        showToast('🔔 Activas con botones ✅/❌ en la cortina');
-      } else {
-        new Notification('🔔 SEISA Rutas — Notificaciones activas', {
-          body: 'Aparecerán aquí durante las entregas',
-          tag:  'seisa-test',
-        });
-        showToast('🔔 Notificaciones activas');
+    // Escuchar mensajes del SW → abrir pantalla de conducción
+    navigator.serviceWorker.addEventListener('message', e => {
+      const { tipo, action, idx } = e.data || {};
+      if (tipo === 'notif_accion' && typeof idx === 'number') {
+        // Asegurarse de que la app esté en pantalla de seguimiento/conducción
+        const ruta = state.rutaActual;
+        if (!ruta) return;
+
+        // Si la acción viene de la notificación, ir directo a conducción
+        // para que el chofer confirme visualmente (más seguro al volante)
+        if (action === 'entregada' || action === 'fallida') {
+          // Ejecutar la acción directamente (viene de la cortina de notificaciones)
+          if (action === 'entregada') marcarEntregadaSeg(idx);
+          if (action === 'fallida')   marcarFallidaSeg(idx);
+        }
+
+        // Siempre mostrar pantalla de conducción después de la acción
+        // para que el chofer pueda ver la siguiente parada fácilmente
+        mostrarPantallaConduccion();
       }
-    } catch(e) { showToast('🔔 Notificaciones activas'); }
-    actualizarBtnNotif();
+    });
+    console.log('✅ SW registrado desde sw.js — notificaciones con botones activas');
+  } catch(err) {
+    console.warn('SW falló (¿falta sw.js?):', err.message);
+    _swListo = false;
+  }
+  _swIntentando = false;
+}
+
+// ── Pedir permiso ─────────────────────────────────────────────────
+async function pedirPermisoNotificaciones() {
+  if (!('Notification' in window)) return false;
+  if (Notification.permission === 'granted') return true;
+  if (Notification.permission === 'denied')  return false;
+  return (await Notification.requestPermission()) === 'granted';
+}
+
+// ── Enviar notificación de parada ─────────────────────────────────
+async function notificarParada(parada, idxReal, letra) {
+  const ok = await pedirPermisoNotificaciones();
+  if (!ok) return;
+
+  // Intentar SW en HTTPS
+  if (!_swListo) await registrarSW();
+
+  const urlApp = location.href;
+  const titulo = '📦 Parada ' + letra;
+  const cuerpo = parada.nombre;
+
+  try {
+    if (_swListo && _swReg) {
+      // ── Modo HTTPS: botones de acción en la cortina ────────────
+      const reg = await navigator.serviceWorker.ready;
+      await reg.showNotification(titulo, {
+        body:    cuerpo,
+        icon:    'https://cdn.jsdelivr.net/npm/twemoji@14/assets/72x72/1f4e6.png',
+        badge:   'https://cdn.jsdelivr.net/npm/twemoji@14/assets/72x72/1f69a.png',
+        tag:     'seisa-' + idxReal,
+        renotify: true,
+        requireInteraction: true,
+        vibrate: [300, 150, 300],
+        data:    { idx: idxReal, url: urlApp },
+        actions: [
+          { action: 'entregada', title: '✅ Entregada' },
+          { action: 'fallida',   title: '❌ Fallida'   },
+        ],
+      });
+    } else {
+      // ── Modo file:// o sin SW: notificación básica ─────────────
+      // Vibrar para avisar al chofer aunque la pantalla esté en Maps
+      if (navigator.vibrate) navigator.vibrate([400, 200, 400]);
+
+      const n = new Notification(titulo + ' — ' + cuerpo, {
+        body:    '↩ Toca aquí para marcar Entregada o Fallida',
+        icon:    'https://cdn.jsdelivr.net/npm/twemoji@14/assets/72x72/1f4e6.png',
+        tag:     'seisa-' + idxReal,
+        requireInteraction: true,
+        silent:  false,
+      });
+      n.onclick = () => {
+        window.focus();
+        n.close();
+        // Abrir pantalla de conducción — minimalista, fácil de usar manejando
+        mostrarPantallaConduccion();
+      };
+    }
+  } catch(err) {
+    console.warn('Error notificación:', err.message);
+  }
+}
+
+// ── Mini-modal de acción rápida (para file:// sin botones SW) ─────
+function mostrarAccionRapida(idxReal, letra, nombre) {
+  // Mostrar pantalla de conducción minimalista
+  mostrarPantallaConduccion(idxReal);
+}
+
+// ══════════════════════════════════════════════════════════════════
+//  PANTALLA DE CONDUCCIÓN — Minimalista
+// ══════════════════════════════════════════════════════════════════
+
+function mostrarPantallaConduccion() {
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+  renderPantallaConduccion();
+  // Ocultar todas las screens y mostrar conducción
+  document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+  document.getElementById('screen-conduccion').classList.remove('hidden');
+}
+
+function ocultarPantallaConduccion() {
+  document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
+  document.getElementById('screen-seguimiento').classList.remove('hidden');
+  renderSeguimiento();
+}
+
+function renderPantallaConduccion() {
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+
+  const paradas    = ruta.paradas || [];
+  const entregadas = paradas.filter(p => p.hecha && !p.fallida).length;
+  const fallidas   = paradas.filter(p => p.fallida).length;
+  const pendientes = paradas.filter(p => !p.hecha && !p.fallida);
+  const total      = paradas.length;
+  const pct        = total ? Math.round((entregadas + fallidas) / total * 100) : 0;
+
+  // Barra de progreso
+  const bar    = document.getElementById('cond-bar');
+  const pctEl  = document.getElementById('cond-pct');
+  const contEl = document.getElementById('cond-contadores');
+  if (bar)    bar.style.width     = pct + '%';
+  if (pctEl)  pctEl.textContent   = pct + '%';
+  if (contEl) contEl.textContent  = `✓${entregadas} ✗${fallidas} ⏳${pendientes.length}`;
+
+  if (!pendientes.length) {
+    const letraEl = document.getElementById('cond-letra');
+    const nomEl   = document.getElementById('cond-nombre');
+    const sigEl   = document.getElementById('cond-siguiente');
+    const bOk     = document.getElementById('cond-btn-ok');
+    const bFall   = document.getElementById('cond-btn-fallida');
+    if (letraEl) { letraEl.textContent = '🎉'; letraEl.style.fontSize = '64px'; }
+    if (nomEl)   nomEl.textContent   = '¡Ruta completada!';
+    if (sigEl)   sigEl.textContent   = 'Regresa a la base 🏁';
+    if (bOk)     bOk.style.display   = 'none';
+    if (bFall)   bFall.style.display = 'none';
     return;
   }
 
-  const perm = await Notification.requestPermission();
-  if (perm === 'granted') {
-    if (esHTTPS) await registrarSW();
-    showToast(_swListo ? '🔔 Activadas con botones ✅/❌ en la cortina' : '🔔 Notificaciones activadas');
-  } else {
-    showToast('🔕 Permiso denegado — actívalo en Ajustes de Chrome → Notificaciones');
-  }
-  actualizarBtnNotif();
+  // Parada actual (primera pendiente)
+  const actual   = pendientes[0];
+  const idxReal  = paradas.indexOf(actual);
+  const letra    = idxToLetra(idxReal);
+  const siguiente = pendientes[1] || null;
+
+  const letraEl = document.getElementById('cond-letra');
+  const nomEl   = document.getElementById('cond-nombre');
+  const sigEl   = document.getElementById('cond-siguiente');
+  const bOk     = document.getElementById('cond-btn-ok');
+  const bFall   = document.getElementById('cond-btn-fallida');
+
+  if (letraEl) { letraEl.textContent = letra; letraEl.style.fontSize = '80px'; }
+  if (nomEl)   nomEl.textContent   = actual.nombre;
+  if (sigEl)   sigEl.textContent   = siguiente
+    ? idxToLetra(paradas.indexOf(siguiente)) + ' — ' + siguiente.nombre
+    : '(última parada)';
+  if (bOk)   bOk.style.display   = '';
+  if (bFall) bFall.style.display = '';
 }
 
-function actualizarBtnNotif() {
-  const btn  = document.getElementById('btn-notif');
-  if (!btn) return;
-  const perm = 'Notification' in window ? Notification.permission : 'denied';
-  if (perm === 'granted') {
-    btn.textContent       = '🔔';
-    btn.style.color       = 'var(--green)';
-    btn.style.borderColor = 'rgba(0,230,118,.5)';
-    btn.style.background  = 'rgba(0,230,118,.1)';
-    btn.title = _swListo ? 'Notificaciones activas con botones' : 'Notificaciones activas';
-  } else if (perm === 'denied') {
-    btn.textContent       = '🔕';
-    btn.style.color       = 'var(--red)';
-    btn.style.borderColor = 'rgba(255,82,82,.4)';
-    btn.style.background  = 'var(--surface2)';
-    btn.title = 'Bloqueadas — Ajustes de Chrome → Notificaciones';
-  } else {
-    btn.textContent       = '🔔';
-    btn.style.color       = 'var(--text3)';
-    btn.style.borderColor = 'var(--border)';
-    btn.style.background  = 'var(--surface2)';
-    btn.title = 'Toca para activar notificaciones';
+// Abrir Maps desde la pantalla de conducción
+function abrirMapsDesdeConduccion() {
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+  const pendientes = ruta.paradas.filter(p => !p.hecha && !p.fallida);
+  if (!pendientes.length) {
+    if (ruta.final) {
+      saveStateLocal();
+      window.open(_urlMaps(ruta.final.lat, ruta.final.lng), '_blank');
+    }
+    return;
   }
+  const siguiente = pendientes[0];
+  saveStateLocal();
+  window.open(_urlMaps(siguiente.lat, siguiente.lng), '_blank');
 }
+
+// Botón ✓ Entregada en modo conducción
+function condEntregada() {
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+  const pendientes = ruta.paradas.filter(p => !p.hecha && !p.fallida);
+  if (!pendientes.length) return;
+  const p = pendientes[0];
+  p.hecha = true; p.fallida = false; p.horaAccion = fmtHora(new Date());
+  saveState();
+  if (navigator.vibrate) navigator.vibrate(100);
+  renderPantallaConduccion();
+  // Notificación de la siguiente parada pendiente
+  const sig = ruta.paradas.filter(q => !q.hecha && !q.fallida);
+  if (sig.length > 0) setTimeout(() => enviarNotificacionParada(), 1500);
+  else showToast('🎉 ¡Todas las paradas completadas!');
+}
+
+// Botón ✗ Fallida en modo conducción
+function condFallida() {
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+  const pendientes = ruta.paradas.filter(p => !p.hecha && !p.fallida);
+  if (!pendientes.length) return;
+  const p = pendientes[0];
+  p.hecha = true; p.fallida = true; p.horaAccion = fmtHora(new Date());
+  saveState();
+  if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+  renderPantallaConduccion();
+  // Notificación de la siguiente parada pendiente
+  const sig = ruta.paradas.filter(q => !q.hecha && !q.fallida);
+  if (sig.length > 0) setTimeout(() => enviarNotificacionParada(), 1500);
+  else showToast('🎉 ¡Todas las paradas completadas!');
+}
+
 
 let _filtroSeg = '';
 
@@ -3923,11 +3914,6 @@ async function instalarPWA() {
   const dd = String(hoy.getDate()).padStart(2,'0');
   const mm = String(hoy.getMonth()+1).padStart(2,'0');
   document.getElementById('cr-fecha').value = `${hoy.getFullYear()}-${mm}-${dd}`;
-
-  // Registrar SW al arrancar si ya tiene permiso (para notificaciones)
-  if ('Notification' in window && Notification.permission === 'granted') {
-    registrarSW().catch(() => {});
-  }
 
   ghConfig = loadGHConfig();
   actualizarBtnGH(false);
