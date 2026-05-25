@@ -1576,18 +1576,44 @@ async function resolverPlusCode(input) {
   const parsed = parsearLineaPlusCode(input.trim());
   if (!parsed) return null;
   const { plusCode, ciudad, nombre } = parsed;
-  const pi = plusCode.indexOf('+');
+  const pi        = plusCode.indexOf('+');
   const prefixLen = pi;
+
+  // ── PASO 1: Google Geocoder (el más preciso para México) ────────
+  if (typeof google !== 'undefined' && google.maps && google.maps.Geocoder) {
+    try {
+      const geocoder = new google.maps.Geocoder();
+      const query    = ciudad ? `${plusCode} ${ciudad}` : plusCode;
+      const result   = await new Promise((resolve) => {
+        geocoder.geocode({ address: query, region: 'MX', language: 'es' }, (res, status) => {
+          if (status === 'OK' && res[0]) {
+            resolve({
+              lat: res[0].geometry.location.lat(),
+              lng: res[0].geometry.location.lng(),
+              nombre: nombre || res[0].formatted_address.split(',')[0]
+            });
+          } else resolve(null);
+        });
+      });
+      if (result) return result;
+    } catch(e) { console.warn('Google geocoder Plus Code:', e.message); }
+  }
+
+  // ── PASO 2: OLC decode directo (plus codes completos 8+ dígitos) ─
   if (prefixLen >= 8) {
     const digits = plusCode.replace(/\+/g, '');
     const coords = olcDecodeCompleto(digits);
-    const rev = await nominatimReverse(coords.lat, coords.lng);
-    return { lat: coords.lat, lng: coords.lng, nombre: rev || nombre };
+    if (coords && coords.lat >= 14 && coords.lat <= 33) { // dentro de México
+      const rev = await nominatimReverse(coords.lat, coords.lng);
+      return { lat: coords.lat, lng: coords.lng, nombre: rev || nombre };
+    }
   }
+
+  // ── PASO 3: plus.codes API ──────────────────────────────────────
   try {
     const queryPC = ciudad ? `${plusCode} ${ciudad}` : plusCode;
-    const urlPC = `https://plus.codes/api?address=${encodeURIComponent(queryPC)}&key=none&language=es`;
-    const resPC = await fetchConTimeout(urlPC, {}, 5000);
+    const urlPC   = `https://plus.codes/api?address=${encodeURIComponent(queryPC)}&key=none&language=es`;
+    const resPC   = await fetchConTimeout(urlPC, {}, 5000);
     if (resPC.ok) {
       const dataPC = await resPC.json();
       if (dataPC?.plus_code?.geometry?.location) {
@@ -1597,22 +1623,23 @@ async function resolverPlusCode(input) {
       }
     }
   } catch(e) { console.warn('plus.codes API:', e.message); }
+
+  // ── PASO 4: OLC corto + referencia geográfica por Nominatim ─────
   if (ciudad && ciudad.trim()) {
     try {
       const queries = [
-        'city=' + encodeURIComponent(ciudad.split(',')[0].trim()) +
-          '&state=' + encodeURIComponent(ciudad.split(',')[1]?.trim() || '') + '&country=Mexico',
-        'q=' + encodeURIComponent(ciudad) + '&countrycodes=mx',
+        'q=' + encodeURIComponent(ciudad.trim()) + '&countrycodes=mx',
+        'q=' + encodeURIComponent(ciudad.split(',')[0].trim()) + '&countrycodes=mx',
       ];
       let refLat = null, refLng = null;
       for (const q of queries) {
-        const url = 'https://nominatim.openstreetmap.org/search?' +
-          q + '&format=json&limit=3&accept-language=es&addressdetails=1';
-        const res = await fetchConTimeout(url, { headers: {'User-Agent':'SEISA-App/1.0'} }, 6000);
+        const url  = 'https://nominatim.openstreetmap.org/search?' +
+          q + '&format=json&limit=3&accept-language=es';
+        const res  = await fetchConTimeout(url, { headers: { 'User-Agent': 'SEISA-App/1.0' } }, 6000);
         const data = await res.json();
         if (!data.length) continue;
         const best = data.find(d =>
-          ['city','town','municipality','village','suburb'].includes(d.type) ||
+          ['city','town','municipality','village','suburb','county'].includes(d.type) ||
           ['city','town','municipality','village'].includes(d.addresstype)
         ) || data[0];
         refLat = parseFloat(best.lat);
@@ -1626,20 +1653,10 @@ async function resolverPlusCode(input) {
           return { lat: coords.lat, lng: coords.lng, nombre: nombre || nombreCalle || plusCode };
         }
       }
-    } catch(e) { console.warn('resolverPlusCode Nominatim ref:', e.message); }
+    } catch(e) { console.warn('resolverPlusCode ref:', e.message); }
   }
-  try {
-    const urlNom = 'https://nominatim.openstreetmap.org/search?q=' +
-      encodeURIComponent(plusCode + (ciudad ? ' ' + ciudad : '')) +
-      '&format=json&limit=1&accept-language=es&countrycodes=mx';
-    const resNom = await fetchConTimeout(urlNom, { headers: {'User-Agent':'SEISA-App/1.0'} }, 6000);
-    const dataNom = await resNom.json();
-    if (dataNom.length) {
-      const lat = parseFloat(dataNom[0].lat), lng = parseFloat(dataNom[0].lon);
-      const rev = await nominatimReverse(lat, lng);
-      return { lat, lng, nombre: nombre || rev || plusCode };
-    }
-  } catch(e) { console.warn('resolverPlusCode Nominatim fallback:', e.message); }
+
+  // ── PASO 5: OLC corto + CDMX como referencia ───────────────────
   try {
     const refLat = 19.4326, refLng = -99.1332;
     const coords = olcRecoverShort(plusCode, refLat, refLng);
@@ -1647,7 +1664,7 @@ async function resolverPlusCode(input) {
       const nombreCalle = await nominatimReverse(coords.lat, coords.lng);
       return { lat: coords.lat, lng: coords.lng, nombre: nombre || nombreCalle || plusCode };
     }
-  } catch(e) { console.warn('resolverPlusCode CDMX fallback:', e.message); }
+  } catch(e) { console.warn('resolverPlusCode CDMX:', e.message); }
   return null;
 }
 
