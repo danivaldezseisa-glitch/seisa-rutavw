@@ -1223,9 +1223,16 @@ function saveStateLocal() {
   } catch(e) {}
 }
 
+let _ghPushTimer = null;
 function saveState() {
   saveStateLocal();
-  if (ghConfig) ghPush();
+  // Debounce: esperar 3s antes de sincronizar con GitHub
+  // Evita el "error al sincronizar" cuando se guardan múltiples
+  // acciones seguidas (marcar entregada, siguiente parada, etc.)
+  if (ghConfig) {
+    clearTimeout(_ghPushTimer);
+    _ghPushTimer = setTimeout(() => ghPush(), 3000);
+  }
 }
 
 let rutaBuild = {
@@ -2615,7 +2622,9 @@ function marcarEntregadaSeg(idx) {
     ruta._navAuto = false;
     saveState();
     actualizarBtnNavAuto();
-  } else if (ruta._navAuto) {
+  } else {
+    // Siempre enviar notificación de la siguiente parada
+    // independientemente del modo nav automático
     setTimeout(() => enviarNotificacionParada(), 1500);
   }
 }
@@ -2641,7 +2650,7 @@ function marcarFallidaSeg(idx) {
   renderSeguimiento();
   showToast('⚠️ Fallida · ' + p.horaAccion);
 
-  if (ruta._navAuto && pendientes.length > 0) {
+  if (pendientes.length > 0) {
     setTimeout(() => enviarNotificacionParada(), 1500);
   }
 }
@@ -2787,6 +2796,44 @@ function mostrarSelectorSegmentos(segmentos, activo) {
 // IMPORTANTE: esta función debe ser SÍNCRONA (no async) para que
 // window.open no sea bloqueado por Chrome PWA como popup.
 // La notificación se manda con setTimeout para no bloquear el return.
+// ── Botones ✓/✗ en pantalla de conducción ────────────────────────
+function condEntregada() {
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+  const pendientes = ruta.paradas.filter(p => !p.hecha && !p.fallida);
+  if (!pendientes.length) return;
+  const p = pendientes[0];
+  p.hecha = true; p.fallida = false; p.horaAccion = fmtHora(new Date());
+  saveState();
+  if (navigator.vibrate) navigator.vibrate(80);
+  _renderCondPanel();
+  _renderCondMap();
+  const sig = ruta.paradas.filter(q => !q.hecha && !q.fallida);
+  if (sig.length > 0) setTimeout(() => enviarNotificacionParada(), 1500);
+  else showToast('🎉 ¡Todas las paradas completadas!');
+}
+
+function condFallida() {
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+  const pendientes = ruta.paradas.filter(p => !p.hecha && !p.fallida);
+  if (!pendientes.length) return;
+  const p = pendientes[0];
+  p.hecha = true; p.fallida = true; p.horaAccion = fmtHora(new Date());
+  saveState();
+  if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
+  _renderCondPanel();
+  _renderCondMap();
+  const sig = ruta.paradas.filter(q => !q.hecha && !q.fallida);
+  if (sig.length > 0) setTimeout(() => enviarNotificacionParada(), 1500);
+  else showToast('🎉 ¡Todas las paradas completadas!');
+}
+
+// Alias para el botón 🗺 Nav de la pantalla de conducción
+function abrirMapsDesdeConduccion() {
+  abrirSiguienteParadaMaps();
+}
+
 // ══════════════════════════════════════════════════════════════════
 //  ABRIR RUTA COMPLETA EN MAPS
 //  Construye URL con todas las paradas pendientes (máx 23 por URL)
