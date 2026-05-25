@@ -1754,56 +1754,72 @@ let _pcCoordsTemp = null;
 async function resolverPlusCodeUI() {
   const raw = document.getElementById('paradas-pluscode').value.trim();
   if (!raw) { showToast('Pega un Plus Code primero'); return; }
-  document.getElementById('pc-confirm-box').style.display = 'none';
-  document.getElementById('pc-error').style.display       = 'none';
-  document.getElementById('pc-loading').style.display     = 'block';
+
+  const loadEl    = document.getElementById('pc-loading');
+  const errorEl   = document.getElementById('pc-error');
+  const confirmEl = document.getElementById('pc-confirm-box');
+  confirmEl.style.display = 'none';
+  errorEl.style.display   = 'none';
+  loadEl.style.display    = 'block';
   _pcCoordsTemp = null;
+
+  const mostrarError = (msg) => {
+    loadEl.style.display  = 'none';
+    errorEl.textContent   = msg;
+    errorEl.style.display = 'block';
+  };
+
   try {
     let result = null;
+
+    // Google Geocoder con timeout de 5s — si no responde, sigue al fallback
     if (googleMapsReady && gmGeocoder) {
       const parsed = parsearLineaPlusCode(raw);
-      const query = parsed ? parsed.plusCode + ' ' + parsed.ciudad : raw;
-      result = await new Promise(resolve => {
-        gmGeocoder.geocode(
-          { address: query, region: 'MX', language: 'es' },
-          async (res, status) => {
-            if (status !== 'OK' || !res[0]) { resolve(null); return; }
-            const addr   = res[0].address_components || [];
-            const street = addr.find(c => c.types.includes('route'))?.long_name || '';
-            const num    = addr.find(c => c.types.includes('street_number'))?.long_name || '';
-            const lat    = res[0].geometry.location.lat();
-            const lng    = res[0].geometry.location.lng();
-            const nombreFinal = (parsed?.nombre && parsed.nombre !== parsed.plusCode)
-              ? parsed.nombre
-              : ([street, num].filter(Boolean).join(' ') || res[0].formatted_address.split(',')[0]);
-            resolve({ lat, lng, nombre: nombreFinal });
-          }
-        );
-      });
+      const query  = parsed ? parsed.plusCode + (parsed.ciudad ? ' ' + parsed.ciudad : '') : raw;
+      result = await Promise.race([
+        new Promise(resolve => {
+          try {
+            gmGeocoder.geocode({ address: query, region: 'MX', language: 'es' }, (res, status) => {
+              if (status !== 'OK' || !res[0]) { resolve(null); return; }
+              const addr   = res[0].address_components || [];
+              const street = addr.find(c => c.types.includes('route'))?.long_name || '';
+              const num    = addr.find(c => c.types.includes('street_number'))?.long_name || '';
+              resolve({
+                lat: res[0].geometry.location.lat(),
+                lng: res[0].geometry.location.lng(),
+                nombre: [street, num].filter(Boolean).join(' ') || res[0].formatted_address.split(',')[0]
+              });
+            });
+          } catch(e) { resolve(null); }
+        }),
+        // Timeout: si Google no responde en 5s, pasar al fallback
+        new Promise(resolve => setTimeout(() => resolve(null), 5000))
+      ]);
     }
+
+    // Fallback: OLC + Nominatim + plus.codes
     if (!result) result = await resolverPlusCode(raw);
-    document.getElementById('pc-loading').style.display = 'none';
+
+    loadEl.style.display = 'none';
+
     if (!result) {
-      document.getElementById('pc-error').textContent = '⚠️ No se encontró la ubicación. Verifica el Plus Code.';
-      document.getElementById('pc-error').style.display = 'block';
+      mostrarError('⚠️ No se encontró. Agrega la ciudad al Plus Code. Ej: HRMF+2HQ Buenavista');
       return;
     }
+
     _pcCoordsTemp = { lat: result.lat, lng: result.lng };
-    const coordsStr = result.lat.toFixed(6) + ', ' + result.lng.toFixed(6);
-    document.getElementById('pc-coords-label').textContent = coordsStr;
-    const parsedRaw = parsearLineaPlusCode(raw);
+    document.getElementById('pc-coords-label').textContent =
+      result.lat.toFixed(6) + ', ' + result.lng.toFixed(6);
     document.getElementById('pc-nombre-input').value = '';
-    document.getElementById('pc-nombre-input').placeholder = 'Escribe el nombre o referencia...';
-    document.getElementById('pc-confirm-box').style.display = 'block';
+    document.getElementById('pc-nombre-input').placeholder = 'Escribe el nombre de la parada...';
+    confirmEl.style.display = 'block';
     if (mapParadas) mapParadas.setView([result.lat, result.lng], 16);
     setTimeout(() => document.getElementById('pc-nombre-input')?.focus(), 150);
+
   } catch(e) {
-    document.getElementById('pc-loading').style.display = 'none';
-    document.getElementById('pc-error').textContent = '⚠️ Error: ' + e.message;
-    document.getElementById('pc-error').style.display = 'block';
+    mostrarError('⚠️ Error: ' + e.message);
   }
 }
-
 function confirmarAgregarPlusCode() {
   if (!_pcCoordsTemp) { showToast('Primero resuelve el Plus Code'); return; }
   const nombre = document.getElementById('pc-nombre-input').value.trim();
