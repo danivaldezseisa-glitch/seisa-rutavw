@@ -617,7 +617,7 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
     <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">Plus Code</div>
     <div style="display:flex;gap:8px;">
       <input class="input" id="editar-pluscode-input" placeholder="Ej: GP3P+538 Naucalpan de Juárez" style="flex:1;font-size:13px;font-family:var(--mono);">
-      <button onclick="resolverPlusCodeEditar()" style="padding:8px 14px;border-radius:10px;border:1.5px solid var(--accent);background:rgba(0,212,255,.12);color:var(--accent);font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;">Buscar</button>
+      <button id="btn-editar-pluscode-buscar" onclick="resolverPlusCodeEditar()" style="padding:8px 14px;border-radius:10px;border:1.5px solid var(--accent);background:rgba(0,212,255,.12);color:var(--accent);font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;">Buscar</button>
     </div>
     <div style="display:flex;align-items:center;gap:8px;margin:6px 0;">
       <div style="flex:1;height:1px;background:var(--border);"></div>
@@ -1200,13 +1200,9 @@ function saveStateLocal() {
   } catch(e) {}
 }
 
-let _ghDebounce = null;
 function saveState() {
   saveStateLocal();
-  if (ghConfig) {
-    clearTimeout(_ghDebounce);
-    _ghDebounce = setTimeout(() => ghPush(), 4000);
-  }
+  if (ghConfig) ghPush();
 }
 
 let rutaBuild = {
@@ -2192,21 +2188,27 @@ function iniciarRutaGoogleMaps() {
   if (!inicio || !fin) { showToast('Faltan puntos de inicio o final'); return; }
   if (!paradas.length) { showToast('No hay paradas pendientes'); return; }
 
-  // Abrir SOLO la primera parada en Maps
-  const primera = paradas[0];
-  saveStateLocal();
-  window.open(_urlMaps(primera.lat, primera.lng), '_blank');
+  const enc = (p) => encodeURIComponent(p.lat + ',' + p.lng);
+  const MAX_WP = 23; // límite de Google Maps por URL
 
-  // Mostrar pantalla de conducción (mapa visual + botones)
-  showScreen('screen-conduccion');
-  renderPantallaConduccion();
+  // Construir todos los segmentos necesarios
+  const segmentos = construirSegmentos(paradas, inicio, fin, MAX_WP);
 
-  // Activar notificaciones automáticamente y enviar la primera
-  registrarSW().then(() => {
-    setTimeout(() => enviarNotificacionParada(), 2000);
-  }).catch(() => {
-    setTimeout(() => enviarNotificacionParada(), 2000);
-  });
+  if (segmentos.length === 1) {
+    saveStateLocal();
+    window.open(segmentos[0].url, '_blank');
+    showToast('🗺️ Abriendo ruta completa en Google Maps...');
+  } else {
+    // Guardar segmentos en state y mostrar selector
+    state.rutaActual._segmentos = segmentos;
+    state.rutaActual._segActual = 0;
+    saveState();
+    mostrarSelectorSegmentos(segmentos, 0);
+    return; // el selector maneja la navegación
+  }
+
+  showScreen('screen-seguimiento');
+  renderSeguimiento();
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -2601,7 +2603,7 @@ function marcarEntregadaSeg(idx) {
     ruta._navAuto = false;
     saveState();
     actualizarBtnNavAuto();
-  } else {
+  } else if (ruta._navAuto) {
     setTimeout(() => enviarNotificacionParada(), 1500);
   }
 }
@@ -2627,7 +2629,7 @@ function marcarFallidaSeg(idx) {
   renderSeguimiento();
   showToast('⚠️ Fallida · ' + p.horaAccion);
 
-  if (pendientes.length > 0) {
+  if (ruta._navAuto && pendientes.length > 0) {
     setTimeout(() => enviarNotificacionParada(), 1500);
   }
 }
@@ -3185,7 +3187,13 @@ window.abrirEditarParada = function(id) {
   const actualEl = document.getElementById('editar-parada-actual');
   if (actualEl && p) { actualEl.textContent = '📍 ' + p.nombre + ' · ' + p.lat.toFixed(5) + ', ' + p.lng.toFixed(5); }
   const nombreEl = document.getElementById('editar-parada-nombre');
-  if (nombreEl) nombreEl.value = p ? p.nombre : '';
+  if (nombreEl) {
+    nombreEl.value = '';
+    nombreEl.placeholder = 'Escribe el nombre de la parada...';
+  }
+  // Limpiar preview
+  const prevEl = document.getElementById('editar-parada-preview');
+  if (prevEl) prevEl.style.display = 'none';
   document.getElementById('modal-editar-parada').classList.remove('hidden');
 };
 
@@ -3219,10 +3227,11 @@ async function ejecutarBusquedaEditarParada() {
         editParadaData = { lat: parseFloat(d.lat), lng: parseFloat(d.lon), nombre };
         const prv = document.getElementById('editar-parada-preview');
         if (prv) { prv.textContent = '📍 ' + nombre; prv.style.display = 'block'; }
+        // Dejar el campo nombre vacío para que el usuario lo escriba
         const nom = document.getElementById('editar-parada-nombre');
-        if (nom && !nom.value.trim()) nom.value = nombre;
+        if (nom) { nom.value = ''; nom.placeholder = 'Escribe el nombre de la parada...'; nom.focus(); }
         res.style.display = 'none';
-        showToast('📍 Ubicación seleccionada');
+        showToast('📍 Ubicación seleccionada — escribe el nombre');
       });
       res.appendChild(el);
     });
@@ -3235,10 +3244,12 @@ async function resolverPlusCodeEditar() {
   const raw = (document.getElementById('editar-pluscode-input')?.value || '').trim();
   if (!raw) { showToast('Pega un Plus Code primero'); return; }
   if (!isPlusCode(raw.split(' ')[0])) { showToast('⚠️ Formato no reconocido. Ej: GP3P+538 Naucalpan'); return; }
-  const btn = document.querySelector('[onclick="resolverPlusCodeEditar()"]');
-  const prevTxt = btn ? btn.textContent : '';
-  if (btn) { btn.textContent = '⏳'; btn.disabled = true; }
+
+  // Usar getElementById para encontrar el botón de forma confiable
+  const btnBuscar = document.getElementById('btn-editar-pluscode-buscar');
+  if (btnBuscar) { btnBuscar.textContent = '⏳'; btnBuscar.disabled = true; }
   showToast('🔍 Resolviendo...');
+
   let result = null;
   try {
     if (googleMapsReady && gmGeocoder) {
@@ -3262,17 +3273,28 @@ async function resolverPlusCodeEditar() {
       ]).catch(() => null);
     }
     if (!result) result = await resolverPlusCode(raw);
-  } catch(e) { console.warn('resolverPlusCodeEditar error:', e); }
-  finally { if (btn) { btn.textContent = prevTxt; btn.disabled = false; } }
+  } catch(e) {
+    console.warn('resolverPlusCodeEditar error:', e);
+  } finally {
+    if (btnBuscar) { btnBuscar.textContent = 'Buscar'; btnBuscar.disabled = false; }
+  }
+
   if (!result) { showToast('⚠️ No se pudo resolver. Agrega la ciudad: "GP3P+538 Naucalpan"'); return; }
-  const parsed = parsearLineaPlusCode(raw);
-  if (parsed?.nombre && parsed.nombre !== parsed.plusCode) { result.nombre = parsed.nombre; }
+
   editParadaData = { lat: result.lat, lng: result.lng, nombre: result.nombre };
+
+  // Mostrar coordenadas en el preview
   const prv = document.getElementById('editar-parada-preview');
-  if (prv) { prv.textContent = '📍 ' + result.nombre + ' · ' + result.lat.toFixed(5) + ', ' + result.lng.toFixed(5); prv.style.display = 'block'; }
+  if (prv) {
+    prv.textContent = '📍 ' + result.lat.toFixed(5) + ', ' + result.lng.toFixed(5);
+    prv.style.display = 'block';
+  }
+
+  // Dejar el campo nombre VACÍO para que el usuario lo escriba
   const nom = document.getElementById('editar-parada-nombre');
-  if (nom) nom.value = result.nombre;
-  showToast('✅ Ubicación encontrada');
+  if (nom) { nom.value = ''; nom.placeholder = 'Escribe el nombre de la parada...'; nom.focus(); }
+
+  showToast('✅ Ubicación encontrada — escribe el nombre');
 }
 
 function confirmarEditarParada() {
@@ -3505,17 +3527,6 @@ let _swListo      = false;
 let _swIntentando = false;
 
 // ── Registrar Service Worker (solo en HTTPS o localhost) ──────────
-async function enviarNotificacionParada() {
-  const ruta = state.rutaActual;
-  if (!ruta) return;
-  const pendientes = ruta.paradas.filter(p => !p.hecha && !p.fallida);
-  if (!pendientes.length) return;
-  const siguiente = pendientes[0];
-  const idxReal   = ruta.paradas.indexOf(siguiente);
-  const letra     = idxToLetra(idxReal);
-  await notificarParada(siguiente, idxReal, letra);
-}
-
 async function registrarSW() {
   if (_swListo || _swIntentando || !('serviceWorker' in navigator)) return;
   if (location.protocol !== 'https:' && location.hostname !== 'localhost') return;
@@ -3529,8 +3540,21 @@ async function registrarSW() {
     // Escuchar mensajes del SW → abrir pantalla de conducción
     navigator.serviceWorker.addEventListener('message', e => {
       const { tipo, action, idx } = e.data || {};
-      if (tipo === 'notif_accion') {
-        // Cualquier toque en la notificación → pantalla de conducción
+      if (tipo === 'notif_accion' && typeof idx === 'number') {
+        // Asegurarse de que la app esté en pantalla de seguimiento/conducción
+        const ruta = state.rutaActual;
+        if (!ruta) return;
+
+        // Si la acción viene de la notificación, ir directo a conducción
+        // para que el chofer confirme visualmente (más seguro al volante)
+        if (action === 'entregada' || action === 'fallida') {
+          // Ejecutar la acción directamente (viene de la cortina de notificaciones)
+          if (action === 'entregada') marcarEntregadaSeg(idx);
+          if (action === 'fallida')   marcarFallidaSeg(idx);
+        }
+
+        // Siempre mostrar pantalla de conducción después de la acción
+        // para que el chofer pueda ver la siguiente parada fácilmente
         mostrarPantallaConduccion();
       }
     });
@@ -3567,16 +3591,17 @@ async function notificarParada(parada, idxReal, letra) {
       // ── Modo HTTPS: botones de acción en la cortina ────────────
       const reg = await navigator.serviceWorker.ready;
       await reg.showNotification(titulo, {
-        body:    cuerpo + '\n📍 Toca para ir a la pantalla de conducción',
+        body:    cuerpo,
         icon:    'https://cdn.jsdelivr.net/npm/twemoji@14/assets/72x72/1f4e6.png',
         badge:   'https://cdn.jsdelivr.net/npm/twemoji@14/assets/72x72/1f69a.png',
         tag:     'seisa-' + idxReal,
         renotify: true,
         requireInteraction: true,
         vibrate: [300, 150, 300],
-        data:    { idx: idxReal, url: urlApp, accion: 'conduccion' },
+        data:    { idx: idxReal, url: urlApp },
         actions: [
-          { action: 'conduccion', title: '🚗 Ir a pantalla' },
+          { action: 'entregada', title: '✅ Entregada' },
+          { action: 'fallida',   title: '❌ Fallida'   },
         ],
       });
     } else {
@@ -3585,7 +3610,7 @@ async function notificarParada(parada, idxReal, letra) {
       if (navigator.vibrate) navigator.vibrate([400, 200, 400]);
 
       const n = new Notification(titulo + ' — ' + cuerpo, {
-        body:    '🚗 Toca para ir a la pantalla de conducción',
+        body:    '↩ Toca aquí para marcar Entregada o Fallida',
         icon:    'https://cdn.jsdelivr.net/npm/twemoji@14/assets/72x72/1f4e6.png',
         tag:     'seisa-' + idxReal,
         requireInteraction: true,
@@ -3594,6 +3619,7 @@ async function notificarParada(parada, idxReal, letra) {
       n.onclick = () => {
         window.focus();
         n.close();
+        // Abrir pantalla de conducción — minimalista, fácil de usar manejando
         mostrarPantallaConduccion();
       };
     }
@@ -3705,23 +3731,12 @@ function condEntregada() {
   const pendientes = ruta.paradas.filter(p => !p.hecha && !p.fallida);
   if (!pendientes.length) return;
   const p = pendientes[0];
+  const idx = ruta.paradas.indexOf(p);
+
   p.hecha = true; p.fallida = false; p.horaAccion = fmtHora(new Date());
   saveState();
   if (navigator.vibrate) navigator.vibrate(100);
-
-  // Ver siguiente parada ANTES de renderizar
-  const sig = ruta.paradas.filter(q => !q.hecha && !q.fallida);
-
-  if (sig.length > 0) {
-    // Abrir Maps a la siguiente parada (síncrono — dentro del evento de usuario)
-    window.open(_urlMaps(sig[0].lat, sig[0].lng), '_blank');
-    renderPantallaConduccion();
-    // Notificación de la siguiente parada
-    setTimeout(() => enviarNotificacionParada(), 1500);
-  } else {
-    renderPantallaConduccion();
-    showToast('🎉 ¡Todas las paradas completadas!');
-  }
+  renderPantallaConduccion();
 }
 
 // Botón ✗ Fallida en modo conducción
@@ -3731,23 +3746,11 @@ function condFallida() {
   const pendientes = ruta.paradas.filter(p => !p.hecha && !p.fallida);
   if (!pendientes.length) return;
   const p = pendientes[0];
+
   p.hecha = true; p.fallida = true; p.horaAccion = fmtHora(new Date());
   saveState();
   if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-
-  // Ver siguiente parada ANTES de renderizar
-  const sig = ruta.paradas.filter(q => !q.hecha && !q.fallida);
-
-  if (sig.length > 0) {
-    // Abrir Maps a la siguiente parada (síncrono — dentro del evento de usuario)
-    window.open(_urlMaps(sig[0].lat, sig[0].lng), '_blank');
-    renderPantallaConduccion();
-    // Notificación de la siguiente parada
-    setTimeout(() => enviarNotificacionParada(), 1500);
-  } else {
-    renderPantallaConduccion();
-    showToast('🎉 ¡Todas las paradas completadas!');
-  }
+  renderPantallaConduccion();
 }
 
 
