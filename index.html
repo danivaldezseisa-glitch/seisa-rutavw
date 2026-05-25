@@ -493,77 +493,100 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
      Diseñada para usarse al volante: botones máximos, cero ruido.
      Se activa desde notificación o botón 🚗 Conducir.
      ════════════════════════════════════════════════════════════════ -->
-<div class="screen hidden" id="screen-conduccion" style="background:#060e1a;">
+<div class="screen hidden" id="screen-conduccion">
 
-  <!-- Topbar mínima: solo progreso y acciones críticas -->
-  <div style="display:flex;align-items:center;gap:10px;padding:max(14px,env(safe-area-inset-top)) 14px 8px;background:#060e1a;flex-shrink:0;">
+  <!-- ── MAPA ocupa toda la pantalla ─────────────────────────── -->
+  <div id="cond-mapa" style="position:absolute;inset:0;z-index:1;"></div>
 
-    <!-- Botón lista paradas (lleva a seguimiento para seleccionar) -->
-    <button onclick="ocultarPantallaConduccion()"
-      style="height:44px;padding:0 16px;border-radius:12px;border:1.5px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#8aabcc;font-size:14px;font-weight:700;cursor:pointer;flex-shrink:0;white-space:nowrap;">
-      ☰ Lista
-    </button>
-
-    <!-- Barra de progreso -->
-    <div style="flex:1;display:flex;flex-direction:column;gap:3px;">
-      <div style="height:7px;background:rgba(255,255,255,.08);border-radius:6px;overflow:hidden;">
-        <div id="cond-bar" style="height:100%;background:linear-gradient(90deg,#00d4ff,#00e676);border-radius:6px;width:0%;transition:width .5s;"></div>
-      </div>
-      <div style="display:flex;justify-content:space-between;font-size:10px;">
-        <span id="cond-contadores" style="color:#4a6a8a;">— / —</span>
-        <span id="cond-pct" style="color:#00d4ff;font-weight:800;">0%</span>
-      </div>
-    </div>
-
-    <!-- Botón Maps -->
-    <button onclick="abrirMapsDesdeConduccion()"
-      style="height:44px;padding:0 14px;border-radius:12px;border:1.5px solid rgba(0,212,255,.35);background:rgba(0,212,255,.1);color:#00d4ff;font-size:14px;font-weight:800;cursor:pointer;flex-shrink:0;">
-      🗺
-    </button>
-  </div>
-
-  <!-- Zona central: parada actual — ocupa todo el espacio -->
-  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:8px 16px;gap:8px;overflow:hidden;">
-
-    <!-- Letra grande -->
-    <div id="cond-letra"
-      style="font-size:80px;font-weight:900;color:#00d4ff;line-height:1;font-family:'SF Mono','Fira Code',monospace;text-shadow:0 0 40px rgba(0,212,255,.4);">
-      A
-    </div>
-
-    <!-- Nombre de la parada -->
-    <div id="cond-nombre"
-      style="font-size:24px;font-weight:800;color:#ffffff;text-align:center;line-height:1.25;max-width:100%;padding:0 4px;word-break:break-word;">
-      —
-    </div>
-
-    <!-- Siguiente (referencia discreta) -->
-    <div style="margin-top:4px;padding:8px 14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:10px;text-align:center;width:100%;max-width:320px;">
-      <div style="font-size:9px;color:#2a4a6a;text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px;">Siguiente</div>
-      <div id="cond-siguiente" style="font-size:13px;color:#4a6a8a;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">—</div>
-    </div>
-
-  </div>
-
-  <!-- Botones de acción — ENORMES, fáciles de tocar manejando -->
-  <div style="padding:8px 12px calc(env(safe-area-inset-bottom,0px)+12px);flex-shrink:0;display:flex;flex-direction:column;gap:8px;">
-
-    <div style="display:flex;gap:10px;">
-      <!-- Fallida -->
-      <button id="cond-btn-fallida" onclick="condFallida()"
-        style="flex:1;padding:0;height:88px;border-radius:20px;border:none;background:#c0392b;color:#fff;font-size:20px;font-weight:900;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 4px 24px rgba(192,57,43,.45);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;">
-        <span style="font-size:28px;">✗</span>
-        <span style="font-size:12px;font-weight:700;opacity:.9;">Fallida</span>
+  <!-- ── TOPBAR flotante sobre el mapa ───────────────────────── -->
+  <div style="position:absolute;top:0;left:0;right:0;z-index:10;
+              padding:max(12px,env(safe-area-inset-top)) 12px 8px;
+              background:linear-gradient(180deg,rgba(255,255,255,.95) 0%,rgba(255,255,255,0) 100%);
+              pointer-events:none;">
+    <div style="display:flex;gap:8px;pointer-events:all;">
+      <button onclick="ocultarPantallaConduccion()"
+        style="height:40px;padding:0 14px;border-radius:12px;border:none;
+               background:rgba(255,255,255,.95);color:#333;font-size:13px;font-weight:700;
+               cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15);flex-shrink:0;">
+        ☰ Lista
       </button>
-
-      <!-- Entregada — más ancho y verde brillante -->
-      <button id="cond-btn-ok" onclick="condEntregada()"
-        style="flex:2;padding:0;height:88px;border-radius:20px;border:none;background:#00c853;color:#000;font-size:20px;font-weight:900;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 4px 28px rgba(0,200,83,.45);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;">
-        <span style="font-size:34px;">✓</span>
-        <span style="font-size:13px;font-weight:800;">Entregada</span>
+      <div style="flex:1;background:rgba(255,255,255,.95);border-radius:12px;
+                  padding:6px 12px;box-shadow:0 2px 8px rgba(0,0,0,.15);
+                  display:flex;align-items:center;gap:8px;">
+        <div style="flex:1;">
+          <div style="height:5px;background:#e0e0e0;border-radius:4px;overflow:hidden;">
+            <div id="cond-bar" style="height:100%;background:linear-gradient(90deg,#1a73e8,#34a853);border-radius:4px;width:0%;transition:width .5s;"></div>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:10px;margin-top:2px;">
+            <span id="cond-contadores" style="color:#666;">— / —</span>
+            <span id="cond-pct" style="color:#1a73e8;font-weight:800;">0%</span>
+          </div>
+        </div>
+      </div>
+      <button onclick="abrirMapsDesdeConduccion()"
+        style="height:40px;padding:0 12px;border-radius:12px;border:none;
+               background:rgba(255,255,255,.95);color:#1a73e8;font-size:13px;font-weight:800;
+               cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.15);flex-shrink:0;">
+        🗺 Nav
       </button>
     </div>
+  </div>
 
+  <!-- ── PANEL INFERIOR flotante ──────────────────────────────── -->
+  <div id="cond-panel" style="position:absolute;bottom:0;left:0;right:0;z-index:10;
+              padding:0 12px calc(env(safe-area-inset-bottom,0px)+12px);">
+
+    <!-- Tarjeta de parada actual -->
+    <div style="background:rgba(255,255,255,.97);border-radius:20px 20px 0 0;
+                padding:14px 16px 12px;box-shadow:0 -4px 24px rgba(0,0,0,.15);
+                margin-bottom:-1px;">
+
+      <!-- ETA y parada siguiente -->
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div id="cond-letra"
+            style="width:40px;height:40px;border-radius:50%;background:#1a73e8;
+                   color:#fff;font-size:18px;font-weight:900;display:flex;
+                   align-items:center;justify-content:center;flex-shrink:0;">A</div>
+          <div style="min-width:0;">
+            <div id="cond-nombre"
+              style="font-size:16px;font-weight:800;color:#1a1a1a;
+                     white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:190px;">—</div>
+            <div style="font-size:11px;color:#666;margin-top:1px;display:flex;gap:6px;">
+              <span id="cond-eta" style="color:#1a73e8;font-weight:700;">—</span>
+              <span>·</span>
+              <span id="cond-dist" style="color:#666;">—</span>
+            </div>
+          </div>
+        </div>
+        <!-- Siguiente parada -->
+        <div style="text-align:right;max-width:110px;">
+          <div style="font-size:9px;color:#999;text-transform:uppercase;letter-spacing:.06em;">Siguiente</div>
+          <div id="cond-siguiente" style="font-size:11px;color:#555;font-weight:600;
+               white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">—</div>
+        </div>
+      </div>
+
+      <!-- Botones ✓ / ✗ -->
+      <div style="display:flex;gap:8px;">
+        <button id="cond-btn-fallida" onclick="condFallida()"
+          style="flex:1;height:72px;border-radius:16px;border:none;
+                 background:#ea4335;color:#fff;font-size:15px;font-weight:900;
+                 cursor:pointer;-webkit-tap-highlight-color:transparent;
+                 display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;">
+          <span style="font-size:24px;">✗</span>
+          <span style="font-size:11px;opacity:.9;">Fallida</span>
+        </button>
+        <button id="cond-btn-ok" onclick="condEntregada()"
+          style="flex:2;height:72px;border-radius:16px;border:none;
+                 background:#34a853;color:#fff;font-size:15px;font-weight:900;
+                 cursor:pointer;-webkit-tap-highlight-color:transparent;
+                 display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;">
+          <span style="font-size:28px;">✓</span>
+          <span style="font-size:12px;">Entregada</span>
+        </button>
+      </div>
+    </div>
   </div>
 
 </div>
@@ -3625,22 +3648,173 @@ function mostrarAccionRapida(idxReal, letra, nombre) {
 //  PANTALLA DE CONDUCCIÓN — Minimalista
 // ══════════════════════════════════════════════════════════════════
 
-function mostrarPantallaConduccion() {
+// ══════════════════════════════════════════════════════════════════
+//  PANTALLA DE CONDUCCIÓN CON MAPA LEAFLET
+//  Mapa estilo OpenStreetMap claro (igual al nativo de Google Maps)
+//  Ruta pintada en azul intenso · GPS en tiempo real · ETA por parada
+// ══════════════════════════════════════════════════════════════════
+
+let condMap        = null;   // instancia Leaflet
+let condPolylines  = [];     // líneas de ruta
+let condMarkers    = [];     // marcadores de paradas
+let condGPSMarker  = null;   // marcador de posición actual
+let condGPSWatch   = null;   // watchPosition ID
+let _condIdxActual = -1;     // índice de la parada actual
+
+function mostrarPantallaConduccion(idxForzado) {
   const ruta = state.rutaActual;
   if (!ruta) return;
-  renderPantallaConduccion();
-  // Ocultar todas las screens y mostrar conducción
+
   document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
   document.getElementById('screen-conduccion').classList.remove('hidden');
+
+  // Inicializar mapa si no existe
+  setTimeout(() => {
+    _initCondMap();
+    _renderCondMap();
+    _renderCondPanel(idxForzado);
+    _iniciarGPSCond();
+  }, 50);
 }
 
 function ocultarPantallaConduccion() {
+  _detenerGPSCond();
   document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
   document.getElementById('screen-seguimiento').classList.remove('hidden');
   renderSeguimiento();
 }
 
-function renderPantallaConduccion() {
+// ── Inicializar mapa ──────────────────────────────────────────────
+function _initCondMap() {
+  if (condMap) { condMap.invalidateSize(); return; }
+
+  const ruta   = state.rutaActual;
+  const centro = ruta?.inicio ? [ruta.inicio.lat, ruta.inicio.lng] : [19.4326, -99.1332];
+
+  condMap = L.map('cond-mapa', {
+    zoomControl:       false,
+    attributionControl: false,
+  }).setView(centro, 14);
+
+  // Tiles estilo claro (idéntico al de Google Maps)
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19,
+    attribution: '© OpenStreetMap'
+  }).addTo(condMap);
+
+  L.control.zoom({ position: 'bottomright' }).addTo(condMap);
+}
+
+// ── Dibujar ruta y marcadores en el mapa ─────────────────────────
+function _renderCondMap() {
+  if (!condMap) return;
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+
+  // Limpiar capas anteriores
+  condPolylines.forEach(p => p.remove()); condPolylines = [];
+  condMarkers.forEach(m => m.remove());   condMarkers   = [];
+
+  const paradas  = ruta.paradas || [];
+  const inicio   = ruta.inicio;
+  const fin      = ruta.final;
+  const pendientes = paradas.filter(p => !p.hecha && !p.fallida);
+
+  // Puntos para la polilínea completa
+  const allPts = [];
+  if (inicio) allPts.push([inicio.lat, inicio.lng]);
+  paradas.forEach(p => allPts.push([p.lat, p.lng]));
+  if (fin) allPts.push([fin.lat, fin.lng]);
+
+  // Línea gris: ruta completa
+  if (allPts.length > 1) {
+    condPolylines.push(
+      L.polyline(allPts, { color: '#bdbdbd', weight: 4, opacity: .6 }).addTo(condMap)
+    );
+  }
+
+  // Línea azul intensa: desde inicio hasta primera parada pendiente
+  const pendIdx = pendientes.length ? paradas.indexOf(pendientes[0]) : -1;
+  if (pendIdx >= 0 && inicio) {
+    const tramo = [[inicio.lat, inicio.lng]];
+    paradas.slice(0, pendIdx + 1).forEach(p => tramo.push([p.lat, p.lng]));
+    condPolylines.push(
+      L.polyline(tramo, {
+        color: '#1a73e8', weight: 5, opacity: 1,
+        dashArray: null
+      }).addTo(condMap)
+    );
+  }
+
+  // Marcador inicio
+  if (inicio) {
+    condMarkers.push(
+      L.marker([inicio.lat, inicio.lng], { icon: _condIcon('🏠', '#34a853', 28) })
+        .addTo(condMap).bindPopup('Inicio')
+    );
+  }
+
+  // Marcadores de paradas
+  paradas.forEach((p, i) => {
+    const letra     = idxToLetra(i);
+    const entregada = p.hecha && !p.fallida;
+    const fallida   = p.fallida;
+    const esPendiente = !p.hecha && !p.fallida;
+    const esPrimera   = esPendiente && i === pendIdx;
+
+    let bgColor = entregada ? '#34a853' : fallida ? '#ea4335' : esPrimera ? '#1a73e8' : '#78909c';
+    let texto   = entregada ? '✓' : fallida ? '✗' : letra;
+    let size    = esPrimera ? 36 : 28;
+
+    condMarkers.push(
+      L.marker([p.lat, p.lng], { icon: _condIconText(texto, bgColor, size) })
+        .addTo(condMap)
+        .bindPopup(`<b>${letra}. ${p.nombre}</b>${entregada ? ' ✓' : fallida ? ' ✗' : ''}`)
+    );
+  });
+
+  // Marcador fin
+  if (fin) {
+    condMarkers.push(
+      L.marker([fin.lat, fin.lng], { icon: _condIcon('🏁', '#ff6d00', 28) })
+        .addTo(condMap).bindPopup('Base')
+    );
+  }
+
+  // Centrar en la parada actual o en toda la ruta
+  if (pendientes.length && condMap) {
+    const primera = pendientes[0];
+    condMap.setView([primera.lat, primera.lng], 15);
+  } else if (allPts.length > 1) {
+    condMap.fitBounds(allPts, { padding: [40, 40], maxZoom: 15 });
+  }
+}
+
+// ── Iconos del mapa ───────────────────────────────────────────────
+function _condIcon(emoji, color, size) {
+  return L.divIcon({
+    html: `<div style="width:${size}px;height:${size}px;border-radius:50%;
+                background:${color};border:2px solid #fff;
+                display:flex;align-items:center;justify-content:center;
+                font-size:${size * .45}px;box-shadow:0 2px 6px rgba(0,0,0,.3);">${emoji}</div>`,
+    className: '', iconSize: [size,size], iconAnchor: [size/2,size/2]
+  });
+}
+
+function _condIconText(texto, color, size) {
+  const fs = texto.length > 2 ? Math.max(9, size * .28) : size * .38;
+  return L.divIcon({
+    html: `<div style="width:${size}px;height:${size}px;border-radius:50%;
+                background:${color};border:2.5px solid #fff;
+                display:flex;align-items:center;justify-content:center;
+                font-size:${fs}px;font-weight:900;color:#fff;
+                box-shadow:0 2px 8px rgba(0,0,0,.35);">${texto}</div>`,
+    className: '', iconSize: [size,size], iconAnchor: [size/2,size/2]
+  });
+}
+
+// ── Panel inferior: nombre, ETA, botones ─────────────────────────
+function _renderCondPanel(idxForzado) {
   const ruta = state.rutaActual;
   if (!ruta) return;
 
@@ -3651,93 +3825,142 @@ function renderPantallaConduccion() {
   const total      = paradas.length;
   const pct        = total ? Math.round((entregadas + fallidas) / total * 100) : 0;
 
-  // Barra de progreso
-  const bar    = document.getElementById('cond-bar');
+  // Progreso
+  const barEl  = document.getElementById('cond-bar');
   const pctEl  = document.getElementById('cond-pct');
-  const contEl = document.getElementById('cond-contadores');
-  if (bar)    bar.style.width     = pct + '%';
-  if (pctEl)  pctEl.textContent   = pct + '%';
-  if (contEl) contEl.textContent  = `✓${entregadas} ✗${fallidas} ⏳${pendientes.length}`;
+  const cntEl  = document.getElementById('cond-contadores');
+  if (barEl) barEl.style.width = pct + '%';
+  if (pctEl) pctEl.textContent = pct + '%';
+  if (cntEl) cntEl.textContent = `✓${entregadas}  ✗${fallidas}  ⏳${pendientes.length}`;
 
   if (!pendientes.length) {
     const letraEl = document.getElementById('cond-letra');
     const nomEl   = document.getElementById('cond-nombre');
     const sigEl   = document.getElementById('cond-siguiente');
+    const etaEl   = document.getElementById('cond-eta');
+    const distEl  = document.getElementById('cond-dist');
     const bOk     = document.getElementById('cond-btn-ok');
     const bFall   = document.getElementById('cond-btn-fallida');
-    if (letraEl) { letraEl.textContent = '🎉'; letraEl.style.fontSize = '64px'; }
+    if (letraEl) { letraEl.textContent = '🎉'; letraEl.style.background = '#34a853'; }
     if (nomEl)   nomEl.textContent   = '¡Ruta completada!';
-    if (sigEl)   sigEl.textContent   = 'Regresa a la base 🏁';
+    if (sigEl)   sigEl.textContent   = 'Regresa a la base';
+    if (etaEl)   etaEl.textContent   = '';
+    if (distEl)  distEl.textContent  = '';
     if (bOk)     bOk.style.display   = 'none';
     if (bFall)   bFall.style.display = 'none';
     return;
   }
 
-  // Parada actual (primera pendiente)
-  const actual   = pendientes[0];
-  const idxReal  = paradas.indexOf(actual);
-  const letra    = idxToLetra(idxReal);
+  const actual    = pendientes[0];
+  const idxReal   = paradas.indexOf(actual);
+  const letra     = idxToLetra(idxReal);
   const siguiente = pendientes[1] || null;
+  _condIdxActual  = idxReal;
+
+  // ETA estimada
+  const { kmRest, etaHora } = calcEtaSeguimiento(ruta);
+  const distParada = ruta.inicio
+    ? Math.round(distHaversine(ruta.inicio.lat, ruta.inicio.lng, actual.lat, actual.lng) * 10) / 10
+    : null;
 
   const letraEl = document.getElementById('cond-letra');
   const nomEl   = document.getElementById('cond-nombre');
   const sigEl   = document.getElementById('cond-siguiente');
+  const etaEl   = document.getElementById('cond-eta');
+  const distEl  = document.getElementById('cond-dist');
   const bOk     = document.getElementById('cond-btn-ok');
   const bFall   = document.getElementById('cond-btn-fallida');
 
-  if (letraEl) { letraEl.textContent = letra; letraEl.style.fontSize = '80px'; }
-  if (nomEl)   nomEl.textContent   = actual.nombre;
-  if (sigEl)   sigEl.textContent   = siguiente
+  if (letraEl) {
+    letraEl.textContent = letra;
+    letraEl.style.background = '#1a73e8';
+    letraEl.style.fontSize   = letra.length > 2 ? '13px' : '18px';
+  }
+  if (nomEl)  nomEl.textContent  = actual.nombre;
+  if (sigEl)  sigEl.textContent  = siguiente
     ? idxToLetra(paradas.indexOf(siguiente)) + ' — ' + siguiente.nombre
     : '(última parada)';
-  if (bOk)   bOk.style.display   = '';
-  if (bFall) bFall.style.display = '';
+  if (etaEl)  etaEl.textContent  = etaHora ? 'Fin: ' + etaHora : '';
+  if (distEl) distEl.textContent = kmRest   ? kmRest + ' km rest.' : '';
+  if (bOk)    bOk.style.display  = '';
+  if (bFall)  bFall.style.display = '';
 }
 
-// Abrir Maps desde la pantalla de conducción
-function abrirMapsDesdeConduccion() {
-  const ruta = state.rutaActual;
-  if (!ruta) return;
-  const pendientes = ruta.paradas.filter(p => !p.hecha && !p.fallida);
-  if (!pendientes.length) {
-    if (ruta.final) {
-      saveStateLocal();
-      window.open(_urlMaps(ruta.final.lat, ruta.final.lng), '_blank');
-    }
-    return;
+// ── GPS en tiempo real ────────────────────────────────────────────
+function _iniciarGPSCond() {
+  if (!navigator.geolocation) return;
+  if (condGPSWatch) return; // ya activo
+  condGPSWatch = navigator.geolocation.watchPosition(
+    pos => {
+      const { latitude: lat, longitude: lng } = pos.coords;
+      if (!condMap) return;
+      if (!condGPSMarker) {
+        condGPSMarker = L.circleMarker([lat, lng], {
+          radius: 10, fillColor: '#1a73e8', color: '#fff',
+          weight: 3, fillOpacity: 1
+        }).addTo(condMap);
+      } else {
+        condGPSMarker.setLatLng([lat, lng]);
+      }
+      // Centrar mapa en posición actual suavemente
+      condMap.panTo([lat, lng], { animate: true, duration: 0.5 });
+    },
+    err => console.warn('GPS cond:', err.message),
+    { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
+  );
+}
+
+function _detenerGPSCond() {
+  if (condGPSWatch) {
+    navigator.geolocation.clearWatch(condGPSWatch);
+    condGPSWatch = null;
   }
-  const siguiente = pendientes[0];
-  saveStateLocal();
-  window.open(_urlMaps(siguiente.lat, siguiente.lng), '_blank');
+  if (condGPSMarker) {
+    condGPSMarker.remove();
+    condGPSMarker = null;
+  }
 }
 
-// Botón ✓ Entregada en modo conducción
+// ── Botones de acción ─────────────────────────────────────────────
+function renderPantallaConduccion() { _renderCondPanel(); _renderCondMap(); }
+
 function condEntregada() {
   const ruta = state.rutaActual;
   if (!ruta) return;
   const pendientes = ruta.paradas.filter(p => !p.hecha && !p.fallida);
   if (!pendientes.length) return;
   const p = pendientes[0];
-  const idx = ruta.paradas.indexOf(p);
-
   p.hecha = true; p.fallida = false; p.horaAccion = fmtHora(new Date());
   saveState();
-  if (navigator.vibrate) navigator.vibrate(100);
-  renderPantallaConduccion();
+  if (navigator.vibrate) navigator.vibrate(80);
+  _renderCondPanel();
+  _renderCondMap();
 }
 
-// Botón ✗ Fallida en modo conducción
 function condFallida() {
   const ruta = state.rutaActual;
   if (!ruta) return;
   const pendientes = ruta.paradas.filter(p => !p.hecha && !p.fallida);
   if (!pendientes.length) return;
   const p = pendientes[0];
-
   p.hecha = true; p.fallida = true; p.horaAccion = fmtHora(new Date());
   saveState();
-  if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-  renderPantallaConduccion();
+  if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
+  _renderCondPanel();
+  _renderCondMap();
+}
+
+function abrirMapsDesdeConduccion() {
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+  const pendientes = ruta.paradas.filter(p => !p.hecha && !p.fallida);
+  if (!pendientes.length) {
+    if (ruta.final) { saveStateLocal(); window.open(_urlMaps(ruta.final.lat, ruta.final.lng), '_blank'); }
+    return;
+  }
+  const siguiente = pendientes[0];
+  saveStateLocal();
+  window.open(_urlMaps(siguiente.lat, siguiente.lng), '_blank');
 }
 
 
