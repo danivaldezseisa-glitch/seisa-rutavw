@@ -3541,61 +3541,50 @@ function renderResumen() {
 
 // ══════════════════════════════════════════════════════════════════
 //  SISTEMA DE NOTIFICACIONES
-//
-//  Funciona en TRES escenarios:
-//
-//  1. HTTPS (Netlify): Service Worker real → botones ✅/❌ en la
-//     cortina de notificaciones, sin abrir la app.
-//
-//  2. file:// (archivo local): Notificación básica con vibración.
-//     Al tocarla enfoca la app. Sin botones de acción (limitación
-//     de Chrome por seguridad en file://).
-//
-//  3. iOS Safari: No soporta Notification API → se omite.
+//  Usa Service Worker real (sw.js) para botones en la cortina.
+//  Funciona en GitHub Pages, Netlify y cualquier HTTPS.
 // ══════════════════════════════════════════════════════════════════
 
 let _swReg        = null;
 let _swListo      = false;
 let _swIntentando = false;
 
-// ── Registrar Service Worker (solo en HTTPS o localhost) ──────────
 async function registrarSW() {
-  if (_swListo || _swIntentando || !('serviceWorker' in navigator)) return;
+  if (_swListo || _swIntentando) return;
+  if (!('serviceWorker' in navigator)) return;
+  // Solo en HTTPS (incluye GitHub Pages y Netlify)
   if (location.protocol !== 'https:' && location.hostname !== 'localhost') return;
-  _swIntentando = true;
 
+  _swIntentando = true;
   try {
-    // Registrar desde sw.js (mismo origen que index.html en Netlify)
-    _swReg   = await navigator.serviceWorker.register('./sw.js', { scope: './' });
+    // Usar la URL base correcta aunque la app esté en subdirectorio
+    const swUrl   = new URL('./sw.js', location.href).href;
+    const swScope = new URL('./',      location.href).href;
+
+    _swReg = await navigator.serviceWorker.register(swUrl, { scope: swScope });
+    await navigator.serviceWorker.ready;
     _swListo = true;
 
-    // Escuchar mensajes del SW → abrir pantalla de conducción
     navigator.serviceWorker.addEventListener('message', e => {
       const { tipo, action, idx } = e.data || {};
-      if (tipo === 'notif_accion' && typeof idx === 'number') {
-        const ruta = state.rutaActual;
-        if (!ruta) return;
-
-        if (action === 'entregada' || action === 'fallida') {
-          // Ejecutar accion (igual que los botones de la pantalla de conducción)
-          // Usa accionConduccion para que automáticamente avance a la siguiente
-          accionConduccion(idx, action);
-        } else {
-          // Click en el cuerpo de la notificación (sin botón) →
-          // abrir pantalla de conducción en esa parada
-          mostrarPantallaConduccion(idx);
-        }
+      if (tipo !== 'notif_accion' || typeof idx !== 'number') return;
+      const ruta = state.rutaActual;
+      if (!ruta) return;
+      if (action === 'entregada' || action === 'fallida') {
+        accionConduccion(idx, action);
+      } else {
+        mostrarPantallaConduccion(idx);
       }
     });
-    console.log('✅ SW registrado desde sw.js — notificaciones con botones activas');
+
+    console.log('✅ SW listo:', swUrl);
   } catch(err) {
-    console.warn('SW falló (¿falta sw.js?):', err.message);
+    console.warn('SW error:', err.message);
     _swListo = false;
   }
   _swIntentando = false;
 }
 
-// ── Pedir permiso ─────────────────────────────────────────────────
 async function pedirPermisoNotificaciones() {
   if (!('Notification' in window)) return false;
   if (Notification.permission === 'granted') return true;
@@ -3603,385 +3592,129 @@ async function pedirPermisoNotificaciones() {
   return (await Notification.requestPermission()) === 'granted';
 }
 
-// ── Enviar notificación de parada ─────────────────────────────────
 async function notificarParada(parada, idxReal, letra) {
   const ok = await pedirPermisoNotificaciones();
-  if (!ok) return;
+  if (!ok) { console.warn('Notif: sin permiso'); return; }
 
-  // Intentar SW en HTTPS
   if (!_swListo) await registrarSW();
 
-  const urlApp = location.href;
   const titulo = '📦 Parada ' + letra;
   const cuerpo = parada.nombre;
+  const urlApp = location.href;
 
   try {
     if (_swListo && _swReg) {
-      // ── Modo HTTPS: botones de acción en la cortina ────────────
+      // HTTPS con SW — botones en la cortina
       const reg = await navigator.serviceWorker.ready;
       await reg.showNotification(titulo, {
-        body:    cuerpo,
-        icon:    'https://cdn.jsdelivr.net/npm/twemoji@14/assets/72x72/1f4e6.png',
-        badge:   'https://cdn.jsdelivr.net/npm/twemoji@14/assets/72x72/1f69a.png',
-        tag:     'seisa-' + idxReal,
+        body:     cuerpo,
+        icon:     'https://cdn.jsdelivr.net/npm/twemoji@14/assets/72x72/1f4e6.png',
+        badge:    'https://cdn.jsdelivr.net/npm/twemoji@14/assets/72x72/1f69a.png',
+        tag:      'seisa-' + idxReal,
         renotify: true,
         requireInteraction: true,
-        vibrate: [300, 150, 300],
-        data:    { idx: idxReal, url: urlApp },
-        actions: [
+        vibrate:  [300, 150, 300],
+        data:     { idx: idxReal, url: urlApp },
+        actions:  [
           { action: 'entregada', title: '✅ Entregada' },
           { action: 'fallida',   title: '❌ Fallida'   },
         ],
       });
+      console.log('🔔 Notificación enviada:', titulo);
     } else {
-      // ── Modo file:// o sin SW: notificación básica ─────────────
-      // Vibrar para avisar al chofer aunque la pantalla esté en Maps
+      // Sin SW — notificación básica, al tocar abre la app
       if (navigator.vibrate) navigator.vibrate([400, 200, 400]);
-
       const n = new Notification(titulo + ' — ' + cuerpo, {
-        body:    '↩ Toca aquí para marcar Entregada o Fallida',
+        body:    'Toca para marcar la entrega',
         icon:    'https://cdn.jsdelivr.net/npm/twemoji@14/assets/72x72/1f4e6.png',
         tag:     'seisa-' + idxReal,
         requireInteraction: true,
-        silent:  false,
       });
-      n.onclick = () => {
-        window.focus();
-        n.close();
-        // Abrir pantalla de conducción — minimalista, fácil de usar manejando
-        mostrarPantallaConduccion();
-      };
+      n.onclick = () => { window.focus(); n.close(); mostrarPantallaConduccion(); };
     }
   } catch(err) {
     console.warn('Error notificación:', err.message);
   }
 }
 
-// ── Mini-modal de acción rápida (para file:// sin botones SW) ─────
-function mostrarAccionRapida(idxReal, letra, nombre) {
-  // Mostrar pantalla de conducción minimalista
-  mostrarPantallaConduccion(idxReal);
-}
-
-// ══════════════════════════════════════════════════════════════════
-//  PANTALLA DE CONDUCCIÓN — Minimalista
-// ══════════════════════════════════════════════════════════════════
-
-// ══════════════════════════════════════════════════════════════════
-//  PANTALLA DE CONDUCCIÓN CON MAPA LEAFLET
-//  Mapa estilo OpenStreetMap claro (igual al nativo de Google Maps)
-//  Ruta pintada en azul intenso · GPS en tiempo real · ETA por parada
-// ══════════════════════════════════════════════════════════════════
-
-let condMap        = null;   // instancia Leaflet
-let condPolylines  = [];     // líneas de ruta
-let condMarkers    = [];     // marcadores de paradas
-let condGPSMarker  = null;   // marcador de posición actual
-let condGPSWatch   = null;   // watchPosition ID
-let _condIdxActual = -1;     // índice de la parada actual
-
-function mostrarPantallaConduccion(idxForzado) {
-  const ruta = state.rutaActual;
-  if (!ruta) return;
-
-  document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
-  document.getElementById('screen-conduccion').classList.remove('hidden');
-
-  // Inicializar mapa si no existe
-  setTimeout(() => {
-    _initCondMap();
-    _renderCondMap();
-    _renderCondPanel(idxForzado);
-    _iniciarGPSCond();
-  }, 50);
-}
-
-function ocultarPantallaConduccion() {
-  _detenerGPSCond();
-  document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
-  document.getElementById('screen-seguimiento').classList.remove('hidden');
-  renderSeguimiento();
-}
-
-// ── Inicializar mapa ──────────────────────────────────────────────
-function _initCondMap() {
-  if (condMap) { condMap.invalidateSize(); return; }
-
-  const ruta   = state.rutaActual;
-  const centro = ruta?.inicio ? [ruta.inicio.lat, ruta.inicio.lng] : [19.4326, -99.1332];
-
-  condMap = L.map('cond-mapa', {
-    zoomControl:       false,
-    attributionControl: false,
-  }).setView(centro, 14);
-
-  // Tiles estilo claro (idéntico al de Google Maps)
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    maxZoom: 19,
-    attribution: '© OpenStreetMap'
-  }).addTo(condMap);
-
-  L.control.zoom({ position: 'bottomright' }).addTo(condMap);
-}
-
-// ── Dibujar ruta y marcadores en el mapa ─────────────────────────
-function _renderCondMap() {
-  if (!condMap) return;
-  const ruta = state.rutaActual;
-  if (!ruta) return;
-
-  // Limpiar capas anteriores
-  condPolylines.forEach(p => p.remove()); condPolylines = [];
-  condMarkers.forEach(m => m.remove());   condMarkers   = [];
-
-  const paradas  = ruta.paradas || [];
-  const inicio   = ruta.inicio;
-  const fin      = ruta.final;
-  const pendientes = paradas.filter(p => !p.hecha && !p.fallida);
-
-  // Puntos para la polilínea completa
-  const allPts = [];
-  if (inicio) allPts.push([inicio.lat, inicio.lng]);
-  paradas.forEach(p => allPts.push([p.lat, p.lng]));
-  if (fin) allPts.push([fin.lat, fin.lng]);
-
-  // Línea gris: ruta completa
-  if (allPts.length > 1) {
-    condPolylines.push(
-      L.polyline(allPts, { color: '#bdbdbd', weight: 4, opacity: .6 }).addTo(condMap)
-    );
-  }
-
-  // Línea azul intensa: desde inicio hasta primera parada pendiente
-  const pendIdx = pendientes.length ? paradas.indexOf(pendientes[0]) : -1;
-  if (pendIdx >= 0 && inicio) {
-    const tramo = [[inicio.lat, inicio.lng]];
-    paradas.slice(0, pendIdx + 1).forEach(p => tramo.push([p.lat, p.lng]));
-    condPolylines.push(
-      L.polyline(tramo, {
-        color: '#1a73e8', weight: 5, opacity: 1,
-        dashArray: null
-      }).addTo(condMap)
-    );
-  }
-
-  // Marcador inicio
-  if (inicio) {
-    condMarkers.push(
-      L.marker([inicio.lat, inicio.lng], { icon: _condIcon('🏠', '#34a853', 28) })
-        .addTo(condMap).bindPopup('Inicio')
-    );
-  }
-
-  // Marcadores de paradas
-  paradas.forEach((p, i) => {
-    const letra     = idxToLetra(i);
-    const entregada = p.hecha && !p.fallida;
-    const fallida   = p.fallida;
-    const esPendiente = !p.hecha && !p.fallida;
-    const esPrimera   = esPendiente && i === pendIdx;
-
-    let bgColor = entregada ? '#34a853' : fallida ? '#ea4335' : esPrimera ? '#1a73e8' : '#78909c';
-    let texto   = entregada ? '✓' : fallida ? '✗' : letra;
-    let size    = esPrimera ? 36 : 28;
-
-    condMarkers.push(
-      L.marker([p.lat, p.lng], { icon: _condIconText(texto, bgColor, size) })
-        .addTo(condMap)
-        .bindPopup(`<b>${letra}. ${p.nombre}</b>${entregada ? ' ✓' : fallida ? ' ✗' : ''}`)
-    );
-  });
-
-  // Marcador fin
-  if (fin) {
-    condMarkers.push(
-      L.marker([fin.lat, fin.lng], { icon: _condIcon('🏁', '#ff6d00', 28) })
-        .addTo(condMap).bindPopup('Base')
-    );
-  }
-
-  // Centrar en la parada actual o en toda la ruta
-  if (pendientes.length && condMap) {
-    const primera = pendientes[0];
-    condMap.setView([primera.lat, primera.lng], 15);
-  } else if (allPts.length > 1) {
-    condMap.fitBounds(allPts, { padding: [40, 40], maxZoom: 15 });
-  }
-}
-
-// ── Iconos del mapa ───────────────────────────────────────────────
-function _condIcon(emoji, color, size) {
-  return L.divIcon({
-    html: `<div style="width:${size}px;height:${size}px;border-radius:50%;
-                background:${color};border:2px solid #fff;
-                display:flex;align-items:center;justify-content:center;
-                font-size:${size * .45}px;box-shadow:0 2px 6px rgba(0,0,0,.3);">${emoji}</div>`,
-    className: '', iconSize: [size,size], iconAnchor: [size/2,size/2]
-  });
-}
-
-function _condIconText(texto, color, size) {
-  const fs = texto.length > 2 ? Math.max(9, size * .28) : size * .38;
-  return L.divIcon({
-    html: `<div style="width:${size}px;height:${size}px;border-radius:50%;
-                background:${color};border:2.5px solid #fff;
-                display:flex;align-items:center;justify-content:center;
-                font-size:${fs}px;font-weight:900;color:#fff;
-                box-shadow:0 2px 8px rgba(0,0,0,.35);">${texto}</div>`,
-    className: '', iconSize: [size,size], iconAnchor: [size/2,size/2]
-  });
-}
-
-// ── Panel inferior: nombre, ETA, botones ─────────────────────────
-function _renderCondPanel(idxForzado) {
-  const ruta = state.rutaActual;
-  if (!ruta) return;
-
-  const paradas    = ruta.paradas || [];
-  const entregadas = paradas.filter(p => p.hecha && !p.fallida).length;
-  const fallidas   = paradas.filter(p => p.fallida).length;
-  const pendientes = paradas.filter(p => !p.hecha && !p.fallida);
-  const total      = paradas.length;
-  const pct        = total ? Math.round((entregadas + fallidas) / total * 100) : 0;
-
-  // Progreso
-  const barEl  = document.getElementById('cond-bar');
-  const pctEl  = document.getElementById('cond-pct');
-  const cntEl  = document.getElementById('cond-contadores');
-  if (barEl) barEl.style.width = pct + '%';
-  if (pctEl) pctEl.textContent = pct + '%';
-  if (cntEl) cntEl.textContent = `✓${entregadas}  ✗${fallidas}  ⏳${pendientes.length}`;
-
-  if (!pendientes.length) {
-    const letraEl = document.getElementById('cond-letra');
-    const nomEl   = document.getElementById('cond-nombre');
-    const sigEl   = document.getElementById('cond-siguiente');
-    const etaEl   = document.getElementById('cond-eta');
-    const distEl  = document.getElementById('cond-dist');
-    const bOk     = document.getElementById('cond-btn-ok');
-    const bFall   = document.getElementById('cond-btn-fallida');
-    if (letraEl) { letraEl.textContent = '🎉'; letraEl.style.background = '#34a853'; }
-    if (nomEl)   nomEl.textContent   = '¡Ruta completada!';
-    if (sigEl)   sigEl.textContent   = 'Regresa a la base';
-    if (etaEl)   etaEl.textContent   = '';
-    if (distEl)  distEl.textContent  = '';
-    if (bOk)     bOk.style.display   = 'none';
-    if (bFall)   bFall.style.display = 'none';
-    return;
-  }
-
-  const actual    = pendientes[0];
-  const idxReal   = paradas.indexOf(actual);
-  const letra     = idxToLetra(idxReal);
-  const siguiente = pendientes[1] || null;
-  _condIdxActual  = idxReal;
-
-  // ETA estimada
-  const { kmRest, etaHora } = calcEtaSeguimiento(ruta);
-  const distParada = ruta.inicio
-    ? Math.round(distHaversine(ruta.inicio.lat, ruta.inicio.lng, actual.lat, actual.lng) * 10) / 10
-    : null;
-
-  const letraEl = document.getElementById('cond-letra');
-  const nomEl   = document.getElementById('cond-nombre');
-  const sigEl   = document.getElementById('cond-siguiente');
-  const etaEl   = document.getElementById('cond-eta');
-  const distEl  = document.getElementById('cond-dist');
-  const bOk     = document.getElementById('cond-btn-ok');
-  const bFall   = document.getElementById('cond-btn-fallida');
-
-  if (letraEl) {
-    letraEl.textContent = letra;
-    letraEl.style.background = '#1a73e8';
-    letraEl.style.fontSize   = letra.length > 2 ? '13px' : '18px';
-  }
-  if (nomEl)  nomEl.textContent  = actual.nombre;
-  if (sigEl)  sigEl.textContent  = siguiente
-    ? idxToLetra(paradas.indexOf(siguiente)) + ' — ' + siguiente.nombre
-    : '(última parada)';
-  if (etaEl)  etaEl.textContent  = etaHora ? 'Fin: ' + etaHora : '';
-  if (distEl) distEl.textContent = kmRest   ? kmRest + ' km rest.' : '';
-  if (bOk)    bOk.style.display  = '';
-  if (bFall)  bFall.style.display = '';
-}
-
-// ── GPS en tiempo real ────────────────────────────────────────────
-function _iniciarGPSCond() {
-  if (!navigator.geolocation) return;
-  if (condGPSWatch) return; // ya activo
-  condGPSWatch = navigator.geolocation.watchPosition(
-    pos => {
-      const { latitude: lat, longitude: lng } = pos.coords;
-      if (!condMap) return;
-      if (!condGPSMarker) {
-        condGPSMarker = L.circleMarker([lat, lng], {
-          radius: 10, fillColor: '#1a73e8', color: '#fff',
-          weight: 3, fillOpacity: 1
-        }).addTo(condMap);
-      } else {
-        condGPSMarker.setLatLng([lat, lng]);
-      }
-      // Centrar mapa en posición actual suavemente
-      condMap.panTo([lat, lng], { animate: true, duration: 0.5 });
-    },
-    err => console.warn('GPS cond:', err.message),
-    { enableHighAccuracy: true, maximumAge: 3000, timeout: 10000 }
-  );
-}
-
-function _detenerGPSCond() {
-  if (condGPSWatch) {
-    navigator.geolocation.clearWatch(condGPSWatch);
-    condGPSWatch = null;
-  }
-  if (condGPSMarker) {
-    condGPSMarker.remove();
-    condGPSMarker = null;
-  }
-}
-
-// ── Botones de acción ─────────────────────────────────────────────
-function renderPantallaConduccion() { _renderCondPanel(); _renderCondMap(); }
-
-function condEntregada() {
+async function enviarNotificacionParada() {
   const ruta = state.rutaActual;
   if (!ruta) return;
   const pendientes = ruta.paradas.filter(p => !p.hecha && !p.fallida);
   if (!pendientes.length) return;
-  const p = pendientes[0];
-  p.hecha = true; p.fallida = false; p.horaAccion = fmtHora(new Date());
-  saveState();
-  if (navigator.vibrate) navigator.vibrate(80);
-  _renderCondPanel();
-  _renderCondMap();
-}
-
-function condFallida() {
-  const ruta = state.rutaActual;
-  if (!ruta) return;
-  const pendientes = ruta.paradas.filter(p => !p.hecha && !p.fallida);
-  if (!pendientes.length) return;
-  const p = pendientes[0];
-  p.hecha = true; p.fallida = true; p.horaAccion = fmtHora(new Date());
-  saveState();
-  if (navigator.vibrate) navigator.vibrate([80, 40, 80]);
-  _renderCondPanel();
-  _renderCondMap();
-}
-
-function abrirMapsDesdeConduccion() {
-  const ruta = state.rutaActual;
-  if (!ruta) return;
-  const pendientes = ruta.paradas.filter(p => !p.hecha && !p.fallida);
-  if (!pendientes.length) {
-    if (ruta.final) { saveStateLocal(); window.open(_urlMaps(ruta.final.lat, ruta.final.lng), '_blank'); }
-    return;
-  }
   const siguiente = pendientes[0];
-  saveStateLocal();
-  window.open(_urlMaps(siguiente.lat, siguiente.lng), '_blank');
+  const idxReal   = ruta.paradas.indexOf(siguiente);
+  const letra     = idxToLetra(idxReal);
+  await notificarParada(siguiente, idxReal, letra);
 }
 
+async function activarNotificaciones() {
+  if (!('Notification' in window)) {
+    showToast('⚠️ Este navegador no soporta notificaciones'); return;
+  }
+
+  const esHTTPS = location.protocol === 'https:' || location.hostname === 'localhost';
+
+  if (Notification.permission === 'granted') {
+    if (esHTTPS) await registrarSW();
+    // Enviar notificación de prueba para confirmar que funciona
+    try {
+      const swOk = _swListo && _swReg;
+      if (swOk) {
+        const reg = await navigator.serviceWorker.ready;
+        await reg.showNotification('🔔 SEISA Rutas — Notificaciones activas', {
+          body:    'Los botones ✅/❌ aparecerán aquí durante las entregas',
+          tag:     'seisa-test',
+          icon:    'https://cdn.jsdelivr.net/npm/twemoji@14/assets/72x72/1f69a.png',
+          requireInteraction: false,
+        });
+        showToast('🔔 Activas con botones ✅/❌ en la cortina');
+      } else {
+        new Notification('🔔 SEISA Rutas — Notificaciones activas', {
+          body: 'Aparecerán aquí durante las entregas',
+          tag:  'seisa-test',
+        });
+        showToast('🔔 Notificaciones activas');
+      }
+    } catch(e) { showToast('🔔 Notificaciones activas'); }
+    actualizarBtnNotif();
+    return;
+  }
+
+  const perm = await Notification.requestPermission();
+  if (perm === 'granted') {
+    if (esHTTPS) await registrarSW();
+    showToast(_swListo ? '🔔 Activadas con botones ✅/❌ en la cortina' : '🔔 Notificaciones activadas');
+  } else {
+    showToast('🔕 Permiso denegado — actívalo en Ajustes de Chrome → Notificaciones');
+  }
+  actualizarBtnNotif();
+}
+
+function actualizarBtnNotif() {
+  const btn  = document.getElementById('btn-notif');
+  if (!btn) return;
+  const perm = 'Notification' in window ? Notification.permission : 'denied';
+  if (perm === 'granted') {
+    btn.textContent       = '🔔';
+    btn.style.color       = 'var(--green)';
+    btn.style.borderColor = 'rgba(0,230,118,.5)';
+    btn.style.background  = 'rgba(0,230,118,.1)';
+    btn.title = _swListo ? 'Notificaciones activas con botones' : 'Notificaciones activas';
+  } else if (perm === 'denied') {
+    btn.textContent       = '🔕';
+    btn.style.color       = 'var(--red)';
+    btn.style.borderColor = 'rgba(255,82,82,.4)';
+    btn.style.background  = 'var(--surface2)';
+    btn.title = 'Bloqueadas — Ajustes de Chrome → Notificaciones';
+  } else {
+    btn.textContent       = '🔔';
+    btn.style.color       = 'var(--text3)';
+    btn.style.borderColor = 'var(--border)';
+    btn.style.background  = 'var(--surface2)';
+    btn.title = 'Toca para activar notificaciones';
+  }
+}
 
 let _filtroSeg = '';
 
