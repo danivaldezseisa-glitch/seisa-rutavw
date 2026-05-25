@@ -2192,27 +2192,21 @@ function iniciarRutaGoogleMaps() {
   if (!inicio || !fin) { showToast('Faltan puntos de inicio o final'); return; }
   if (!paradas.length) { showToast('No hay paradas pendientes'); return; }
 
-  const enc = (p) => encodeURIComponent(p.lat + ',' + p.lng);
-  const MAX_WP = 23; // límite de Google Maps por URL
+  // Abrir SOLO la primera parada en Maps
+  const primera = paradas[0];
+  saveStateLocal();
+  window.open(_urlMaps(primera.lat, primera.lng), '_blank');
 
-  // Construir todos los segmentos necesarios
-  const segmentos = construirSegmentos(paradas, inicio, fin, MAX_WP);
+  // Mostrar pantalla de conducción (mapa visual + botones)
+  showScreen('screen-conduccion');
+  renderPantallaConduccion();
 
-  if (segmentos.length === 1) {
-    saveStateLocal();
-    window.open(segmentos[0].url, '_blank');
-    showToast('🗺️ Abriendo ruta completa en Google Maps...');
-  } else {
-    // Guardar segmentos en state y mostrar selector
-    state.rutaActual._segmentos = segmentos;
-    state.rutaActual._segActual = 0;
-    saveState();
-    mostrarSelectorSegmentos(segmentos, 0);
-    return; // el selector maneja la navegación
-  }
-
-  showScreen('screen-seguimiento');
-  renderSeguimiento();
+  // Activar notificaciones automáticamente y enviar la primera
+  registrarSW().then(() => {
+    setTimeout(() => enviarNotificacionParada(), 2000);
+  }).catch(() => {
+    setTimeout(() => enviarNotificacionParada(), 2000);
+  });
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -3535,21 +3529,8 @@ async function registrarSW() {
     // Escuchar mensajes del SW → abrir pantalla de conducción
     navigator.serviceWorker.addEventListener('message', e => {
       const { tipo, action, idx } = e.data || {};
-      if (tipo === 'notif_accion' && typeof idx === 'number') {
-        // Asegurarse de que la app esté en pantalla de seguimiento/conducción
-        const ruta = state.rutaActual;
-        if (!ruta) return;
-
-        // Si la acción viene de la notificación, ir directo a conducción
-        // para que el chofer confirme visualmente (más seguro al volante)
-        if (action === 'entregada' || action === 'fallida') {
-          // Ejecutar la acción directamente (viene de la cortina de notificaciones)
-          if (action === 'entregada') marcarEntregadaSeg(idx);
-          if (action === 'fallida')   marcarFallidaSeg(idx);
-        }
-
-        // Siempre mostrar pantalla de conducción después de la acción
-        // para que el chofer pueda ver la siguiente parada fácilmente
+      if (tipo === 'notif_accion') {
+        // Cualquier toque en la notificación → pantalla de conducción
         mostrarPantallaConduccion();
       }
     });
@@ -3586,17 +3567,16 @@ async function notificarParada(parada, idxReal, letra) {
       // ── Modo HTTPS: botones de acción en la cortina ────────────
       const reg = await navigator.serviceWorker.ready;
       await reg.showNotification(titulo, {
-        body:    cuerpo,
+        body:    cuerpo + '\n📍 Toca para ir a la pantalla de conducción',
         icon:    'https://cdn.jsdelivr.net/npm/twemoji@14/assets/72x72/1f4e6.png',
         badge:   'https://cdn.jsdelivr.net/npm/twemoji@14/assets/72x72/1f69a.png',
         tag:     'seisa-' + idxReal,
         renotify: true,
         requireInteraction: true,
         vibrate: [300, 150, 300],
-        data:    { idx: idxReal, url: urlApp },
+        data:    { idx: idxReal, url: urlApp, accion: 'conduccion' },
         actions: [
-          { action: 'entregada', title: '✅ Entregada' },
-          { action: 'fallida',   title: '❌ Fallida'   },
+          { action: 'conduccion', title: '🚗 Ir a pantalla' },
         ],
       });
     } else {
@@ -3605,7 +3585,7 @@ async function notificarParada(parada, idxReal, letra) {
       if (navigator.vibrate) navigator.vibrate([400, 200, 400]);
 
       const n = new Notification(titulo + ' — ' + cuerpo, {
-        body:    '↩ Toca aquí para marcar Entregada o Fallida',
+        body:    '🚗 Toca para ir a la pantalla de conducción',
         icon:    'https://cdn.jsdelivr.net/npm/twemoji@14/assets/72x72/1f4e6.png',
         tag:     'seisa-' + idxReal,
         requireInteraction: true,
@@ -3614,7 +3594,6 @@ async function notificarParada(parada, idxReal, letra) {
       n.onclick = () => {
         window.focus();
         n.close();
-        // Abrir pantalla de conducción — minimalista, fácil de usar manejando
         mostrarPantallaConduccion();
       };
     }
@@ -3729,11 +3708,20 @@ function condEntregada() {
   p.hecha = true; p.fallida = false; p.horaAccion = fmtHora(new Date());
   saveState();
   if (navigator.vibrate) navigator.vibrate(100);
-  renderPantallaConduccion();
-  // Notificación de la siguiente parada pendiente
+
+  // Ver siguiente parada ANTES de renderizar
   const sig = ruta.paradas.filter(q => !q.hecha && !q.fallida);
-  if (sig.length > 0) setTimeout(() => enviarNotificacionParada(), 1500);
-  else showToast('🎉 ¡Todas las paradas completadas!');
+
+  if (sig.length > 0) {
+    // Abrir Maps a la siguiente parada (síncrono — dentro del evento de usuario)
+    window.open(_urlMaps(sig[0].lat, sig[0].lng), '_blank');
+    renderPantallaConduccion();
+    // Notificación de la siguiente parada
+    setTimeout(() => enviarNotificacionParada(), 1500);
+  } else {
+    renderPantallaConduccion();
+    showToast('🎉 ¡Todas las paradas completadas!');
+  }
 }
 
 // Botón ✗ Fallida en modo conducción
@@ -3746,11 +3734,20 @@ function condFallida() {
   p.hecha = true; p.fallida = true; p.horaAccion = fmtHora(new Date());
   saveState();
   if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-  renderPantallaConduccion();
-  // Notificación de la siguiente parada pendiente
+
+  // Ver siguiente parada ANTES de renderizar
   const sig = ruta.paradas.filter(q => !q.hecha && !q.fallida);
-  if (sig.length > 0) setTimeout(() => enviarNotificacionParada(), 1500);
-  else showToast('🎉 ¡Todas las paradas completadas!');
+
+  if (sig.length > 0) {
+    // Abrir Maps a la siguiente parada (síncrono — dentro del evento de usuario)
+    window.open(_urlMaps(sig[0].lat, sig[0].lng), '_blank');
+    renderPantallaConduccion();
+    // Notificación de la siguiente parada
+    setTimeout(() => enviarNotificacionParada(), 1500);
+  } else {
+    renderPantallaConduccion();
+    showToast('🎉 ¡Todas las paradas completadas!');
+  }
 }
 
 
