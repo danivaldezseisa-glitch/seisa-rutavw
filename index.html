@@ -599,8 +599,8 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
 <div class="modal-overlay hidden" id="modal-masivo">
   <div class="modal-sheet">
     <div class="modal-title">📋 Pegado masivo de Plus Codes</div>
-    <div style="font-size:12px;color:var(--text3);margin-bottom:8px;">Un código por línea. El texto después del estado es el nombre de la parada:</div>
-    <div style="font-size:11px;font-family:var(--mono);color:var(--accent);background:var(--surface2);padding:8px 12px;border-radius:8px;margin-bottom:10px;line-height:1.8;">GQ8J+FFH Tlalnepantla, Estado de México Hidalgo 2<br>GP3P+538 Naucalpan de Juárez Morelos 45<br>76F2CVM8+QQ Ciudad de México López 8</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:8px;">Un código por línea. El nombre entre paréntesis al final es el nombre de la parada:</div>
+    <div style="font-size:11px;font-family:var(--mono);color:var(--accent);background:var(--surface2);padding:8px 12px;border-radius:8px;margin-bottom:10px;line-height:1.8;">JR5Q+MR Buenavista, Estado de México (Jacarandas 12)<br>GP3P+538 Naucalpan de Juárez (Morelos 45)<br>GQ8J+FFH Tlalnepantla, Estado de México (Hidalgo 2)</div>
     <textarea id="masivo-textarea" class="input" style="height:150px;resize:none;font-family:var(--mono);font-size:13px;line-height:1.7;" placeholder="Pega aquí los Plus Codes o direcciones..."></textarea>
     <div id="masivo-status" style="font-size:12px;color:var(--text3);min-height:18px;text-align:center;"></div>
     <button class="btn btn-green" onclick="procesarMasivo()" id="btn-masivo-procesar">⚡ Procesar y agregar</button>
@@ -3346,24 +3346,32 @@ async function procesarMasivo() {
   btn.disabled = true;
   let ok = 0, err = 0;
   for (let i = 0; i < lineas.length; i++) {
-    const linea = lineas[i];
+    let linea = lineas[i];
     statusEl.textContent = `Procesando ${i+1}/${lineas.length}...`;
     try {
       let lat, lng, nombre;
+
+      // ── Extraer nombre entre paréntesis ──────────────────────────
+      // Formato: JR5Q+MR Ciudad, Estado (jacarandas 12)
+      // El texto entre ( ) se usa como nombre de la parada.
+      // Se elimina de la línea antes de geocodificar.
+      let nombreParentesis = null;
+      const matchParen = linea.match(/\(([^)]+)\)\s*$/);
+      if (matchParen) {
+        nombreParentesis = matchParen[1].trim();
+        linea = linea.slice(0, matchParen.index).trim();
+      }
+
       if (isPlusCode(linea.split(' ')[0])) {
-        // Extraer nombre personalizado antes de geocodificar
-        // Formato: PLUSCODE Ciudad, Estado NombrePersonalizado
-        // "NombrePersonalizado" es todo lo que viene después del estado
         const parsed = parsearLineaPlusCode(linea);
-        const nombrePersonalizado = (parsed?.nombre && parsed.nombre !== parsed?.plusCode)
-          ? parsed.nombre
-          : null;
+        const nombreEstado = (parsed?.nombre && parsed.nombre !== parsed?.plusCode)
+          ? parsed.nombre : null;
         const r = await resolverPlusCode(linea);
         if (!r) throw new Error('Plus code no resuelto');
-        lat    = r.lat;
-        lng    = r.lng;
-        // Prioridad: lo que escribió el usuario > nombre del geocoder
-        nombre = nombrePersonalizado || r.nombre;
+        lat  = r.lat;
+        lng  = r.lng;
+        // Prioridad: paréntesis > después del estado > geocoder
+        nombre = nombreParentesis || nombreEstado || r.nombre;
       } else {
         const resultado = await new Promise((resolve) => {
           geocode(linea, {
@@ -3375,8 +3383,11 @@ async function procesarMasivo() {
           setTimeout(() => resolve(null), 5000);
         });
         if (!resultado) throw new Error('Sin resultado');
-        lat = resultado.lat; lng = resultado.lng; nombre = resultado.nombre;
+        lat    = resultado.lat;
+        lng    = resultado.lng;
+        nombre = nombreParentesis || resultado.nombre;
       }
+
       if (lat && lng) {
         const id = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,5);
         rutaBuild.paradas.push({ id, nombre, lat, lng, hecha: false, fallida: false, horaAccion: null });
@@ -3384,7 +3395,7 @@ async function procesarMasivo() {
       } else throw new Error('Coords inválidas');
       if (i < lineas.length - 1) await new Promise(r => setTimeout(r, 1100));
     } catch(e) {
-      console.warn('masivo error:', linea, e.message);
+      console.warn('masivo error:', lineas[i], e.message);
       err++;
     }
   }
