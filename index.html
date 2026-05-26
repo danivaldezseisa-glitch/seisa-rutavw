@@ -364,7 +364,7 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
 </div>
 
 <!-- SCREEN 4: RESUMEN -->
-<div class="screen hidden" id="screen-resumen" style="display:flex;flex-direction:column;overflow:hidden;">
+<div class="screen hidden" id="screen-resumen">
   <div class="topbar" style="flex-shrink:0;">
     <button class="topbar-back" id="res-btn-back" onclick="resumenVolver()">←</button>
     <h2>📊 Resumen</h2>
@@ -1244,8 +1244,9 @@ function showScreen(id) {
   if (target) {
     target.classList.remove('hidden');
     currentScreen = id;
-    if (id === 'screen-paradas')    initMapaParadas();
+    if (id === 'screen-paradas')     initMapaParadas();
     if (id === 'screen-seguimiento') renderSeguimiento();
+    if (id === 'screen-resumen')     setTimeout(() => initMapaResumen(), 100);
   }
 }
 
@@ -3520,70 +3521,67 @@ function renderResumen() {
     lista.appendChild(d);
   }
 
-  // ── Mapa Leaflet interactivo ─────────────────────────────────
+}
+
+function initMapaResumen() {
   const mapEl = document.getElementById('res-map');
-  if (mapEl && typeof L !== 'undefined') {
-    // Destruir mapa anterior si existe
-    if (window._resMap) { try { window._resMap.remove(); } catch(e){} window._resMap = null; }
-    mapEl.innerHTML = '';
+  if (!mapEl || typeof L === 'undefined') return;
 
-    const centro = rutaBuild.inicio
-      ? [rutaBuild.inicio.lat, rutaBuild.inicio.lng]
-      : [19.4326, -99.1332];
-
-    window._resMap = L.map(mapEl, { zoomControl: true, attributionControl: false }).setView(centro, 12);
-
-    // Tiles INEGI (más detalle en México)
-    L.tileLayer('https://geowebservices.inegi.org.mx/geoserver/Infraestructura_Basica/wms?SERVICE=WMS&VERSION=1.1.1&REQUEST=GetMap&FORMAT=image%2Fpng&TRANSPARENT=true&LAYERS=Infraestructura_Basica&BBOX={bbox-epsg-3857}&WIDTH=256&HEIGHT=256&SRS=EPSG%3A3857', {
-      maxZoom: 18, opacity: 1,
-      errorTileUrl: 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
-    }).addTo(window._resMap);
-
-    // Fallback a OSM si INEGI falla
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19, opacity: 0.7
-    }).addTo(window._resMap);
-
-    const pts = [];
-
-    // Marcador inicio
-    if (rutaBuild.inicio) {
-      pts.push([rutaBuild.inicio.lat, rutaBuild.inicio.lng]);
-      L.marker([rutaBuild.inicio.lat, rutaBuild.inicio.lng], {
-        icon: L.divIcon({ html: '<div style="width:28px;height:28px;border-radius:50%;background:#00e676;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 6px rgba(0,0,0,.4);">🏠</div>', className:'', iconSize:[28,28], iconAnchor:[14,14] })
-      }).addTo(window._resMap).bindPopup('Inicio: ' + rutaBuild.inicio.nombre);
-    }
-
-    // Marcadores de paradas con letras
-    rutaBuild.paradas.forEach((p, i) => {
-      pts.push([p.lat, p.lng]);
-      const letra = idxToLetra(i);
-      const fs    = letra.length > 2 ? '9px' : '11px';
-      L.marker([p.lat, p.lng], {
-        icon: L.divIcon({
-          html: `<div style="width:26px;height:26px;border-radius:50%;background:#00d4ff;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:${fs};font-weight:900;color:#000;box-shadow:0 2px 6px rgba(0,0,0,.4);">${letra}</div>`,
-          className:'', iconSize:[26,26], iconAnchor:[13,13]
-        })
-      }).addTo(window._resMap).bindPopup(letra + '. ' + p.nombre);
-    });
-
-    // Marcador base final
-    const base = rutaBuild.final;
-    if (base) {
-      pts.push([base.lat, base.lng]);
-      L.marker([base.lat, base.lng], {
-        icon: L.divIcon({ html: '<div style="width:28px;height:28px;border-radius:50%;background:#ff9100;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 6px rgba(0,0,0,.4);">🏁</div>', className:'', iconSize:[28,28], iconAnchor:[14,14] })
-      }).addTo(window._resMap).bindPopup('Base: ' + base.nombre);
-    }
-
-    // Línea punteada de la ruta
-    if (pts.length > 1) {
-      L.polyline(pts, { color:'#00d4ff', weight:2.5, opacity:.7, dashArray:'6,8' }).addTo(window._resMap);
-      window._resMap.fitBounds(pts, { padding:[24,24], maxZoom:14 });
-    }
-
-    setTimeout(() => window._resMap && window._resMap.invalidateSize(), 150);
+  // Destruir mapa anterior si existe
+  if (window._resMap) {
+    try { window._resMap.remove(); } catch(e) {}
+    window._resMap = null;
   }
+  mapEl.innerHTML = '';
+
+  const centro = rutaBuild.inicio
+    ? [rutaBuild.inicio.lat, rutaBuild.inicio.lng]
+    : [19.4326, -99.1332];
+
+  window._resMap = L.map(mapEl, { zoomControl: true, attributionControl: false })
+    .setView(centro, 12);
+
+  // Tiles OSM claros (igual estilo Google Maps)
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19
+  }).addTo(window._resMap);
+
+  const pts = [];
+
+  if (rutaBuild.inicio) {
+    pts.push([rutaBuild.inicio.lat, rutaBuild.inicio.lng]);
+    L.marker([rutaBuild.inicio.lat, rutaBuild.inicio.lng], {
+      icon: L.divIcon({ html: '<div style="width:28px;height:28px;border-radius:50%;background:#00e676;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 6px rgba(0,0,0,.4);">🏠</div>', className:'', iconSize:[28,28], iconAnchor:[14,14] })
+    }).addTo(window._resMap).bindPopup('Inicio: ' + rutaBuild.inicio.nombre);
+  }
+
+  rutaBuild.paradas.forEach((p, i) => {
+    pts.push([p.lat, p.lng]);
+    const letra = idxToLetra(i);
+    const fs    = letra.length > 2 ? '9px' : '11px';
+    L.marker([p.lat, p.lng], {
+      icon: L.divIcon({
+        html: `<div style="width:26px;height:26px;border-radius:50%;background:#00d4ff;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:${fs};font-weight:900;color:#000;box-shadow:0 2px 6px rgba(0,0,0,.4);">${letra}</div>`,
+        className:'', iconSize:[26,26], iconAnchor:[13,13]
+      })
+    }).addTo(window._resMap).bindPopup(letra + '. ' + p.nombre);
+  });
+
+  const base = rutaBuild.final;
+  if (base) {
+    pts.push([base.lat, base.lng]);
+    L.marker([base.lat, base.lng], {
+      icon: L.divIcon({ html: '<div style="width:28px;height:28px;border-radius:50%;background:#ff9100;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 6px rgba(0,0,0,.4);">🏁</div>', className:'', iconSize:[28,28], iconAnchor:[14,14] })
+    }).addTo(window._resMap).bindPopup('Base: ' + base.nombre);
+  }
+
+  if (pts.length > 1) {
+    L.polyline(pts, { color:'#00d4ff', weight:2.5, opacity:.7, dashArray:'6,8' }).addTo(window._resMap);
+    window._resMap.fitBounds(pts, { padding:[24,24], maxZoom:14 });
+  }
+
+  // Forzar recalcular tamaño ahora que el div es visible
+  window._resMap.invalidateSize();
 }
 
 // ══════════════════════════════════════════════════════════════════
