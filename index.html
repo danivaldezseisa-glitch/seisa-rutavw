@@ -3353,6 +3353,7 @@ function confirmarEditarParada() {
       renderSeguimiento();
       showToast('✅ Parada actualizada');
     }
+  }
   // Aplicar prioridad si se cambió
   const paradas = rutaBuild.paradas || state.rutaActual?.paradas || [];
   const pEdit = paradas.find(x => x.id === id);
