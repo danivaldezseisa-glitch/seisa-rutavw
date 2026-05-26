@@ -1485,7 +1485,7 @@ function isPlusCode(q) {
 }
 
 function parsearLineaPlusCode(linea) {
-  // Quitar texto entre paréntesis antes de parsear
+  // Quitar texto entre paréntesis (es el nombre, no la ciudad)
   linea = linea.replace(/\([^)]*\)/g, '').trim();
   const clean = linea.trim();
   const pcMatch = clean.match(/^([23456789CFGHJMPQRVWX]{2,8}\+[23456789CFGHJMPQRVWX0-9]*)/i);
@@ -1744,16 +1744,11 @@ async function resolverPlusCodeUI() {
   const rawOriginal = document.getElementById('paradas-pluscode').value.trim();
   if (!rawOriginal) { showToast('Pega un Plus Code primero'); return; }
 
-  // ── Extraer nombre entre paréntesis antes de geocodificar ────────
-  // Formato: HRMF+2HQ Buenavista, Estado de México (guerrero 160)
-  // → nombre = "guerrero 160", geocodificar sin los paréntesis
-  let nombreParentesis = null;
+  // Extraer nombre entre paréntesis antes de geocodificar
+  let nombreParen = null;
   let raw = rawOriginal;
-  const matchP = rawOriginal.match(/\(([^)]+)\)\s*$/);
-  if (matchP) {
-    nombreParentesis = matchP[1].trim();
-    raw = rawOriginal.slice(0, matchP.index).trim();
-  }
+  const mP = rawOriginal.match(/\(([^)]+)\)\s*$/);
+  if (mP) { nombreParen = mP[1].trim(); raw = rawOriginal.slice(0, mP.index).trim(); }
 
   const loadEl    = document.getElementById('pc-loading');
   const errorEl   = document.getElementById('pc-error');
@@ -1766,12 +1761,10 @@ async function resolverPlusCodeUI() {
   try {
     let result = null;
 
-    // Google Geocoder CON timeout 5s — evita quedarse colgado
+    // Google Geocoder con timeout 5s — nunca se queda colgado
     if (googleMapsReady && gmGeocoder) {
       const parsed = parsearLineaPlusCode(raw);
-      const query  = parsed
-        ? parsed.plusCode + (parsed.ciudad ? ' ' + parsed.ciudad : '')
-        : raw;
+      const query  = parsed ? parsed.plusCode + (parsed.ciudad ? ' ' + parsed.ciudad : '') : raw;
       result = await Promise.race([
         new Promise(resolve => {
           try {
@@ -1789,7 +1782,7 @@ async function resolverPlusCodeUI() {
       ]);
     }
 
-    // Fallback: OLC + Nominatim + plus.codes API
+    // Fallback encadenado: OLC → plus.codes → Nominatim
     if (!result) result = await resolverPlusCode(raw);
 
     loadEl.style.display = 'none';
@@ -1801,19 +1794,17 @@ async function resolverPlusCodeUI() {
     }
 
     _pcCoordsTemp = { lat: result.lat, lng: result.lng };
-
-    // Coordenadas en el label
     document.getElementById('pc-coords-label').textContent =
       result.lat.toFixed(6) + ', ' + result.lng.toFixed(6);
 
-    // Poner nombre entre paréntesis en el campo — o dejarlo vacío
-    const nomInput = document.getElementById('pc-nombre-input');
-    nomInput.value       = nombreParentesis || '';
-    nomInput.placeholder = 'Escribe el nombre de la parada...';
+    // Poner nombre del paréntesis en el campo automáticamente
+    const nomEl = document.getElementById('pc-nombre-input');
+    nomEl.value       = nombreParen || '';
+    nomEl.placeholder = 'Escribe el nombre de la parada...';
 
     confirmEl.style.display = 'block';
     if (mapParadas) mapParadas.setView([result.lat, result.lng], 16);
-    setTimeout(() => nomInput.focus(), 150);
+    setTimeout(() => nomEl.focus(), 150);
 
   } catch(e) {
     loadEl.style.display  = 'none';
@@ -2222,27 +2213,18 @@ function iniciarRutaGoogleMaps() {
   if (!inicio || !fin) { showToast('Faltan puntos de inicio o final'); return; }
   if (!paradas.length) { showToast('No hay paradas pendientes'); return; }
 
-  const enc = (p) => encodeURIComponent(p.lat + ',' + p.lng);
-  const MAX_WP = 23; // límite de Google Maps por URL
+  // Abrir SOLO la primera parada en Google Maps
+  const primera = paradas[0];
+  saveStateLocal();
+  window.open(_urlMaps(primera.lat, primera.lng), '_blank');
 
-  // Construir todos los segmentos necesarios
-  const segmentos = construirSegmentos(paradas, inicio, fin, MAX_WP);
+  // Mostrar pantalla de conducción
+  showScreen('screen-conduccion');
+  renderPantallaConduccion();
 
-  if (segmentos.length === 1) {
-    saveStateLocal();
-    window.open(segmentos[0].url, '_blank');
-    showToast('🗺️ Abriendo ruta completa en Google Maps...');
-  } else {
-    // Guardar segmentos en state y mostrar selector
-    state.rutaActual._segmentos = segmentos;
-    state.rutaActual._segActual = 0;
-    saveState();
-    mostrarSelectorSegmentos(segmentos, 0);
-    return; // el selector maneja la navegación
-  }
-
-  showScreen('screen-seguimiento');
-  renderSeguimiento();
+  // Registrar SW y enviar notificación de primera parada
+  registrarSW().catch(() => {});
+  setTimeout(() => enviarNotificacionParada(), 2000);
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -3381,24 +3363,26 @@ async function procesarMasivo() {
   btn.disabled = true;
   let ok = 0, err = 0;
   for (let i = 0; i < lineas.length; i++) {
-    const linea = lineas[i];
+    let linea = lineas[i];
     statusEl.textContent = `Procesando ${i+1}/${lineas.length}...`;
     try {
       let lat, lng, nombre;
+
+      // Extraer nombre entre paréntesis → campo nombre de la parada
+      // Formato: HRMF+2HQ Buenavista Estado de México,(tlaxacala 3)
+      let nombreParen = null;
+      const mParen = linea.match(/\(([^)]+)\)\s*$/);
+      if (mParen) {
+        nombreParen = mParen[1].trim();
+        linea = linea.slice(0, mParen.index).trim();
+      }
+
       if (isPlusCode(linea.split(' ')[0])) {
-        // Extraer nombre personalizado antes de geocodificar
-        // Formato: PLUSCODE Ciudad, Estado NombrePersonalizado
-        // "NombrePersonalizado" es todo lo que viene después del estado
-        const parsed = parsearLineaPlusCode(linea);
-        const nombrePersonalizado = (parsed?.nombre && parsed.nombre !== parsed?.plusCode)
-          ? parsed.nombre
-          : null;
         const r = await resolverPlusCode(linea);
         if (!r) throw new Error('Plus code no resuelto');
         lat    = r.lat;
         lng    = r.lng;
-        // Prioridad: lo que escribió el usuario > nombre del geocoder
-        nombre = nombrePersonalizado || r.nombre;
+        nombre = nombreParen || r.nombre;
       } else {
         const resultado = await new Promise((resolve) => {
           geocode(linea, {
@@ -3547,9 +3531,9 @@ async function enviarNotificacionParada() {
   const pend = ruta.paradas.filter(p => !p.hecha && !p.fallida);
   if (!pend.length) return;
   const sig   = pend[0];
-  const idx   = ruta.paradas.indexOf(sig);
-  const letra = idxToLetra(idx);
-  await notificarParada(sig, idx, letra);
+  const idxR  = ruta.paradas.indexOf(sig);
+  const letra = idxToLetra(idxR);
+  await notificarParada(sig, idxR, letra);
 }
 
 async function registrarSW() {
@@ -3565,22 +3549,12 @@ async function registrarSW() {
     // Escuchar mensajes del SW → abrir pantalla de conducción
     navigator.serviceWorker.addEventListener('message', e => {
       const { tipo, action, idx } = e.data || {};
-      if (tipo === 'notif_accion' && typeof idx === 'number') {
-        // Asegurarse de que la app esté en pantalla de seguimiento/conducción
-        const ruta = state.rutaActual;
-        if (!ruta) return;
-
-        // Si la acción viene de la notificación, ir directo a conducción
-        // para que el chofer confirme visualmente (más seguro al volante)
-        if (action === 'entregada' || action === 'fallida') {
-          // Ejecutar la acción directamente (viene de la cortina de notificaciones)
-          if (action === 'entregada') marcarEntregadaSeg(idx);
-          if (action === 'fallida')   marcarFallidaSeg(idx);
+      if (tipo === 'notif_accion') {
+        if (action === 'fin') {
+          mostrarPantallaFin();
+        } else {
+          mostrarPantallaConduccion();
         }
-
-        // Siempre mostrar pantalla de conducción después de la acción
-        // para que el chofer pueda ver la siguiente parada fácilmente
-        mostrarPantallaConduccion();
       }
     });
     console.log('✅ SW registrado desde sw.js — notificaciones con botones activas');
@@ -3625,8 +3599,7 @@ async function notificarParada(parada, idxReal, letra) {
         vibrate: [300, 150, 300],
         data:    { idx: idxReal, url: urlApp },
         actions: [
-          { action: 'entregada', title: '✅ Entregada' },
-          { action: 'fallida',   title: '❌ Fallida'   },
+          { action: 'conduccion', title: '🚗 Ir a pantalla' },
         ],
       });
     } else {
@@ -3750,41 +3723,191 @@ function abrirMapsDesdeConduccion() {
 }
 
 // Botón ✓ Entregada en modo conducción
-function condEntregada() {
+function _accionCond(esFallida) {
   const ruta = state.rutaActual;
   if (!ruta) return;
   const pend = ruta.paradas.filter(p => !p.hecha && !p.fallida);
   if (!pend.length) return;
-  const p = pend[0];
-  p.hecha = true; p.fallida = false; p.horaAccion = fmtHora(new Date());
+
+  // Marcar la parada actual
+  const p    = pend[0];
+  p.hecha    = true;
+  p.fallida  = esFallida;
+  p.horaAccion = fmtHora(new Date());
   saveState();
-  if (navigator.vibrate) navigator.vibrate(100);
-  // Abrir Maps a la siguiente parada (síncrono en el evento de usuario)
+  if (navigator.vibrate) navigator.vibrate(esFallida ? [100,50,100] : 100);
+
+  // Calcular qué sigue DESPUÉS de marcar
   const sig = ruta.paradas.filter(q => !q.hecha && !q.fallida);
-  if (sig.length > 0) window.open(_urlMaps(sig[0].lat, sig[0].lng), '_blank');
-  renderPantallaConduccion();
-  if (sig.length > 0) setTimeout(() => enviarNotificacionParada(), 1500);
-  else showToast('🎉 ¡Todas las paradas completadas!');
+
+  if (sig.length > 0) {
+    // Hay más paradas → abrir Maps a la siguiente (síncrono)
+    window.open(_urlMaps(sig[0].lat, sig[0].lng), '_blank');
+    renderPantallaConduccion();
+    setTimeout(() => enviarNotificacionParada(), 1500);
+  } else {
+    // Última parada → abrir Maps al punto final (base)
+    const fin = ruta.final;
+    if (fin) window.open(_urlMaps(fin.lat, fin.lng), '_blank');
+    renderPantallaConduccion();
+    // Notificación especial de finalizar ruta
+    setTimeout(() => notificarFinRuta(), 1500);
+  }
 }
+
+function condEntregada() { _accionCond(false); }
 
 // Botón ✗ Fallida en modo conducción
-function condFallida() {
-  const ruta = state.rutaActual;
-  if (!ruta) return;
-  const pend = ruta.paradas.filter(p => !p.hecha && !p.fallida);
-  if (!pend.length) return;
-  const p = pend[0];
-  p.hecha = true; p.fallida = true; p.horaAccion = fmtHora(new Date());
-  saveState();
-  if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
-  // Abrir Maps a la siguiente parada (síncrono en el evento de usuario)
-  const sig = ruta.paradas.filter(q => !q.hecha && !q.fallida);
-  if (sig.length > 0) window.open(_urlMaps(sig[0].lat, sig[0].lng), '_blank');
-  renderPantallaConduccion();
-  if (sig.length > 0) setTimeout(() => enviarNotificacionParada(), 1500);
-  else showToast('🎉 ¡Todas las paradas completadas!');
+function condFallida() { _accionCond(true); }
+
+// Notificación especial al llegar a la base
+async function notificarFinRuta() {
+  const ok = await pedirPermisoNotificaciones();
+  if (!ok) return;
+  if (!_swListo) await registrarSW();
+  const urlApp = location.href;
+  try {
+    if (_swListo && _swReg) {
+      const reg = await navigator.serviceWorker.ready;
+      await reg.showNotification('🏁 ¡Ruta completada! — Regresa a la base', {
+        body:     'Toca para ir a la pantalla de finalización',
+        icon:     'https://cdn.jsdelivr.net/npm/twemoji@14/assets/72x72/1f3c1.png',
+        tag:      'seisa-fin',
+        requireInteraction: true,
+        vibrate:  [400, 200, 400, 200, 400],
+        data:     { accion: 'fin', url: urlApp },
+        actions:  [{ action: 'fin', title: '🏁 Finalizar ruta' }],
+      });
+    } else {
+      const n = new Notification('🏁 ¡Ruta completada!', {
+        body: 'Toca para finalizar la ruta',
+        tag:  'seisa-fin',
+        requireInteraction: true,
+      });
+      n.onclick = () => { window.focus(); n.close(); mostrarPantallaFin(); };
+    }
+  } catch(e) { console.warn('notificarFinRuta:', e.message); }
 }
 
+
+// ══════════════════════════════════════════════════════════════════
+//  PANTALLA DE FINALIZACIÓN DE RUTA
+// ══════════════════════════════════════════════════════════════════
+function mostrarPantallaFin() {
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+
+  let modal = document.getElementById('pantalla-fin-ruta');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'pantalla-fin-ruta';
+    modal.style.cssText = 'position:fixed;inset:0;z-index:9900;background:#0a1628;display:flex;flex-direction:column;font-family:system-ui,sans-serif;';
+    document.body.appendChild(modal);
+  }
+
+  const paradas    = ruta.paradas || [];
+  const entregadas = paradas.filter(p => p.hecha && !p.fallida);
+  const fallidas   = paradas.filter(p => p.fallida);
+  const total      = paradas.length;
+  const pct        = total ? Math.round(entregadas.length / total * 100) : 0;
+
+  const listaHTML = paradas.map((p, i) => {
+    const letra  = idxToLetra(i);
+    const estado = p.fallida ? '❌' : p.hecha ? '✅' : '⏳';
+    const color  = p.fallida ? '#ff5252' : p.hecha ? '#00e676' : '#aaa';
+    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.06);">
+      <span style="font-size:18px;">${estado}</span>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:13px;font-weight:700;color:${color};">${letra}. ${p.nombre}</div>
+        ${p.horaAccion ? `<div style="font-size:11px;color:#4a6a8a;">${p.horaAccion}</div>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+
+  modal.innerHTML = `
+    <div style="padding:max(14px,env(safe-area-inset-top)) 16px 12px;background:#0d1b2a;border-bottom:1px solid #1e3560;flex-shrink:0;display:flex;align-items:center;gap:12px;">
+      <div style="font-size:28px;">🏁</div>
+      <div style="flex:1;">
+        <div style="font-size:18px;font-weight:800;color:#fff;">Ruta completada</div>
+        <div style="font-size:12px;color:#4a6a8a;margin-top:2px;">${ruta.nombre || 'Sin nombre'}</div>
+      </div>
+    </div>
+
+    <!-- Resumen -->
+    <div style="display:flex;gap:0;flex-shrink:0;border-bottom:1px solid #1e3560;">
+      <div style="flex:1;padding:14px;text-align:center;border-right:1px solid #1e3560;">
+        <div style="font-size:24px;font-weight:900;color:#00e676;">${entregadas.length}</div>
+        <div style="font-size:11px;color:#4a6a8a;">Entregadas</div>
+      </div>
+      <div style="flex:1;padding:14px;text-align:center;border-right:1px solid #1e3560;">
+        <div style="font-size:24px;font-weight:900;color:#ff5252;">${fallidas.length}</div>
+        <div style="font-size:11px;color:#4a6a8a;">Fallidas</div>
+      </div>
+      <div style="flex:1;padding:14px;text-align:center;">
+        <div style="font-size:24px;font-weight:900;color:#00d4ff;">${pct}%</div>
+        <div style="font-size:11px;color:#4a6a8a;">Efectividad</div>
+      </div>
+    </div>
+
+    <!-- Lista de paradas -->
+    <div style="flex:1;overflow-y:auto;">${listaHTML}</div>
+
+    <!-- Botón finalizar -->
+    <div style="padding:12px 16px calc(env(safe-area-inset-bottom,0px)+12px);flex-shrink:0;background:#0d1b2a;border-top:1px solid #1e3560;">
+      <button onclick="finalizarRutaDefinitivo()"
+        style="width:100%;padding:18px;border-radius:16px;border:none;
+               background:linear-gradient(135deg,#00d4ff,#00e676);
+               color:#000;font-size:18px;font-weight:900;cursor:pointer;">
+        🏁 Marcar fin de ruta y guardar
+      </button>
+    </div>
+  `;
+
+  modal.style.display = 'flex';
+
+  // Iniciar mapa si Leaflet disponible
+  setTimeout(() => {
+    if (typeof L === 'undefined') return;
+    // El mapa va en un div separado encima de la lista
+    const mapDiv = document.createElement('div');
+    mapDiv.style.cssText = 'height:200px;width:100%;flex-shrink:0;';
+    const lista = modal.querySelector('[style*="overflow-y:auto"]');
+    lista.parentNode.insertBefore(mapDiv, lista);
+    const m = L.map(mapDiv, { zoomControl: false, attributionControl: false }).setView([19.4326,-99.1332], 12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(m);
+    const pts = [];
+    if (ruta.inicio) { pts.push([ruta.inicio.lat, ruta.inicio.lng]); L.marker([ruta.inicio.lat, ruta.inicio.lng]).addTo(m).bindPopup('Inicio'); }
+    paradas.forEach((p, i) => {
+      pts.push([p.lat, p.lng]);
+      L.circleMarker([p.lat, p.lng], { radius:8, fillColor: p.fallida?'#ff5252':'#00e676', color:'#fff', weight:2, fillOpacity:1 })
+       .addTo(m).bindPopup(idxToLetra(i)+'. '+p.nombre);
+    });
+    if (ruta.final) { pts.push([ruta.final.lat, ruta.final.lng]); L.marker([ruta.final.lat, ruta.final.lng]).addTo(m).bindPopup('Base'); }
+    if (pts.length > 1) m.fitBounds(pts, { padding: [20,20] });
+    setTimeout(() => m.invalidateSize(), 100);
+  }, 200);
+}
+
+function finalizarRutaDefinitivo() {
+  const ruta = state.rutaActual;
+  if (ruta) {
+    ruta.horaFin    = fmtHora(new Date());
+    ruta.finalizada = true;
+    // Guardar en historial
+    if (!state.historial) state.historial = [];
+    state.historial.unshift({ ...ruta });
+    saveState();
+  }
+  // Limpiar pantalla de fin
+  const modal = document.getElementById('pantalla-fin-ruta');
+  if (modal) modal.style.display = 'none';
+  // Volver a home
+  state.rutaActual = null;
+  saveState();
+  showScreen('screen-home');
+  renderHome();
+  showToast('✅ Ruta finalizada y guardada');
+}
 
 let _filtroSeg = '';
 
