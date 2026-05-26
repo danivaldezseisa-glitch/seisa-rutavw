@@ -613,12 +613,18 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
   <div class="modal-sheet">
     <div class="modal-title">✏️ Editar parada</div>
     <input type="hidden" id="editar-parada-id">
-    <div id="editar-parada-actual" style="font-size:12px;color:var(--text3);padding:8px 12px;background:var(--surface2);border-radius:8px;margin-bottom:4px;"></div>
-    <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">Plus Code</div>
+
+    <!-- Ubicación actual -->
+    <div id="editar-parada-actual" style="font-size:12px;color:var(--text3);padding:8px 12px;background:var(--surface2);border-radius:8px;"></div>
+
+    <!-- Plus Code actual (se rellena automáticamente al abrir) -->
+    <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-top:8px;margin-bottom:5px;">Plus Code actual / nuevo</div>
     <div style="display:flex;gap:8px;">
-      <input class="input" id="editar-pluscode-input" placeholder="Ej: GP3P+538 Naucalpan de Juárez" style="flex:1;font-size:13px;font-family:var(--mono);">
+      <input class="input" id="editar-pluscode-input" placeholder="Ej: GP3P+538 Naucalpan" style="flex:1;font-size:13px;font-family:var(--mono);">
       <button onclick="resolverPlusCodeEditar()" style="padding:8px 14px;border-radius:10px;border:1.5px solid var(--accent);background:rgba(0,212,255,.12);color:var(--accent);font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;">Buscar</button>
     </div>
+
+    <!-- Separador -->
     <div style="display:flex;align-items:center;gap:8px;margin:6px 0;">
       <div style="flex:1;height:1px;background:var(--border);"></div>
       <span style="font-size:11px;color:var(--text3);">o buscar dirección</span>
@@ -626,11 +632,35 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
     </div>
     <input class="input" id="editar-parada-input" placeholder="🔍 Escribir dirección..." style="font-size:14px;">
     <button onclick="ejecutarBusquedaEditarParada()" class="btn btn-ghost" style="font-size:13px;padding:10px;">🔍 Buscar dirección</button>
-    <div id="editar-parada-resultados" style="display:none;max-height:150px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;background:var(--surface2);"></div>
+    <div id="editar-parada-resultados" style="display:none;max-height:140px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;background:var(--surface2);"></div>
     <div id="editar-parada-preview" style="display:none;font-size:12px;color:var(--green);padding:8px 12px;background:rgba(0,230,118,.08);border-radius:8px;border:1px solid rgba(0,230,118,.2);"></div>
+
+    <!-- Nombre -->
     <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-top:4px;margin-bottom:5px;">Nombre de la parada</div>
     <input class="input" id="editar-parada-nombre" placeholder="Ej: José Ma. Morelos 6" style="font-size:14px;">
-    <button class="btn btn-green" onclick="confirmarEditarParada()" style="margin-top:4px;">✓ Confirmar cambios</button>
+
+    <!-- Prioridad de la parada -->
+    <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-top:8px;margin-bottom:6px;">Prioridad en la ruta</div>
+    <div style="display:flex;gap:8px;">
+      <button onclick="marcarPrioridadParada('primera')" id="btn-editar-primera"
+        style="flex:1;padding:10px 6px;border-radius:10px;border:1.5px solid rgba(0,230,118,.4);
+               background:rgba(0,230,118,.08);color:var(--green);font-size:12px;font-weight:700;cursor:pointer;">
+        🥇 Primera parada
+      </button>
+      <button onclick="marcarPrioridadParada('ultima')" id="btn-editar-ultima"
+        style="flex:1;padding:10px 6px;border-radius:10px;border:1.5px solid rgba(255,145,0,.4);
+               background:rgba(255,145,0,.08);color:var(--orange);font-size:12px;font-weight:700;cursor:pointer;">
+        🏁 Última parada
+      </button>
+      <button onclick="marcarPrioridadParada('normal')" id="btn-editar-normal"
+        style="flex:1;padding:10px 6px;border-radius:10px;border:1px solid var(--border);
+               background:var(--surface2);color:var(--text3);font-size:12px;font-weight:700;cursor:pointer;">
+        Normal
+      </button>
+    </div>
+    <div id="editar-prioridad-info" style="font-size:11px;color:var(--text3);text-align:center;margin-top:4px;"></div>
+
+    <button class="btn btn-green" onclick="confirmarEditarParada()" style="margin-top:8px;">✓ Confirmar cambios</button>
     <button class="btn btn-ghost" onclick="closeModal('modal-editar-parada')">Cancelar</button>
   </div>
 </div>
@@ -1246,7 +1276,7 @@ function showScreen(id) {
     currentScreen = id;
     if (id === 'screen-paradas')    initMapaParadas();
     if (id === 'screen-seguimiento') renderSeguimiento();
-    if (id === 'screen-resumen')     setTimeout(() => _initMapaResumen(), 300);
+    if (id === 'screen-resumen')     setTimeout(()=>_initMapaResumen&&_initMapaResumen(),300);
   }
 }
 
@@ -1483,7 +1513,6 @@ function isPlusCode(q) {
 }
 
 function parsearLineaPlusCode(linea) {
-  linea = linea.replace(/\([^)]*\)/g, '').trim();
   const clean = linea.trim();
   const pcMatch = clean.match(/^([23456789CFGHJMPQRVWX]{2,8}\+[23456789CFGHJMPQRVWX0-9]*)/i);
   if (!pcMatch) return null;
@@ -1726,6 +1755,17 @@ function crearIconoNum(n, color) {
   });
 }
 
+function fitTodasParadas() {
+  if (!mapParadas) return;
+  const pts = [];
+  if (rutaBuild.inicio) pts.push([rutaBuild.inicio.lat, rutaBuild.inicio.lng]);
+  rutaBuild.paradas.forEach(p => pts.push([p.lat, p.lng]));
+  if (rutaBuild.final) pts.push([rutaBuild.final.lat, rutaBuild.final.lng]);
+  if (!pts.length) { showToast('No hay puntos en el mapa'); return; }
+  if (pts.length === 1) { mapParadas.setView(pts[0], 15); return; }
+  mapParadas.fitBounds(pts, { padding: [32, 32], maxZoom: 15 });
+}
+
 function agregarParada(lat, lng, nombre) {
   const id = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
   const parada = { id, nombre, lat, lng, hecha: false, fallida: false, horaAccion: null };
@@ -1738,45 +1778,58 @@ function agregarParada(lat, lng, nombre) {
 let _pcCoordsTemp = null;
 
 async function resolverPlusCodeUI() {
-  const rawOrig = document.getElementById('paradas-pluscode').value.trim();
-  if (!rawOrig) { showToast('Pega un Plus Code primero'); return; }
-  let nombreParen = null, raw = rawOrig;
-  const mP = rawOrig.match(/\(([^)]+)\)\s*$/);
-  if (mP) { nombreParen = mP[1].trim(); raw = rawOrig.slice(0, mP.index).trim(); }
-  const loadEl = document.getElementById('pc-loading');
-  const errorEl = document.getElementById('pc-error');
-  const confirmEl = document.getElementById('pc-confirm-box');
-  confirmEl.style.display = 'none'; errorEl.style.display = 'none'; loadEl.style.display = 'block';
+  const raw = document.getElementById('paradas-pluscode').value.trim();
+  if (!raw) { showToast('Pega un Plus Code primero'); return; }
+  document.getElementById('pc-confirm-box').style.display = 'none';
+  document.getElementById('pc-error').style.display       = 'none';
+  document.getElementById('pc-loading').style.display     = 'block';
   _pcCoordsTemp = null;
   try {
     let result = null;
     if (googleMapsReady && gmGeocoder) {
       const parsed = parsearLineaPlusCode(raw);
-      const query = parsed ? parsed.plusCode + (parsed.ciudad ? ' ' + parsed.ciudad : '') : raw;
-      result = await Promise.race([
-        new Promise(resolve => {
-          try {
-            gmGeocoder.geocode({ address: query, region: 'MX', language: 'es' }, (res, status) => {
-              if (status !== 'OK' || !res[0]) { resolve(null); return; }
-              resolve({ lat: res[0].geometry.location.lat(), lng: res[0].geometry.location.lng(), nombre: res[0].formatted_address.split(',')[0] });
-            });
-          } catch(e) { resolve(null); }
-        }),
-        new Promise(resolve => setTimeout(() => resolve(null), 5000))
-      ]);
+      const query = parsed ? parsed.plusCode + ' ' + parsed.ciudad : raw;
+      result = await new Promise(resolve => {
+        gmGeocoder.geocode(
+          { address: query, region: 'MX', language: 'es' },
+          async (res, status) => {
+            if (status !== 'OK' || !res[0]) { resolve(null); return; }
+            const addr   = res[0].address_components || [];
+            const street = addr.find(c => c.types.includes('route'))?.long_name || '';
+            const num    = addr.find(c => c.types.includes('street_number'))?.long_name || '';
+            const lat    = res[0].geometry.location.lat();
+            const lng    = res[0].geometry.location.lng();
+            const nombreFinal = (parsed?.nombre && parsed.nombre !== parsed.plusCode)
+              ? parsed.nombre
+              : ([street, num].filter(Boolean).join(' ') || res[0].formatted_address.split(',')[0]);
+            resolve({ lat, lng, nombre: nombreFinal });
+          }
+        );
+      });
     }
     if (!result) result = await resolverPlusCode(raw);
-    loadEl.style.display = 'none';
-    if (!result) { errorEl.textContent = '⚠️ No se encontró. Agrega la ciudad: "HRMF+2HQ Buenavista"'; errorEl.style.display = 'block'; return; }
+    document.getElementById('pc-loading').style.display = 'none';
+    if (!result) {
+      document.getElementById('pc-error').textContent = '⚠️ No se encontró la ubicación. Verifica el Plus Code.';
+      document.getElementById('pc-error').style.display = 'block';
+      return;
+    }
     _pcCoordsTemp = { lat: result.lat, lng: result.lng };
-    document.getElementById('pc-coords-label').textContent = result.lat.toFixed(6) + ', ' + result.lng.toFixed(6);
-    const nomEl = document.getElementById('pc-nombre-input');
-    nomEl.value = nombreParen || ''; nomEl.placeholder = 'Escribe el nombre de la parada...';
-    confirmEl.style.display = 'block';
+    const coordsStr = result.lat.toFixed(6) + ', ' + result.lng.toFixed(6);
+    document.getElementById('pc-coords-label').textContent = coordsStr;
+    const parsedRaw = parsearLineaPlusCode(raw);
+    document.getElementById('pc-nombre-input').value = '';
+    document.getElementById('pc-nombre-input').placeholder = 'Escribe el nombre o referencia...';
+    document.getElementById('pc-confirm-box').style.display = 'block';
     if (mapParadas) mapParadas.setView([result.lat, result.lng], 16);
-    setTimeout(() => nomEl.focus(), 150);
-  } catch(e) { loadEl.style.display = 'none'; errorEl.textContent = '⚠️ Error: ' + e.message; errorEl.style.display = 'block'; }
+    setTimeout(() => document.getElementById('pc-nombre-input')?.focus(), 150);
+  } catch(e) {
+    document.getElementById('pc-loading').style.display = 'none';
+    document.getElementById('pc-error').textContent = '⚠️ Error: ' + e.message;
+    document.getElementById('pc-error').style.display = 'block';
+  }
 }
+
 function confirmarAgregarPlusCode() {
   if (!_pcCoordsTemp) { showToast('Primero resuelve el Plus Code'); return; }
   const nombre = document.getElementById('pc-nombre-input').value.trim();
@@ -2178,14 +2231,12 @@ function iniciarRutaGoogleMaps() {
   if (!inicio || !fin) { showToast('Faltan puntos de inicio o final'); return; }
   if (!paradas.length) { showToast('No hay paradas pendientes'); return; }
 
-  // SOLO la primera parada — el chofer avanza de una en una
   const primera = paradas[0];
   saveStateLocal();
   window.open(_urlMaps(primera.lat, primera.lng), '_blank');
   showToast('🗺️ Parada A — ' + primera.nombre);
   showScreen('screen-seguimiento');
   renderSeguimiento();
-  // Registrar SW y enviar notificación de primera parada
   if (!_swListo) registrarSW().catch(()=>{});
   setTimeout(()=>enviarNotificacionParada(), 2000);
 }
@@ -2582,7 +2633,7 @@ function marcarEntregadaSeg(idx) {
     ruta._navAuto = false;
     saveState();
     actualizarBtnNavAuto();
-  } else {
+  } else if (ruta._navAuto) {
     setTimeout(() => enviarNotificacionParada(), 1500);
   }
 }
@@ -2608,7 +2659,7 @@ function marcarFallidaSeg(idx) {
   renderSeguimiento();
   showToast('⚠️ Fallida · ' + p.horaAccion);
 
-  if (pendientes.length > 0) {
+  if (ruta._navAuto && pendientes.length > 0) {
     setTimeout(() => enviarNotificacionParada(), 1500);
   }
 }
@@ -3015,6 +3066,9 @@ function finalizarRuta() {
   state.paradaActual = 0;
   if (state.rutas.length > 50) state.rutas = state.rutas.slice(-50);
   saveState();
+  // Limpiar pantalla de paradas para la siguiente ruta
+  rutaBuild = { nombre: '', fecha: '', peajes: false, inicio: null, final: null, paradas: [] };
+  if (mapParadas) { paradaMarkers.forEach(m => { try { m.remove(); } catch(e){} }); paradaMarkers = []; }
   showScreen('screen-home');
   renderHome();
   showToast('✅ Ruta finalizada y guardada');
@@ -3156,17 +3210,35 @@ window.abrirEditarParada = function(id) {
   editParadaData = null;
   document.getElementById('editar-parada-id').value = id;
   document.getElementById('editar-parada-input').value = '';
-  document.getElementById('editar-pluscode-input').value = '';
   const prev = document.getElementById('editar-parada-preview');
   const res  = document.getElementById('editar-parada-resultados');
   if (prev) prev.style.display = 'none';
   if (res)  { res.style.display = 'none'; res.innerHTML = ''; }
+
   const p = (rutaBuild && rutaBuild.paradas && rutaBuild.paradas.find(x => x.id === id))
          || state.rutaActual?.paradas.find(x => x.id === id);
+
+  // Mostrar info actual de la parada
   const actualEl = document.getElementById('editar-parada-actual');
-  if (actualEl && p) { actualEl.textContent = '📍 ' + p.nombre + ' · ' + p.lat.toFixed(5) + ', ' + p.lng.toFixed(5); }
+  if (actualEl && p) {
+    actualEl.textContent = '📍 ' + p.nombre + ' · ' + p.lat.toFixed(5) + ', ' + p.lng.toFixed(5);
+  }
+
+  // Rellenar Plus Code con las coordenadas actuales de la parada
+  const pcInput = document.getElementById('editar-pluscode-input');
+  if (pcInput && p) {
+    // Mostrar coords como referencia — el usuario puede pegar un nuevo plus code
+    pcInput.value = '';
+    pcInput.placeholder = `${p.lat.toFixed(6)}, ${p.lng.toFixed(6)} — pega nuevo Plus Code aquí`;
+  }
+
+  // Rellenar nombre
   const nombreEl = document.getElementById('editar-parada-nombre');
-  if (nombreEl) nombreEl.value = p ? p.nombre : '';
+  if (nombreEl) { nombreEl.value = ''; nombreEl.placeholder = p ? p.nombre : 'Nombre de la parada'; }
+
+  // Mostrar prioridad actual
+  _actualizarBotonesPrioridad(p?.prioridad || 'normal');
+
   document.getElementById('modal-editar-parada').classList.remove('hidden');
 };
 
@@ -3281,7 +3353,16 @@ function confirmarEditarParada() {
       renderSeguimiento();
       showToast('✅ Parada actualizada');
     }
+  // Aplicar prioridad si se cambió
+  const paradas = rutaBuild.paradas || state.rutaActual?.paradas || [];
+  const pEdit = paradas.find(x => x.id === id);
+  if (pEdit && window._prioridadActual && window._prioridadActual !== 'normal') {
+    pEdit.prioridad = window._prioridadActual;
+    _aplicarPrioridades(paradas);
+    if (state.rutaActual) state.rutaActual.paradas = paradas;
+    if (rutaBuild) rutaBuild.paradas = paradas;
   }
+  window._prioridadActual = null;
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -3326,22 +3407,24 @@ async function procesarMasivo() {
   btn.disabled = true;
   let ok = 0, err = 0;
   for (let i = 0; i < lineas.length; i++) {
-    let linea = lineas[i];
+    const linea = lineas[i];
     statusEl.textContent = `Procesando ${i+1}/${lineas.length}...`;
     try {
       let lat, lng, nombre;
-
-      // Extraer nombre entre paréntesis — formato: HRMF+2HQ Ciudad,(calle num)
-      let nombreParen = null;
-      const mParen = linea.match(/\(([^)]+)\)\s*$/);
-      if (mParen) { nombreParen = mParen[1].trim(); linea = linea.slice(0, mParen.index).trim(); }
-
       if (isPlusCode(linea.split(' ')[0])) {
+        // Extraer nombre personalizado antes de geocodificar
+        // Formato: PLUSCODE Ciudad, Estado NombrePersonalizado
+        // "NombrePersonalizado" es todo lo que viene después del estado
+        const parsed = parsearLineaPlusCode(linea);
+        const nombrePersonalizado = (parsed?.nombre && parsed.nombre !== parsed?.plusCode)
+          ? parsed.nombre
+          : null;
         const r = await resolverPlusCode(linea);
         if (!r) throw new Error('Plus code no resuelto');
         lat    = r.lat;
         lng    = r.lng;
-        nombre = nombreParen || r.nombre;
+        // Prioridad: lo que escribió el usuario > nombre del geocoder
+        nombre = nombrePersonalizado || r.nombre;
       } else {
         const resultado = await new Promise((resolve) => {
           geocode(linea, {
@@ -3460,29 +3543,31 @@ function renderResumen() {
     lista.appendChild(d);
   }
 
-  setTimeout(() => _initMapaResumen(), 300);
+  setTimeout(()=>_initMapaResumen(),300);
 }
 
-function _initMapaResumen() {
-  const mapEl = document.getElementById('res-map');
-  const loadEl = document.getElementById('res-map-loading');
-  if (!mapEl) return;
-  if (window._resMap) { try { window._resMap.remove(); } catch(e){} window._resMap = null; }
-  mapEl.innerHTML = '';
-  if (loadEl) loadEl.style.display = 'none';
-  const centro = rutaBuild.inicio ? [rutaBuild.inicio.lat, rutaBuild.inicio.lng] : [19.4326, -99.1332];
-  window._resMap = L.map(mapEl, { zoomControl: true, attributionControl: false, tap: false }).setView(centro, 12);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(window._resMap);
-  const pts = [];
-  const mkI = (e, c) => L.divIcon({ html: `<div style="width:30px;height:30px;border-radius:50%;background:${c};border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,.3);">${e}</div>`, className:'', iconSize:[30,30], iconAnchor:[15,15] });
-  const mkL = (t, c) => { const fs = t.length > 2 ? '9px' : '11px'; return L.divIcon({ html: `<div style="width:26px;height:26px;border-radius:50%;background:${c};border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:${fs};font-weight:900;color:#000;box-shadow:0 2px 6px rgba(0,0,0,.3);">${t}</div>`, className:'', iconSize:[26,26], iconAnchor:[13,13] }); };
-  if (rutaBuild.inicio) { const p = rutaBuild.inicio; pts.push([p.lat,p.lng]); L.marker([p.lat,p.lng],{icon:mkI('🏠','#00e676')}).addTo(window._resMap).bindPopup('🏠 '+p.nombre); }
-  rutaBuild.paradas.forEach((p,i) => { pts.push([p.lat,p.lng]); L.marker([p.lat,p.lng],{icon:mkL(idxToLetra(i),'#00d4ff')}).addTo(window._resMap).bindPopup('<b>'+idxToLetra(i)+'.</b> '+p.nombre); });
-  if (rutaBuild.final) { const p = rutaBuild.final; pts.push([p.lat,p.lng]); L.marker([p.lat,p.lng],{icon:mkI('🏁','#ff9100')}).addTo(window._resMap).bindPopup('🏁 '+p.nombre); }
-  if (pts.length > 1) { L.polyline(pts,{color:'#00d4ff',weight:2.5,opacity:.8,dashArray:'6,8'}).addTo(window._resMap); window._resMap.fitBounds(pts,{padding:[24,24],maxZoom:14}); }
+function _initMapaResumen(){
+  const mapEl=document.getElementById('res-map');
+  const loadEl=document.getElementById('res-map-loading');
+  if(!mapEl)return;
+  if(window._resMap){try{window._resMap.remove();}catch(e){}window._resMap=null;}
+  mapEl.innerHTML='';
+  if(loadEl)loadEl.style.display='none';
+  const centro=rutaBuild.inicio?[rutaBuild.inicio.lat,rutaBuild.inicio.lng]:[19.4326,-99.1332];
+  window._resMap=L.map(mapEl,{zoomControl:true,attributionControl:false,tap:false}).setView(centro,12);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(window._resMap);
+  const pts=[];
+  const mkI=(e,c)=>L.divIcon({html:`<div style="width:30px;height:30px;border-radius:50%;background:${c};border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font-size:14px;box-shadow:0 2px 8px rgba(0,0,0,.3);">${e}</div>`,className:'',iconSize:[30,30],iconAnchor:[15,15]});
+  const mkL=(t,c)=>{const fs=t.length>2?'9px':'11px';return L.divIcon({html:`<div style="width:26px;height:26px;border-radius:50%;background:${c};border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:${fs};font-weight:900;color:#000;box-shadow:0 2px 6px rgba(0,0,0,.3);">${t}</div>`,className:'',iconSize:[26,26],iconAnchor:[13,13]});};
+  if(rutaBuild.inicio){const p=rutaBuild.inicio;pts.push([p.lat,p.lng]);L.marker([p.lat,p.lng],{icon:mkI('🏠','#00e676')}).addTo(window._resMap).bindPopup('🏠 '+p.nombre);}
+  rutaBuild.paradas.forEach((p,i)=>{pts.push([p.lat,p.lng]);L.marker([p.lat,p.lng],{icon:mkL(idxToLetra(i),'#00d4ff')}).addTo(window._resMap).bindPopup('<b>'+idxToLetra(i)+'.</b> '+p.nombre);});
+  if(rutaBuild.final){const p=rutaBuild.final;pts.push([p.lat,p.lng]);L.marker([p.lat,p.lng],{icon:mkI('🏁','#ff9100')}).addTo(window._resMap).bindPopup('🏁 '+p.nombre);}
+  if(pts.length>1){L.polyline(pts,{color:'#00d4ff',weight:2.5,opacity:.8,dashArray:'6,8'}).addTo(window._resMap);window._resMap.fitBounds(pts,{padding:[24,24],maxZoom:14});}
   window._resMap.invalidateSize();
-  setTimeout(() => window._resMap && window._resMap.invalidateSize(), 400);
+  setTimeout(()=>window._resMap&&window._resMap.invalidateSize(),400);
 }
+
+// ═
 
 // ══════════════════════════════════════════════════════════════════
 //  SISTEMA DE NOTIFICACIONES
@@ -3507,7 +3592,8 @@ let _swIntentando = false;
 async function enviarNotificacionParada(){
   const ruta=state.rutaActual;if(!ruta)return;
   const pend=ruta.paradas.filter(p=>!p.hecha&&!p.fallida);if(!pend.length)return;
-  await notificarParada(pend[0],ruta.paradas.indexOf(pend[0]),idxToLetra(ruta.paradas.indexOf(pend[0])));
+  const sig=pend[0];const idxR=ruta.paradas.indexOf(sig);
+  await notificarParada(sig,idxR,idxToLetra(idxR));
 }
 async function registrarSW(){
   if (_swListo || _swIntentando || !('serviceWorker' in navigator)) return;
@@ -3523,11 +3609,8 @@ async function registrarSW(){
     navigator.serviceWorker.addEventListener('message', e => {
       const { tipo, action, idx } = e.data || {};
       if (tipo === 'notif_accion') {
-        if (action === 'fin') {
-          mostrarPantallaFin();
-        } else {
-          mostrarPantallaConduccion();
-        }
+        if (action === 'fin') { mostrarPantallaFin && mostrarPantallaFin(); }
+        else { mostrarPantallaConduccion(); }
       }
     });
     console.log('✅ SW registrado desde sw.js — notificaciones con botones activas');
@@ -3572,7 +3655,7 @@ async function notificarParada(parada, idxReal, letra) {
         vibrate: [300, 150, 300],
         data:    { idx: idxReal, url: urlApp },
         actions: [
-          { action: 'conduccion', title: '🚗 Ir a pantalla' },
+          { action: 'conduccion', title: '🚗 Ir a pantalla de conducir' },
         ],
       });
     } else {
@@ -3698,139 +3781,104 @@ function abrirMapsDesdeConduccion() {
 // Botón ✓ Entregada en modo conducción
 function _accionCond(esFallida) {
   const ruta = state.rutaActual; if (!ruta) return;
-  const pend = ruta.paradas.filter(p => !p.hecha && !p.fallida); if (!pend.length) return;
+  const pend = ruta.paradas.filter(p=>!p.hecha&&!p.fallida); if (!pend.length) return;
   const p = pend[0];
-  p.hecha = true; p.fallida = esFallida; p.horaAccion = fmtHora(new Date());
+  p.hecha=true; p.fallida=esFallida; p.horaAccion=fmtHora(new Date());
   saveState();
-  if (navigator.vibrate) navigator.vibrate(esFallida ? [100,50,100] : 100);
-  const sig = ruta.paradas.filter(q => !q.hecha && !q.fallida);
+  if (navigator.vibrate) navigator.vibrate(esFallida?[100,50,100]:100);
+  const sig = ruta.paradas.filter(q=>!q.hecha&&!q.fallida);
   if (sig.length > 0) {
-    // Abrir Maps a la siguiente parada (síncrono — dentro del evento del usuario)
     window.open(_urlMaps(sig[0].lat, sig[0].lng), '_blank');
     renderPantallaConduccion();
-    setTimeout(() => enviarNotificacionParada(), 1500);
+    setTimeout(()=>enviarNotificacionParada(), 1500);
   } else {
-    // Última parada completada → abrir Maps al punto base
-    const fin = ruta.final;
-    if (fin) window.open(_urlMaps(fin.lat, fin.lng), '_blank');
+    if (ruta.final) window.open(_urlMaps(ruta.final.lat, ruta.final.lng), '_blank');
     renderPantallaConduccion();
-    // Notificación especial de fin de ruta
-    setTimeout(() => _notifFinRuta(), 1500);
+    setTimeout(()=>_notifFinRuta&&_notifFinRuta(), 1500);
   }
 }
-function condEntregada() { _accionCond(false); }
-function condFallida()   { _accionCond(true);  }
+function condEntregada(){_accionCond(false);}
+function condFallida(){_accionCond(true);}
 
-async function _notifFinRuta() {
-  const ok = await pedirPermisoNotificaciones(); if (!ok) return;
-  if (!_swListo) await registrarSW();
-  try {
-    if (_swListo && _swReg) {
-      const reg = await navigator.serviceWorker.ready;
-      await reg.showNotification('🏁 ¡Ruta completada! Regresa a la base', {
-        body: 'Toca para ver el resumen y finalizar',
-        icon: 'https://cdn.jsdelivr.net/npm/twemoji@14/assets/72x72/1f3c1.png',
-        tag: 'seisa-fin', requireInteraction: true, vibrate: [400,200,400,200,400],
-        data: { accion: 'fin', url: location.href },
-        actions: [{ action: 'fin', title: '🏁 Finalizar ruta' }],
+async function _notifFinRuta(){
+  const ok=await pedirPermisoNotificaciones();if(!ok)return;
+  if(!_swListo)await registrarSW();
+  try{
+    if(_swListo&&_swReg){
+      const reg=await navigator.serviceWorker.ready;
+      await reg.showNotification('🏁 ¡Ruta completada! Regresa a la base',{
+        body:'Toca para ver el resumen y finalizar',
+        icon:'https://cdn.jsdelivr.net/npm/twemoji@14/assets/72x72/1f3c1.png',
+        tag:'seisa-fin',requireInteraction:true,vibrate:[400,200,400,200,400],
+        data:{accion:'fin',url:location.href},
+        actions:[{action:'fin',title:'🏁 Finalizar ruta'}],
       });
-    } else {
-      const n = new Notification('🏁 ¡Ruta completada!', { body: 'Toca para finalizar', tag: 'seisa-fin', requireInteraction: true });
-      n.onclick = () => { window.focus(); n.close(); mostrarPantallaFin(); };
+    }else{
+      const n=new Notification('🏁 ¡Ruta completada!',{body:'Toca para finalizar',tag:'seisa-fin',requireInteraction:true});
+      n.onclick=()=>{window.focus();n.close();mostrarPantallaFin&&mostrarPantallaFin();};
     }
-  } catch(e) { console.warn('_notifFinRuta:', e); }
+  }catch(e){}
 }
 
 
-// ══════════════════════════════════════════════════════════════════
-//  PANTALLA DE FINALIZACIÓN DE RUTA
-// ══════════════════════════════════════════════════════════════════
-function mostrarPantallaFin() {
-  const ruta = state.rutaActual; if (!ruta) return;
-  let modal = document.getElementById('pantalla-fin-ruta');
-  if (!modal) {
-    modal = document.createElement('div');
-    modal.id = 'pantalla-fin-ruta';
-    modal.style.cssText = 'position:fixed;inset:0;z-index:9900;background:#0a1628;display:flex;flex-direction:column;font-family:system-ui,sans-serif;';
-    document.body.appendChild(modal);
-  }
-  const paradas    = ruta.paradas || [];
-  const entregadas = paradas.filter(p => p.hecha && !p.fallida).length;
-  const fallidas   = paradas.filter(p => p.fallida).length;
-  const pct        = paradas.length ? Math.round(entregadas/paradas.length*100) : 0;
-  const listaHTML  = paradas.map((p,i) => {
-    const icono = p.fallida ? '❌' : p.hecha ? '✅' : '⏳';
-    const color = p.fallida ? '#ff5252' : p.hecha ? '#00e676' : '#aaa';
-    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.06);">
-      <span style="font-size:18px;">${icono}</span>
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:13px;font-weight:700;color:${color};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${idxToLetra(i)}. ${p.nombre}</div>
-        ${p.horaAccion ? `<div style="font-size:11px;color:#4a6a8a;">${p.horaAccion}</div>` : ''}
-      </div>
-    </div>`;
+function mostrarPantallaFin(){
+  const ruta=state.rutaActual;if(!ruta)return;
+  let modal=document.getElementById('pantalla-fin-ruta');
+  if(!modal){modal=document.createElement('div');modal.id='pantalla-fin-ruta';
+    modal.style.cssText='position:fixed;inset:0;z-index:9900;background:#0a1628;display:flex;flex-direction:column;';
+    document.body.appendChild(modal);}
+  const par=ruta.paradas||[];
+  const ent=par.filter(p=>p.hecha&&!p.fallida).length;
+  const fal=par.filter(p=>p.fallida).length;
+  const pct=par.length?Math.round(ent/par.length*100):0;
+  const lista=par.map((p,i)=>{
+    const ic=p.fallida?'❌':p.hecha?'✅':'⏳';
+    const co=p.fallida?'#ff5252':p.hecha?'#00e676':'#aaa';
+    return`<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.06);">
+      <span style="font-size:18px;">${ic}</span>
+      <div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;color:${co};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${idxToLetra(i)}. ${p.nombre}</div>
+      ${p.horaAccion?`<div style="font-size:11px;color:#4a6a8a;">${p.horaAccion}</div>`:''}</div></div>`;
   }).join('');
-  modal.innerHTML = `
+  modal.innerHTML=`
     <div style="padding:max(14px,env(safe-area-inset-top)) 16px 10px;background:#0d1b2a;border-bottom:1px solid #1e3560;flex-shrink:0;display:flex;align-items:center;gap:12px;">
       <div style="font-size:26px;">🏁</div>
       <div style="flex:1;"><div style="font-size:17px;font-weight:800;color:#fff;">Ruta completada</div>
-      <div style="font-size:11px;color:#4a6a8a;">${ruta.nombre||'Sin nombre'}</div></div>
-    </div>
+      <div style="font-size:11px;color:#4a6a8a;">${ruta.nombre||'Sin nombre'}</div></div></div>
     <div style="display:flex;flex-shrink:0;border-bottom:1px solid #1e3560;">
-      <div style="flex:1;padding:12px;text-align:center;border-right:1px solid #1e3560;"><div style="font-size:22px;font-weight:900;color:#00e676;">${entregadas}</div><div style="font-size:10px;color:#4a6a8a;">Entregadas</div></div>
-      <div style="flex:1;padding:12px;text-align:center;border-right:1px solid #1e3560;"><div style="font-size:22px;font-weight:900;color:#ff5252;">${fallidas}</div><div style="font-size:10px;color:#4a6a8a;">Fallidas</div></div>
-      <div style="flex:1;padding:12px;text-align:center;"><div style="font-size:22px;font-weight:900;color:#00d4ff;">${pct}%</div><div style="font-size:10px;color:#4a6a8a;">Efectividad</div></div>
-    </div>
-    <div id="fin-mapa-div" style="height:180px;flex-shrink:0;border-bottom:1px solid #1e3560;"></div>
-    <div style="flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;">${listaHTML}</div>
+      <div style="flex:1;padding:12px;text-align:center;border-right:1px solid #1e3560;"><div style="font-size:22px;font-weight:900;color:#00e676;">${ent}</div><div style="font-size:10px;color:#4a6a8a;">Entregadas</div></div>
+      <div style="flex:1;padding:12px;text-align:center;border-right:1px solid #1e3560;"><div style="font-size:22px;font-weight:900;color:#ff5252;">${fal}</div><div style="font-size:10px;color:#4a6a8a;">Fallidas</div></div>
+      <div style="flex:1;padding:12px;text-align:center;"><div style="font-size:22px;font-weight:900;color:#00d4ff;">${pct}%</div><div style="font-size:10px;color:#4a6a8a;">Efectividad</div></div></div>
+    <div id="fin-mapa-div" style="height:170px;flex-shrink:0;border-bottom:1px solid #1e3560;"></div>
+    <div style="flex:1;overflow-y:auto;">${lista}</div>
     <div style="padding:12px 16px calc(env(safe-area-inset-bottom,0px)+10px);flex-shrink:0;background:#0d1b2a;border-top:1px solid #1e3560;">
-      <button onclick="finalizarRutaDefinitivo()"
-        style="width:100%;padding:16px;border-radius:16px;border:none;
-               background:linear-gradient(135deg,#00d4ff,#00e676);
-               color:#000;font-size:16px;font-weight:900;cursor:pointer;">
-        🏁 Marcar fin de ruta y guardar
-      </button>
-    </div>`;
-  modal.style.display = 'flex';
-  // Mapa de paradas finales
-  setTimeout(() => {
-    const mapEl = document.getElementById('fin-mapa-div');
-    if (!mapEl || typeof L === 'undefined') return;
-    const centro = ruta.inicio ? [ruta.inicio.lat, ruta.inicio.lng] : [19.4326,-99.1332];
-    const m = L.map(mapEl, { zoomControl:false, attributionControl:false, tap:false }).setView(centro, 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19 }).addTo(m);
-    const pts = [];
-    if (ruta.inicio) pts.push([ruta.inicio.lat, ruta.inicio.lng]);
-    paradas.forEach((p,i) => {
-      pts.push([p.lat,p.lng]);
-      L.circleMarker([p.lat,p.lng], { radius:9, fillColor:p.fallida?'#ff5252':'#00e676', color:'#fff', weight:2, fillOpacity:1 })
-       .addTo(m).bindPopup(idxToLetra(i)+'. '+p.nombre);
-    });
-    if (ruta.final) pts.push([ruta.final.lat, ruta.final.lng]);
-    if (pts.length > 1) {
-      L.polyline(pts,{color:'#00d4ff',weight:2,dashArray:'5,6',opacity:.8}).addTo(m);
-      m.fitBounds(pts,{padding:[16,16]});
-    }
-    setTimeout(() => m.invalidateSize(), 100);
-  }, 200);
+      <button onclick="finalizarRutaDefinitivo()" style="width:100%;padding:16px;border-radius:16px;border:none;background:linear-gradient(135deg,#00d4ff,#00e676);color:#000;font-size:16px;font-weight:900;cursor:pointer;">
+        🏁 Marcar fin de ruta y guardar</button></div>`;
+  modal.style.display='flex';
+  setTimeout(()=>{
+    const mapEl=document.getElementById('fin-mapa-div');
+    if(!mapEl||typeof L==='undefined')return;
+    const centro=ruta.inicio?[ruta.inicio.lat,ruta.inicio.lng]:[19.4326,-99.1332];
+    const m=L.map(mapEl,{zoomControl:false,attributionControl:false,tap:false}).setView(centro,12);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(m);
+    const pts=[];
+    if(ruta.inicio)pts.push([ruta.inicio.lat,ruta.inicio.lng]);
+    par.forEach((p,i)=>{pts.push([p.lat,p.lng]);L.circleMarker([p.lat,p.lng],{radius:9,fillColor:p.fallida?'#ff5252':'#00e676',color:'#fff',weight:2,fillOpacity:1}).addTo(m).bindPopup(idxToLetra(i)+'. '+p.nombre);});
+    if(ruta.final)pts.push([ruta.final.lat,ruta.final.lng]);
+    if(pts.length>1){L.polyline(pts,{color:'#00d4ff',weight:2,dashArray:'5,6'}).addTo(m);m.fitBounds(pts,{padding:[16,16]});}
+    setTimeout(()=>m.invalidateSize(),100);
+  },200);
 }
-
-function finalizarRutaDefinitivo() {
-  const ruta = state.rutaActual;
-  if (ruta) {
-    ruta.horaFin    = fmtHora(new Date());
-    ruta.finalizada = true;
-    if (!state.historial) state.historial = [];
-    state.historial.unshift({ ...ruta });
-  }
-  const modal = document.getElementById('pantalla-fin-ruta');
-  if (modal) modal.style.display = 'none';
-  state.rutaActual = null;
-  saveState();
-  showScreen('screen-home');
-  renderHome();
+function finalizarRutaDefinitivo(){
+  const ruta=state.rutaActual;
+  if(ruta){ruta.horaFin=fmtHora(new Date());ruta.finalizada=true;
+    if(!state.historial)state.historial=[];state.historial.unshift({...ruta});}
+  const modal=document.getElementById('pantalla-fin-ruta');if(modal)modal.style.display='none';
+  // Limpiar rutaBuild para la siguiente ruta
+  rutaBuild={nombre:'',fecha:'',peajes:false,inicio:null,final:null,paradas:[]};
+  state.rutaActual=null;saveState();
+  showScreen('screen-home');renderHome();
   showToast('✅ Ruta finalizada y guardada');
 }
-
 
 let _filtroSeg = '';
 
