@@ -67,8 +67,9 @@
 </script>
 
 <title>SEISA Rutas</title>
-<link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<!-- MapLibre GL JS — mapa fluido WebGL, sin API key, gratis -->
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@4.3.2/dist/maplibre-gl.css"/>
+<script src="https://unpkg.com/maplibre-gl@4.3.2/dist/maplibre-gl.js"></script>
 <script>
 window.GOOGLE_API_KEY = "AIzaSyAGsOfVDl73CXEVPSb1UUXbreVJC-GmBcY";
 window.gm_authFailure = function() {
@@ -365,19 +366,17 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
 
 <!-- SCREEN 4: RESUMEN -->
 <div class="screen hidden" id="screen-resumen">
-  <div class="topbar" style="flex-shrink:0;">
-    <button class="topbar-back" onclick="resumenVolver()">←</button>
+  <div class="topbar">
+    <button class="topbar-back" onclick="showScreen('screen-paradas')">←</button>
     <h2>📊 Resumen</h2>
     <span id="res-paradas-count" style="font-size:12px;color:var(--accent);font-weight:700;"></span>
   </div>
-  <!-- Mapa Google Maps (mismo que el nativo del celular) -->
-  <div id="res-map" style="height:220px;min-height:220px;flex-shrink:0;position:relative;border-bottom:1px solid var(--border);">
+  <div id="res-map" style="height:240px;min-height:240px;flex-shrink:0;position:relative;background:var(--surface2);border-bottom:1px solid var(--border);">
     <div id="res-map-loading" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;z-index:10;background:var(--surface);">
       <div style="font-size:28px;">🗺️</div>
-      <div style="font-size:13px;color:var(--text3);">Cargando mapa...</div>
+      <div style="font-size:13px;color:var(--text3);">Trazando ruta...</div>
     </div>
   </div>
-  <!-- Zona scrolleable: stats + lista + botones -->
   <div class="scroll" style="padding:12px 16px;display:flex;flex-direction:column;gap:10px;">
     <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:6px;">
       <div class="card" style="padding:10px 4px;text-align:center;">
@@ -404,11 +403,10 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
       </div>
       <div id="res-orden-list"></div>
     </div>
-    <button class="btn btn-green" onclick="iniciarRutaGoogleMaps()" style="font-size:17px;padding:18px;gap:10px;flex-shrink:0;">
+    <button class="btn btn-green" onclick="iniciarRutaGoogleMaps()" style="font-size:17px;padding:18px;gap:10px;">
       <span style="font-size:20px;">🚀</span> Iniciar en Google Maps
     </button>
-    <button class="btn btn-ghost" onclick="resumenVolver()" style="flex-shrink:0;">← Volver</button>
-    <div style="height:8px;"></div>
+    <button class="btn btn-ghost" onclick="showScreen('screen-paradas')">← Editar paradas</button>
   </div>
 </div>
 
@@ -1203,10 +1201,9 @@ function saveStateLocal() {
   } catch(e) {}
 }
 
-let _ghDebounce = null;
 function saveState() {
   saveStateLocal();
-  if (ghConfig) { clearTimeout(_ghDebounce); _ghDebounce = setTimeout(() => ghPush(), 4000); }
+  if (ghConfig) ghPush();
 }
 
 let rutaBuild = {
@@ -1485,7 +1482,6 @@ function isPlusCode(q) {
 }
 
 function parsearLineaPlusCode(linea) {
-  linea = linea.replace(/\([^)]*\)/g, '').trim();
   const clean = linea.trim();
   const pcMatch = clean.match(/^([23456789CFGHJMPQRVWX]{2,8}\+[23456789CFGHJMPQRVWX0-9]*)/i);
   if (!pcMatch) return null;
@@ -1679,54 +1675,127 @@ async function reverseGeocode(lat, lng, fallbackNombre) {
 // ══════════════════════════════════════════════════════════════════
 function initMapaParadas() {
   if (mapParadas) {
-    mapParadas.invalidateSize();
-    if (rutaBuild.inicio) mapParadas.setView([rutaBuild.inicio.lat, rutaBuild.inicio.lng], 12);
+    if (rutaBuild.inicio) mapParadas.flyTo({ center: [rutaBuild.inicio.lng, rutaBuild.inicio.lat], zoom: 12 });
     return;
   }
   const centro = rutaBuild.inicio
-    ? [rutaBuild.inicio.lat, rutaBuild.inicio.lng]
-    : [19.4326, -99.1332];
-  mapParadas = L.map('paradas-map', { zoomControl: false }).setView(centro, 12);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    attribution: '© OpenStreetMap © CARTO', maxZoom: 19, subdomains: 'abcd'
-  }).addTo(mapParadas);
+    ? [rutaBuild.inicio.lng, rutaBuild.inicio.lat]
+    : [-99.1332, 19.4326];
+
+  mapParadas = new maplibregl.Map({
+    container:   'paradas-map',
+    style:       'https://tiles.openfreemap.org/styles/bright',
+    center:      centro,
+    zoom:        12,
+    attributionControl: false,
+  });
+
+  mapParadas.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'bottom-right');
+
+  mapParadas.on('load', () => {
+    _actualizarMarcadoresParadas();
+  });
+
+  // Click en el mapa → agregar parada
+  mapParadas.on('click', async (e) => {
+    const { lng, lat } = e.lngLat;
+    showToast('📍 Buscando dirección...');
+    let nombre = `${lat.toFixed(5)},${lng.toFixed(5)}`;
+    try {
+      const r = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=es`, { headers: { 'User-Agent': 'SEISA-App/1.0' } });
+      const d = await r.json();
+      if (d.address) {
+        const road = d.address.road || d.address.pedestrian || d.address.path || '';
+        const num  = d.address.house_number || '';
+        nombre = [road, num].filter(Boolean).join(' ') || d.display_name.split(',')[0];
+      }
+    } catch(e) {}
+    mostrarModalClickMapa(lat, lng, nombre);
+  });
+}
+
+// Marcadores MapLibre para paradas
+let _mlMarcadoresParadas = [];
+
+function _actualizarMarcadoresParadas() {
+  if (!mapParadas) return;
+  _mlMarcadoresParadas.forEach(m => m.remove());
+  _mlMarcadoresParadas = [];
+
   if (rutaBuild.inicio) {
-    L.marker([rutaBuild.inicio.lat, rutaBuild.inicio.lng], { icon: crearIcono('🏠', '#00e676') })
-      .addTo(mapParadas).bindPopup('Inicio: ' + rutaBuild.inicio.nombre);
+    const el = _crearElIcono('🏠', '#00e676');
+    _mlMarcadoresParadas.push(
+      new maplibregl.Marker({ element: el })
+        .setLngLat([rutaBuild.inicio.lng, rutaBuild.inicio.lat])
+        .setPopup(new maplibregl.Popup().setText('Inicio: ' + rutaBuild.inicio.nombre))
+        .addTo(mapParadas)
+    );
   }
   if (rutaBuild.final) {
-    L.marker([rutaBuild.final.lat, rutaBuild.final.lng], { icon: crearIcono('🏁', '#ff9100') })
-      .addTo(mapParadas).bindPopup('Final: ' + rutaBuild.final.nombre);
+    const el = _crearElIcono('🏁', '#ff9100');
+    _mlMarcadoresParadas.push(
+      new maplibregl.Marker({ element: el })
+        .setLngLat([rutaBuild.final.lng, rutaBuild.final.lat])
+        .setPopup(new maplibregl.Popup().setText('Base: ' + rutaBuild.final.nombre))
+        .addTo(mapParadas)
+    );
   }
-  mapParadas.on('click', async function(e) {
-    const { lat, lng } = e.latlng;
-    showToast('📍 Buscando dirección...');
-    try {
-      const url = `https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&language=es`;
-      const r = await fetch(url);
-      const d = await r.json();
-      const nombre = (d.address?.road || '') + ' ' + (d.address?.house_number || '') +
-                     (d.address?.suburb ? ', ' + d.address.suburb : '');
-      agregarParada(lat, lng, nombre.trim() || `${lat.toFixed(5)},${lng.toFixed(5)}`);
-    } catch(e) {
-      agregarParada(lat, lng, `${lat.toFixed(5)},${lng.toFixed(5)}`);
-    }
+  rutaBuild.paradas.forEach((p, i) => {
+    const letra = idxToLetra(i);
+    const el    = _crearElTexto(letra, '#00d4ff');
+    _mlMarcadoresParadas.push(
+      new maplibregl.Marker({ element: el })
+        .setLngLat([p.lng, p.lat])
+        .setPopup(new maplibregl.Popup().setText(letra + '. ' + p.nombre))
+        .addTo(mapParadas)
+    );
   });
 }
 
-function crearIcono(emoji, color) {
-  return L.divIcon({
-    html: `<div style="width:32px;height:32px;border-radius:50%;background:${color};border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 8px rgba(0,0,0,.4);">${emoji}</div>`,
-    className: '', iconSize: [32,32], iconAnchor: [16,16]
-  });
+function _crearElIcono(emoji, color) {
+  const el = document.createElement('div');
+  el.style.cssText = `width:32px;height:32px;border-radius:50%;background:${color};border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font-size:16px;box-shadow:0 2px 8px rgba(0,0,0,.3);cursor:pointer;`;
+  el.textContent = emoji;
+  return el;
 }
 
-function crearIconoNum(n, color) {
-  return L.divIcon({
-    html: `<div style="width:28px;height:28px;border-radius:50%;background:${color};border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;color:#000;box-shadow:0 2px 8px rgba(0,0,0,.4);">${n}</div>`,
-    className: '', iconSize: [28,28], iconAnchor: [14,14]
-  });
+function _crearElTexto(texto, color) {
+  const fs = texto.length > 2 ? '9px' : '11px';
+  const el = document.createElement('div');
+  el.style.cssText = `width:26px;height:26px;border-radius:50%;background:${color};border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:${fs};font-weight:900;color:#000;box-shadow:0 2px 6px rgba(0,0,0,.3);cursor:pointer;`;
+  el.textContent = texto;
+  return el;
 }
+
+function mostrarModalClickMapa(lat, lng, nombreSugerido) {
+  let modal = document.getElementById('modal-click-mapa');
+  if (!modal) {
+    modal = document.createElement('div');
+    modal.id = 'modal-click-mapa';
+    modal.className = 'modal-overlay';
+    document.body.appendChild(modal);
+  }
+  modal.innerHTML = `
+    <div class="modal-sheet" style="gap:12px;">
+      <div class="modal-title">📍 Agregar parada aquí</div>
+      <div style="font-size:12px;color:var(--text3);text-align:center;">${lat.toFixed(5)}, ${lng.toFixed(5)}</div>
+      <input id="click-mapa-nombre" type="text" class="input" placeholder="Nombre de la parada (calle y número)" value="${nombreSugerido}" style="font-size:14px;"/>
+      <div style="display:flex;gap:8px;">
+        <button class="btn btn-ghost" onclick="document.getElementById('modal-click-mapa').classList.add('hidden')" style="flex:1;">Cancelar</button>
+        <button class="btn btn-accent" style="flex:2;" onclick="confirmarClickMapa(${lat},${lng})">✓ Agregar parada</button>
+      </div>
+    </div>`;
+  modal.classList.remove('hidden');
+  setTimeout(() => { const inp = document.getElementById('click-mapa-nombre'); if (inp) { inp.select(); inp.focus(); } }, 200);
+}
+
+function confirmarClickMapa(lat, lng) {
+  const nombre = (document.getElementById('click-mapa-nombre')?.value || '').trim();
+  if (!nombre) { showToast('Escribe el nombre de la parada'); return; }
+  agregarParada(lat, lng, nombre);
+  document.getElementById('modal-click-mapa').classList.add('hidden');
+}
+
 
 function agregarParada(lat, lng, nombre) {
   const id = 'p_' + Date.now() + '_' + Math.random().toString(36).slice(2,6);
@@ -1810,18 +1879,14 @@ function confirmarAgregarPlusCode() {
 async function agregarPorPlusCode() { resolverPlusCodeUI(); }
 
 function actualizarMapaParadas() {
-  if (!mapParadas) return;
-  paradaMarkers.forEach(m => m.remove());
+  if (!mapParadas) { return; }
+  _actualizarMarcadoresParadas();
+  // compatibilidad — no usar paradaMarkers con MapLibre
   paradaMarkers = [];
-  rutaBuild.paradas.forEach((p, i) => {
-    const m = L.marker([p.lat, p.lng], { icon: crearIconoNum(idxToLetra(i), '#00d4ff') })
-      .addTo(mapParadas)
-      .bindPopup(`<b>${i+1}. ${p.nombre}</b>`);
-    paradaMarkers.push(m);
-  });
+  _actualizarMarcadoresParadas();
   if (rutaBuild.paradas.length) {
     const last = rutaBuild.paradas[rutaBuild.paradas.length - 1];
-    mapParadas.panTo([last.lat, last.lng]);
+    mapParadas.flyTo({ center: [last.lng, last.lat] });
   }
 }
 
@@ -2193,13 +2258,27 @@ function iniciarRutaGoogleMaps() {
   if (!inicio || !fin) { showToast('Faltan puntos de inicio o final'); return; }
   if (!paradas.length) { showToast('No hay paradas pendientes'); return; }
 
-  const primera = paradas[0];
-  saveStateLocal();
-  window.open(_urlMaps(primera.lat, primera.lng), '_blank');
-  showScreen('screen-conduccion');
-  renderPantallaConduccion();
-  registrarSW().catch(() => {});
-  setTimeout(() => enviarNotificacionParada(), 2000);
+  const enc = (p) => encodeURIComponent(p.lat + ',' + p.lng);
+  const MAX_WP = 23; // límite de Google Maps por URL
+
+  // Construir todos los segmentos necesarios
+  const segmentos = construirSegmentos(paradas, inicio, fin, MAX_WP);
+
+  if (segmentos.length === 1) {
+    saveStateLocal();
+    window.open(segmentos[0].url, '_blank');
+    showToast('🗺️ Abriendo ruta completa en Google Maps...');
+  } else {
+    // Guardar segmentos en state y mostrar selector
+    state.rutaActual._segmentos = segmentos;
+    state.rutaActual._segActual = 0;
+    saveState();
+    mostrarSelectorSegmentos(segmentos, 0);
+    return; // el selector maneja la navegación
+  }
+
+  showScreen('screen-seguimiento');
+  renderSeguimiento();
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -2315,104 +2394,71 @@ function initMapaSeg() {
     ? [ruta.inicio.lat, ruta.inicio.lng]
     : [19.4326, -99.1332];
 
-  mapSeg = L.map('seg-mapa', { zoomControl: false, attributionControl: false })
-             .setView(centro, 12);
-
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    maxZoom: 19, subdomains: 'abcd'
-  }).addTo(mapSeg);
-
-  // Control de zoom compacto arriba-derecha
-  L.control.zoom({ position: 'topright' }).addTo(mapSeg);
+  mapSeg = new maplibregl.Map({
+    container:   'seg-mapa',
+    style:       'https://tiles.openfreemap.org/styles/bright',
+    center:      [centro[1], centro[0]],
+    zoom:        12,
+    attributionControl: false,
+  });
+  mapSeg.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 }
 
 function renderMapaSeg() {
   const ruta = state.rutaActual;
   if (!mapSeg || !ruta) return;
 
-  // Limpiar marcadores y línea anteriores
-  mapSegMarkers.forEach(m => m.remove());
+  // Limpiar marcadores anteriores
+  mapSegMarkers.forEach(m => { try { m.remove(); } catch(e){} });
   mapSegMarkers = [];
-  if (mapSegLine) { mapSegLine.remove(); mapSegLine = null; }
+  if (mapSegLine) { try { mapSeg.removeLayer('seg-route'); mapSeg.removeSource('seg-route'); } catch(e){} mapSegLine = null; }
 
-  const paradas  = ruta.paradas || [];
-  const inicio   = ruta.inicio;
-  const fin      = ruta.final;
-  const allPoints = [];
+  const paradas   = ruta.paradas || [];
+  const inicio    = ruta.inicio;
+  const fin       = ruta.final;
+  const allCoords = [];
 
-  // Marcador de inicio (base)
+  const addMarker = (lng, lat, el, popup) => {
+    const mk = new maplibregl.Marker({ element: el })
+      .setLngLat([lng, lat])
+      .setPopup(new maplibregl.Popup({ offset: 16 }).setText(popup))
+      .addTo(mapSeg);
+    mapSegMarkers.push(mk);
+  };
+
   if (inicio) {
-    allPoints.push([inicio.lat, inicio.lng]);
-    const m = L.marker([inicio.lat, inicio.lng], {
-      icon: L.divIcon({
-        html: `<div style="width:30px;height:30px;border-radius:50%;background:#00e676;border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.5);">🏠</div>`,
-        className: '', iconSize: [30,30], iconAnchor: [15,15]
-      })
-    }).addTo(mapSeg).bindPopup('Inicio: ' + inicio.nombre);
-    mapSegMarkers.push(m);
+    allCoords.push([inicio.lng, inicio.lat]);
+    addMarker(inicio.lng, inicio.lat, _crearElIcono('🏠', '#34a853'), 'Inicio: ' + inicio.nombre);
   }
 
-  // Marcadores de paradas
   paradas.forEach((p, i) => {
     const letra     = idxToLetra(i);
     const entregada = p.hecha && !p.fallida;
     const fallida   = p.fallida;
-
-    const color = entregada ? '#00e676' : fallida ? '#ff5252' : '#00d4ff';
-    const opacidad = (entregada || fallida) ? '0.45' : '1';
-    const texto = entregada ? '✓' : fallida ? '✗' : letra;
-    const fontSize = letra.length > 1 ? '9px' : '11px';
-
-    allPoints.push([p.lat, p.lng]);
-
-    const m = L.marker([p.lat, p.lng], {
-      icon: L.divIcon({
-        html: `<div style="width:26px;height:26px;border-radius:50%;background:${color};border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:${fontSize};font-weight:800;color:#000;box-shadow:0 2px 6px rgba(0,0,0,.5);opacity:${opacidad};">${texto}</div>`,
-        className: '', iconSize: [26,26], iconAnchor: [13,13]
-      })
-    }).addTo(mapSeg).bindPopup(`<b>${letra}. ${p.nombre}</b>`);
-    mapSegMarkers.push(m);
+    const color     = entregada ? '#34a853' : fallida ? '#ea4335' : '#00d4ff';
+    const texto     = entregada ? '✓' : fallida ? '✗' : letra;
+    const opacity   = (entregada || fallida) ? '0.5' : '1';
+    allCoords.push([p.lng, p.lat]);
+    const el = _crearElTexto(texto, color);
+    el.style.opacity = opacity;
+    addMarker(p.lng, p.lat, el, letra + '. ' + p.nombre);
   });
 
-  // Marcador de base de regreso
   if (fin) {
-    allPoints.push([fin.lat, fin.lng]);
-    const m = L.marker([fin.lat, fin.lng], {
-      icon: L.divIcon({
-        html: `<div style="width:30px;height:30px;border-radius:50%;background:#ff9100;border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.5);">🏁</div>`,
-        className: '', iconSize: [30,30], iconAnchor: [15,15]
-      })
-    }).addTo(mapSeg).bindPopup('Base: ' + fin.nombre);
-    mapSegMarkers.push(m);
+    allCoords.push([fin.lng, fin.lat]);
+    addMarker(fin.lng, fin.lat, _crearElIcono('🏁', '#ff6d00'), 'Base: ' + fin.nombre);
   }
 
-  // Línea punteada de la ruta completa
-  if (allPoints.length > 1) {
-    mapSegLine = L.polyline(allPoints, {
-      color:     '#00d4ff',
-      weight:    2.5,
-      opacity:   0.7,
-      dashArray: '6, 8',   // línea punteada
-    }).addTo(mapSeg);
+  // Línea punteada de ruta
+  if (allCoords.length > 1) {
+    try { mapSeg.removeLayer('seg-route'); mapSeg.removeSource('seg-route'); } catch(e) {}
+    mapSeg.addSource('seg-route', { type: 'geojson', data: { type: 'Feature', geometry: { type: 'LineString', coordinates: allCoords } } });
+    mapSeg.addLayer({ id: 'seg-route', type: 'line', source: 'seg-route',
+      paint: { 'line-color': '#00d4ff', 'line-width': 2.5, 'line-dasharray': [2, 2], 'line-opacity': 0.8 } });
+    mapSegLine = 'seg-route';
 
-    // Línea de paradas ya completadas en verde
-    const completadas = [];
-    if (inicio) completadas.push([inicio.lat, inicio.lng]);
-    paradas.forEach(p => {
-      if (p.hecha || p.fallida) completadas.push([p.lat, p.lng]);
-    });
-    if (completadas.length > 1) {
-      L.polyline(completadas, {
-        color:   '#00e676',
-        weight:  2.5,
-        opacity: 0.6,
-        dashArray: '4, 6',
-      }).addTo(mapSeg);
-      mapSegMarkers.push(); // no necesita guardarse para limpieza, se hace con clearLayers si queremos
-    }
-
-    // Ajustar zoom para ver todas las paradas
-    mapSeg.fitBounds(mapSegLine.getBounds(), { padding: [20, 20], maxZoom: 14 });
+    const bounds = allCoords.reduce((b, c) => b.extend(c), new maplibregl.LngLatBounds(allCoords[0], allCoords[0]));
+    mapSeg.fitBounds(bounds, { padding: 30, maxZoom: 14 });
   }
 }
 
@@ -2594,7 +2640,7 @@ function marcarEntregadaSeg(idx) {
     ruta._navAuto = false;
     saveState();
     actualizarBtnNavAuto();
-  } else {
+  } else if (ruta._navAuto) {
     setTimeout(() => enviarNotificacionParada(), 1500);
   }
 }
@@ -2620,7 +2666,7 @@ function marcarFallidaSeg(idx) {
   renderSeguimiento();
   showToast('⚠️ Fallida · ' + p.horaAccion);
 
-  if (pendientes.length > 0) {
+  if (ruta._navAuto && pendientes.length > 0) {
     setTimeout(() => enviarNotificacionParada(), 1500);
   }
 }
@@ -3338,10 +3384,7 @@ async function procesarMasivo() {
   btn.disabled = true;
   let ok = 0, err = 0;
   for (let i = 0; i < lineas.length; i++) {
-    let linea = lineas[i];
-    let nombreParen = null;
-    const mParen = linea.match(/\(([^)]+)\)\s*$/);
-    if (mParen) { nombreParen = mParen[1].trim(); linea = linea.slice(0, mParen.index).trim(); }
+    const linea = lineas[i];
     statusEl.textContent = `Procesando ${i+1}/${lineas.length}...`;
     try {
       let lat, lng, nombre;
@@ -3358,7 +3401,7 @@ async function procesarMasivo() {
         lat    = r.lat;
         lng    = r.lng;
         // Prioridad: lo que escribió el usuario > nombre del geocoder
-        nombre = nombreParen || nombrePersonalizado || r.nombre;
+        nombre = nombrePersonalizado || r.nombre;
       } else {
         const resultado = await new Promise((resolve) => {
           geocode(linea, {
@@ -3477,128 +3520,8 @@ function renderResumen() {
     lista.appendChild(d);
   }
 
-  // Inicializar mapa Google Maps después de un tick
-  // para que el div sea visible cuando se llame
-  setTimeout(() => initMapaResumen(), 150);
-}
-
-function resumenVolver() {
-  if (state.rutaActual && state.rutaActual.finalizada) {
-    showScreen('screen-home'); renderHome();
-  } else {
-    showScreen('screen-paradas');
-  }
-}
-
-function initMapaResumen() {
-  const mapEl = document.getElementById('res-map');
-  const loadEl = document.getElementById('res-map-loading');
-  if (!mapEl) return;
-
-  // ── Google Maps API (igual al mapa nativo del celular) ────────
-  if (googleMapsReady && typeof google !== 'undefined' && google.maps) {
-    if (loadEl) loadEl.style.display = 'none';
-
-    // Destruir mapa anterior
-    if (window._resGmap) { window._resGmap = null; }
-    mapEl.innerHTML = '';
-
-    const centro = rutaBuild.inicio
-      ? { lat: rutaBuild.inicio.lat, lng: rutaBuild.inicio.lng }
-      : { lat: 19.4326, lng: -99.1332 };
-
-    window._resGmap = new google.maps.Map(mapEl, {
-      center:            centro,
-      zoom:              12,
-      mapTypeId:         'roadmap',
-      disableDefaultUI:  false,
-      zoomControl:       true,
-      streetViewControl: false,
-      mapTypeControl:    false,
-      fullscreenControl: false,
-      gestureHandling:   'greedy',
-    });
-
-    const bounds = new google.maps.LatLngBounds();
-    const infoWindow = new google.maps.InfoWindow();
-
-    // Marcador inicio
-    if (rutaBuild.inicio) {
-      const pos = { lat: rutaBuild.inicio.lat, lng: rutaBuild.inicio.lng };
-      bounds.extend(pos);
-      const mk = new google.maps.Marker({
-        position: pos, map: window._resGmap, title: 'Inicio',
-        icon: { path: google.maps.SymbolPath.CIRCLE, scale: 10,
-          fillColor: '#00e676', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 },
-        label: { text: '🏠', fontSize: '14px' }
-      });
-      mk.addListener('click', () => { infoWindow.setContent('🏠 Inicio: ' + rutaBuild.inicio.nombre); infoWindow.open(window._resGmap, mk); });
-    }
-
-    // Marcadores de paradas con letra
-    const pathPoints = rutaBuild.inicio ? [{ lat: rutaBuild.inicio.lat, lng: rutaBuild.inicio.lng }] : [];
-    rutaBuild.paradas.forEach((p, i) => {
-      const pos   = { lat: p.lat, lng: p.lng };
-      const letra = idxToLetra(i);
-      bounds.extend(pos);
-      pathPoints.push(pos);
-      const mk = new google.maps.Marker({
-        position: pos, map: window._resGmap, title: letra + '. ' + p.nombre,
-        label: { text: letra, color: '#000', fontWeight: 'bold', fontSize: letra.length > 2 ? '9px' : '11px' },
-        icon: { path: google.maps.SymbolPath.CIRCLE, scale: 13,
-          fillColor: '#00d4ff', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 }
-      });
-      mk.addListener('click', () => { infoWindow.setContent('<b>' + letra + '.</b> ' + p.nombre); infoWindow.open(window._resGmap, mk); });
-    });
-
-    // Marcador base
-    if (rutaBuild.final) {
-      const pos = { lat: rutaBuild.final.lat, lng: rutaBuild.final.lng };
-      bounds.extend(pos);
-      pathPoints.push(pos);
-      const mk = new google.maps.Marker({
-        position: pos, map: window._resGmap, title: 'Base',
-        icon: { path: google.maps.SymbolPath.CIRCLE, scale: 10,
-          fillColor: '#ff9100', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 },
-        label: { text: '🏁', fontSize: '14px' }
-      });
-      mk.addListener('click', () => { infoWindow.setContent('🏁 Base: ' + rutaBuild.final.nombre); infoWindow.open(window._resGmap, mk); });
-    }
-
-    // Línea punteada de la ruta
-    if (pathPoints.length > 1) {
-      new google.maps.Polyline({
-        path:          pathPoints,
-        geodesic:      true,
-        strokeColor:   '#00d4ff',
-        strokeOpacity: 0.8,
-        strokeWeight:  3,
-        icons: [{ icon: { path: 'M 0,-1 0,1', strokeOpacity: 1, scale: 3 }, offset: '0', repeat: '15px' }],
-        map: window._resGmap
-      });
-      window._resGmap.fitBounds(bounds, { top: 20, right: 20, bottom: 20, left: 20 });
-    }
-
-  } else {
-    // ── Fallback OSM/Leaflet si Google Maps no está listo ─────────
-    if (typeof L === 'undefined') { if (loadEl) loadEl.style.display = 'none'; return; }
-    if (loadEl) loadEl.style.display = 'none';
-    if (window._resMap) { try { window._resMap.remove(); } catch(e){} window._resMap = null; }
-    mapEl.innerHTML = '';
-    const centro2 = rutaBuild.inicio ? [rutaBuild.inicio.lat, rutaBuild.inicio.lng] : [19.4326, -99.1332];
-    window._resMap = L.map(mapEl, { zoomControl: true, attributionControl: false }).setView(centro2, 12);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(window._resMap);
-    const pts = [];
-    if (rutaBuild.inicio) pts.push([rutaBuild.inicio.lat, rutaBuild.inicio.lng]);
-    rutaBuild.paradas.forEach((p, i) => {
-      pts.push([p.lat, p.lng]);
-      const letra = idxToLetra(i);
-      L.marker([p.lat, p.lng], { icon: L.divIcon({ html: `<div style="width:24px;height:24px;border-radius:50%;background:#00d4ff;border:2px solid #fff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:900;color:#000;">${letra}</div>`, className:'', iconSize:[24,24], iconAnchor:[12,12] }) }).addTo(window._resMap).bindPopup(letra + '. ' + p.nombre);
-    });
-    if (rutaBuild.final) pts.push([rutaBuild.final.lat, rutaBuild.final.lng]);
-    if (pts.length > 1) { L.polyline(pts, { color:'#00d4ff', weight:2.5, dashArray:'6,8' }).addTo(window._resMap); window._resMap.fitBounds(pts, { padding:[20,20] }); }
-    setTimeout(() => window._resMap && window._resMap.invalidateSize(), 100);
-  }
+  const loadingEl = document.getElementById('res-map-loading');
+  if (loadingEl) loadingEl.style.display = 'none';
 }
 
 // ══════════════════════════════════════════════════════════════════
@@ -3621,13 +3544,6 @@ let _swListo      = false;
 let _swIntentando = false;
 
 // ── Registrar Service Worker (solo en HTTPS o localhost) ──────────
-async function enviarNotificacionParada() {
-  const ruta = state.rutaActual; if (!ruta) return;
-  const pend = ruta.paradas.filter(p => !p.hecha && !p.fallida); if (!pend.length) return;
-  const sig = pend[0]; const idxR = ruta.paradas.indexOf(sig);
-  await notificarParada(sig, idxR, idxToLetra(idxR));
-}
-
 async function registrarSW() {
   if (_swListo || _swIntentando || !('serviceWorker' in navigator)) return;
   if (location.protocol !== 'https:' && location.hostname !== 'localhost') return;
@@ -3641,8 +3557,22 @@ async function registrarSW() {
     // Escuchar mensajes del SW → abrir pantalla de conducción
     navigator.serviceWorker.addEventListener('message', e => {
       const { tipo, action, idx } = e.data || {};
-      if (tipo === 'notif_accion') {
-        if (action === 'fin') { mostrarPantallaFin(); } else { mostrarPantallaConduccion(); }
+      if (tipo === 'notif_accion' && typeof idx === 'number') {
+        // Asegurarse de que la app esté en pantalla de seguimiento/conducción
+        const ruta = state.rutaActual;
+        if (!ruta) return;
+
+        // Si la acción viene de la notificación, ir directo a conducción
+        // para que el chofer confirme visualmente (más seguro al volante)
+        if (action === 'entregada' || action === 'fallida') {
+          // Ejecutar la acción directamente (viene de la cortina de notificaciones)
+          if (action === 'entregada') marcarEntregadaSeg(idx);
+          if (action === 'fallida')   marcarFallidaSeg(idx);
+        }
+
+        // Siempre mostrar pantalla de conducción después de la acción
+        // para que el chofer pueda ver la siguiente parada fácilmente
+        mostrarPantallaConduccion();
       }
     });
     console.log('✅ SW registrado desde sw.js — notificaciones con botones activas');
@@ -3687,7 +3617,8 @@ async function notificarParada(parada, idxReal, letra) {
         vibrate: [300, 150, 300],
         data:    { idx: idxReal, url: urlApp },
         actions: [
-          { action: 'conduccion', title: '🚗 Ir a pantalla' },
+          { action: 'entregada', title: '✅ Entregada' },
+          { action: 'fallida',   title: '❌ Fallida'   },
         ],
       });
     } else {
@@ -3811,115 +3742,34 @@ function abrirMapsDesdeConduccion() {
 }
 
 // Botón ✓ Entregada en modo conducción
-function _accionCond(esFallida) {
-  const ruta = state.rutaActual; if (!ruta) return;
-  const pend = ruta.paradas.filter(p => !p.hecha && !p.fallida); if (!pend.length) return;
-  const p = pend[0];
-  p.hecha = true; p.fallida = esFallida; p.horaAccion = fmtHora(new Date());
-  saveState();
-  if (navigator.vibrate) navigator.vibrate(esFallida ? [100,50,100] : 100);
-  const sig = ruta.paradas.filter(q => !q.hecha && !q.fallida);
-  if (sig.length > 0) {
-    window.open(_urlMaps(sig[0].lat, sig[0].lng), '_blank');
-    renderPantallaConduccion();
-    setTimeout(() => enviarNotificacionParada(), 1500);
-  } else {
-    if (ruta.final) window.open(_urlMaps(ruta.final.lat, ruta.final.lng), '_blank');
-    renderPantallaConduccion();
-    setTimeout(() => notificarFinRuta(), 1500);
-  }
-}
-function condEntregada() { _accionCond(false); }
-function condFallida()   { _accionCond(true);  }
-
-async function notificarFinRuta() {
-  const ok = await pedirPermisoNotificaciones(); if (!ok) return;
-  if (!_swListo) await registrarSW();
-  try {
-    if (_swListo && _swReg) {
-      const reg = await navigator.serviceWorker.ready;
-      await reg.showNotification('🏁 ¡Ruta completada!', {
-        body: 'Toca para finalizar la ruta', icon: 'https://cdn.jsdelivr.net/npm/twemoji@14/assets/72x72/1f3c1.png',
-        tag: 'seisa-fin', requireInteraction: true, vibrate: [400,200,400,200,400],
-        data: { accion: 'fin', url: location.href },
-        actions: [{ action: 'fin', title: '🏁 Finalizar ruta' }],
-      });
-    } else {
-      const n = new Notification('🏁 ¡Ruta completada!', { body: 'Toca para finalizar', tag: 'seisa-fin', requireInteraction: true });
-      n.onclick = () => { window.focus(); n.close(); mostrarPantallaFin(); };
-    }
-  } catch(e) {}
-}
-
-
-function mostrarPantallaFin() {
-  const ruta = state.rutaActual; if (!ruta) return;
-  let modal = document.getElementById('pantalla-fin-ruta');
-  if (!modal) { modal = document.createElement('div'); modal.id = 'pantalla-fin-ruta';
-    modal.style.cssText = 'position:fixed;inset:0;z-index:9900;background:#0a1628;display:flex;flex-direction:column;'; document.body.appendChild(modal); }
-  const paradas = ruta.paradas || [];
-  const entregadas = paradas.filter(p => p.hecha && !p.fallida).length;
-  const fallidas   = paradas.filter(p => p.fallida).length;
-  const pct = paradas.length ? Math.round(entregadas/paradas.length*100) : 0;
-  const lista = paradas.map((p,i) => {
-    const e = p.fallida ? '❌' : p.hecha ? '✅' : '⏳';
-    const c = p.fallida ? '#ff5252' : p.hecha ? '#00e676' : '#aaa';
-    return `<div style="display:flex;align-items:center;gap:10px;padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.06);">
-      <span style="font-size:18px;">${e}</span>
-      <div style="flex:1;min-width:0;"><div style="font-size:13px;font-weight:700;color:${c};">${idxToLetra(i)}. ${p.nombre}</div>
-      ${p.horaAccion?`<div style="font-size:11px;color:#4a6a8a;">${p.horaAccion}</div>`:''}</div></div>`;
-  }).join('');
-  modal.innerHTML = `
-    <div style="padding:max(14px,env(safe-area-inset-top)) 16px 10px;background:#0d1b2a;border-bottom:1px solid #1e3560;flex-shrink:0;display:flex;align-items:center;gap:12px;">
-      <div style="font-size:26px;">🏁</div>
-      <div style="flex:1;"><div style="font-size:17px;font-weight:800;color:#fff;">Ruta completada</div>
-      <div style="font-size:11px;color:#4a6a8a;">${ruta.nombre||'Sin nombre'}</div></div></div>
-    <div style="display:flex;flex-shrink:0;border-bottom:1px solid #1e3560;">
-      <div style="flex:1;padding:12px;text-align:center;border-right:1px solid #1e3560;"><div style="font-size:22px;font-weight:900;color:#00e676;">${entregadas}</div><div style="font-size:10px;color:#4a6a8a;">Entregadas</div></div>
-      <div style="flex:1;padding:12px;text-align:center;border-right:1px solid #1e3560;"><div style="font-size:22px;font-weight:900;color:#ff5252;">${fallidas}</div><div style="font-size:10px;color:#4a6a8a;">Fallidas</div></div>
-      <div style="flex:1;padding:12px;text-align:center;"><div style="font-size:22px;font-weight:900;color:#00d4ff;">${pct}%</div><div style="font-size:10px;color:#4a6a8a;">Efectividad</div></div></div>
-    <div id="fin-mapa" style="height:180px;flex-shrink:0;border-bottom:1px solid #1e3560;"></div>
-    <div style="flex:1;overflow-y:auto;">${lista}</div>
-    <div style="padding:12px 16px calc(env(safe-area-inset-bottom,0px)+10px);flex-shrink:0;background:#0d1b2a;border-top:1px solid #1e3560;">
-      <button onclick="finalizarRutaDefinitivo()" style="width:100%;padding:16px;border-radius:16px;border:none;background:linear-gradient(135deg,#00d4ff,#00e676);color:#000;font-size:16px;font-weight:900;cursor:pointer;">🏁 Marcar fin de ruta y guardar</button></div>`;
-  modal.style.display = 'flex';
-  setTimeout(() => {
-    const mapEl = document.getElementById('fin-mapa');
-    if (!mapEl) return;
-    if (googleMapsReady && typeof google !== 'undefined') {
-      const centro = ruta.inicio ? { lat: ruta.inicio.lat, lng: ruta.inicio.lng } : { lat: 19.4326, lng: -99.1332 };
-      const m = new google.maps.Map(mapEl, { center: centro, zoom: 12, mapTypeId: 'roadmap', disableDefaultUI: true, gestureHandling: 'greedy' });
-      const bounds = new google.maps.LatLngBounds();
-      if (ruta.inicio) bounds.extend({ lat: ruta.inicio.lat, lng: ruta.inicio.lng });
-      paradas.forEach((p,i) => {
-        bounds.extend({ lat: p.lat, lng: p.lng });
-        new google.maps.Marker({ position: { lat: p.lat, lng: p.lng }, map: m,
-          label: { text: idxToLetra(i), color: '#000', fontWeight: 'bold', fontSize: '10px' },
-          icon: { path: google.maps.SymbolPath.CIRCLE, scale: 12, fillColor: p.fallida ? '#ff5252' : '#00e676', fillOpacity: 1, strokeColor: '#fff', strokeWeight: 2 }
-        });
-      });
-      if (ruta.final) bounds.extend({ lat: ruta.final.lat, lng: ruta.final.lng });
-      m.fitBounds(bounds, { top: 16, right: 16, bottom: 16, left: 16 });
-    } else if (typeof L !== 'undefined') {
-      const centro = ruta.inicio ? [ruta.inicio.lat, ruta.inicio.lng] : [19.4326,-99.1332];
-      const m = L.map(mapEl, { zoomControl:false, attributionControl:false }).setView(centro, 12);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(m);
-      const pts = [];
-      if (ruta.inicio) pts.push([ruta.inicio.lat, ruta.inicio.lng]);
-      paradas.forEach((p,i) => { pts.push([p.lat,p.lng]); L.circleMarker([p.lat,p.lng],{radius:8,fillColor:p.fallida?'#ff5252':'#00e676',color:'#fff',weight:2,fillOpacity:1}).addTo(m); });
-      if (ruta.final) pts.push([ruta.final.lat,ruta.final.lng]);
-      if (pts.length>1) { L.polyline(pts,{color:'#00d4ff',weight:2}).addTo(m); m.fitBounds(pts,{padding:[16,16]}); }
-      setTimeout(() => m.invalidateSize(), 100);
-    }
-  }, 200);
-}
-function finalizarRutaDefinitivo() {
+function condEntregada() {
   const ruta = state.rutaActual;
-  if (ruta) { ruta.horaFin = fmtHora(new Date()); ruta.finalizada = true; if (!state.historial) state.historial = []; state.historial.unshift({...ruta}); }
-  const modal = document.getElementById('pantalla-fin-ruta'); if (modal) modal.style.display = 'none';
-  state.rutaActual = null; saveState(); showScreen('screen-home'); renderHome();
-  showToast('✅ Ruta finalizada y guardada');
+  if (!ruta) return;
+  const pendientes = ruta.paradas.filter(p => !p.hecha && !p.fallida);
+  if (!pendientes.length) return;
+  const p = pendientes[0];
+  const idx = ruta.paradas.indexOf(p);
+
+  p.hecha = true; p.fallida = false; p.horaAccion = fmtHora(new Date());
+  saveState();
+  if (navigator.vibrate) navigator.vibrate(100);
+  renderPantallaConduccion();
 }
+
+// Botón ✗ Fallida en modo conducción
+function condFallida() {
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+  const pendientes = ruta.paradas.filter(p => !p.hecha && !p.fallida);
+  if (!pendientes.length) return;
+  const p = pendientes[0];
+
+  p.hecha = true; p.fallida = true; p.horaAccion = fmtHora(new Date());
+  saveState();
+  if (navigator.vibrate) navigator.vibrate([100, 50, 100]);
+  renderPantallaConduccion();
+}
+
 
 let _filtroSeg = '';
 
