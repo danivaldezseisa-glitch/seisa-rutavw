@@ -366,7 +366,7 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
 <!-- SCREEN 4: RESUMEN -->
 <div class="screen hidden" id="screen-resumen">
   <div class="topbar">
-    <button class="topbar-back" onclick="showScreen('screen-paradas')">←</button>
+    <button class="topbar-back" onclick="navegarAtras()">←</button>
     <h2>📊 Resumen</h2>
     <span id="res-paradas-count" style="font-size:12px;color:var(--accent);font-weight:700;"></span>
   </div>
@@ -408,7 +408,7 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
     <button class="btn btn-green" onclick="iniciarRutaGoogleMaps()" style="font-size:17px;padding:18px;gap:10px;">
       <span style="font-size:20px;">🚀</span> Iniciar en Google Maps
     </button>
-    <button class="btn btn-ghost" onclick="showScreen('screen-paradas')">← Editar paradas</button>
+    <button class="btn btn-ghost" onclick="_verRutaHistorial=false;showScreen('screen-paradas')">← Editar paradas</button>
   </div>
 </div>
 
@@ -1248,15 +1248,28 @@ let editUbData    = null;
 //  NAVEGACIÓN DE PANTALLAS
 // ══════════════════════════════════════════════════════════════════
 let currentScreen = 'screen-home';
+let _verRutaHistorial = false; // flag: venimos de ver una ruta finalizada
+
 const BACK_MAP = {
-  'screen-home':         'screen-login',
+  'screen-home':         null,           // home no tiene atrás — se pide confirmación salir
   'screen-crear':        'screen-home',
-  'screen-paradas':      'screen-crear',
+  'screen-paradas':      'screen-home',  // desde paradas en flujo nuevo vuelve a home (tiene botón ← propio)
   'screen-resumen':      'screen-paradas',
   'screen-seguimiento':  'screen-home',
 };
 
 function navegarAtras() {
+  // Desde home → preguntar si quiere salir
+  if (currentScreen === 'screen-home') {
+    confirmarSalirApp();
+    return;
+  }
+  // Desde resumen viendo una ruta finalizada → volver a home
+  if (currentScreen === 'screen-resumen' && _verRutaHistorial) {
+    _verRutaHistorial = false;
+    showScreen('screen-home');
+    return;
+  }
   const prev = BACK_MAP[currentScreen];
   if (prev) showScreen(prev);
 }
@@ -1320,6 +1333,35 @@ function renderHome() {
     }).join('');
 }
 
+function confirmarSalirApp() {
+  // Crear overlay de confirmación si no existe
+  let overlay = document.getElementById('overlay-salir-app');
+  if (!overlay) {
+    overlay = document.createElement('div');
+    overlay.id = 'overlay-salir-app';
+    overlay.style.cssText = 'position:fixed;inset:0;z-index:9950;background:rgba(0,0,0,.7);display:flex;align-items:flex-end;';
+    overlay.innerHTML = `
+      <div style="width:100%;background:var(--bg2);border-radius:20px 20px 0 0;padding:24px 20px calc(env(safe-area-inset-bottom,20px)+20px);display:flex;flex-direction:column;gap:10px;">
+        <div style="text-align:center;font-size:28px;margin-bottom:4px;">🚛</div>
+        <div style="font-size:16px;font-weight:800;text-align:center;color:var(--text);">¿Salir de SEISA Rutas?</div>
+        <div style="font-size:12px;color:var(--text3);text-align:center;margin-bottom:4px;">Los datos guardados permanecen seguros.</div>
+        <button onclick="window.close()||history.go(-(history.length-1))"
+          style="padding:15px;border-radius:14px;border:none;background:var(--red);color:#fff;font-size:15px;font-weight:800;cursor:pointer;">
+          Salir de la app
+        </button>
+        <button onclick="document.getElementById('overlay-salir-app').style.display='none';history.pushState({},'')"
+          style="padding:13px;border-radius:14px;border:1px solid var(--border);background:var(--surface2);color:var(--text2);font-size:15px;font-weight:700;cursor:pointer;">
+          Cancelar — seguir aquí
+        </button>
+      </div>`;
+    document.body.appendChild(overlay);
+  } else {
+    overlay.style.display = 'flex';
+  }
+  // Asegurar que el botón físico siguiente cierre el overlay en vez de salir
+  history.pushState({}, '');
+}
+
 function continuarRuta() {
   if (!state.rutaActual) return;
   rutaBuild = { ...state.rutaActual };
@@ -1329,6 +1371,7 @@ function continuarRuta() {
 function verRuta(id) {
   const r = state.rutas.find(x => x.id === id);
   if (!r) return;
+  _verRutaHistorial = true;   // venimos del historial, atrás = home
   rutaBuild = { ...r };
   renderResumen();
   showScreen('screen-resumen');
@@ -4140,6 +4183,13 @@ function fitTodasParadas(){
   history.replaceState({}, '');
   history.pushState({}, '');
   window.addEventListener('popstate', () => {
+    // Si el overlay de salir está visible, cerrarlo
+    const overlayS = document.getElementById('overlay-salir-app');
+    if (overlayS && overlayS.style.display !== 'none') {
+      overlayS.style.display = 'none';
+      history.pushState({}, '');
+      return;
+    }
     navegarAtras();
     history.pushState({}, '');
   });
