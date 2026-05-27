@@ -127,7 +127,7 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
 .badge-green  { background: rgba(0,230,118,.15); color: var(--green); border: 1px solid rgba(0,230,118,.3); }
 .badge-orange { background: rgba(255,145,0,.15);  color: var(--orange); border: 1px solid rgba(255,145,0,.3); }
 .badge-red    { background: rgba(255,82,82,.15);   color: var(--red);   border: 1px solid rgba(255,82,82,.3); }
-.parada-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.parada-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
 .parada-num { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; flex-shrink: 0; }
 .parada-info { flex: 1; min-width: 0; }
 .parada-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -3229,6 +3229,9 @@ function _initEditMapa() {
     _editMapaMark.setLatLng(e.latlng);
     onPos(e.latlng);
   });
+
+  // Forzar redibujado correcto dentro del modal
+  setTimeout(() => _editMapaL.invalidateSize(), 100);
 }
 
 function _resetEditMapa() {
@@ -3264,11 +3267,17 @@ window.abrirEditarParada = function(id) {
   if (actualEl && p) { actualEl.textContent = '📍 ' + p.nombre + ' · ' + p.lat.toFixed(5) + ', ' + p.lng.toFixed(5); }
   const nombreEl = document.getElementById('editar-parada-nombre');
   if (nombreEl) nombreEl.value = p ? p.nombre : '';
-  // Inicializar en tab mapa
-  switchEditTab('mapa');
+  // Asegurar tab mapa activo (sin inicializar mapa aún)
+  ['mapa','buscar','plus'].forEach(t => {
+    const panel = document.getElementById('edit-panel-' + t);
+    const btn   = document.getElementById('edit-tab-' + t);
+    const active = t === 'mapa';
+    if (panel) panel.style.display = active ? 'flex' : 'none';
+    if (btn) { btn.style.background = active ? 'var(--accent)' : 'var(--surface2)'; btn.style.color = active ? '#000' : 'var(--text2)'; }
+  });
+  // Mostrar modal PRIMERO, luego inicializar mapa con delay amplio
   document.getElementById('modal-editar-parada').classList.remove('hidden');
-  // Inicializar mapa después de que el modal sea visible
-  setTimeout(() => _initEditMapa(), 200);
+  setTimeout(() => { _initEditMapa(); }, 350);
 };
 
 async function ejecutarBusquedaEditarParada() {
@@ -3553,7 +3562,7 @@ function renderResumen() {
     const esUltima  = i === n - 1;
     const d = document.createElement('div');
     d.className = 'parada-item';
-    d.style.cssText = (p.hecha ? 'opacity:.5;' : p.fallida ? 'opacity:.5;' : '') + 'flex-wrap:wrap;gap:6px;';
+    d.style.cssText = (p.hecha ? 'opacity:.5;' : p.fallida ? 'opacity:.5;' : '') + 'flex-wrap:wrap;gap:0;padding:10px 16px 6px;align-items:flex-start;';
     // Fila principal
     const filaMain = document.createElement('div');
     filaMain.style.cssText = 'display:flex;align-items:center;gap:10px;width:100%;';
@@ -3566,7 +3575,7 @@ function renderResumen() {
     d.appendChild(filaMain);
     // Fila de botones de reorden
     const filaBtns = document.createElement('div');
-    filaBtns.style.cssText = 'display:flex;gap:6px;padding:0 0 4px 38px;width:100%;';
+    filaBtns.style.cssText = 'display:flex;gap:6px;padding:6px 0 2px 38px;width:100%;box-sizing:border-box;';
     if (!esPrimera) {
       const btnP = document.createElement('button');
       btnP.textContent = '⬆ Primera';
@@ -3596,11 +3605,10 @@ function renderResumen() {
     lista.appendChild(d);
   }
 
-  // Mostrar/ocultar botón de re-optimizar según si hay paradas fijadas
+  // Mostrar/ocultar botón de re-optimizar si hubo reorden manual
   const btnReoptRes = document.getElementById('btn-reopt-resumen');
   if (btnReoptRes) {
-    const hayFijadas = rutaBuild.paradas.some(p => p._fijada);
-    btnReoptRes.style.display = hayFijadas ? 'flex' : 'none';
+    btnReoptRes.style.display = rutaBuild._reordenManual ? 'flex' : 'none';
   }
 
   setTimeout(()=>typeof _initMapaResumen==='function'&&_initMapaResumen(),300);
@@ -3618,9 +3626,7 @@ function moverParadaResumen(idx, destino) {
     showToast('⬇ ' + p.nombre + ' → última parada');
   }
   rutaBuild.paradas = paradas;
-  // Mostrar botón de re-optimizar
-  const btn = document.getElementById('btn-reopt-resumen');
-  if (btn) btn.style.display = 'flex';
+  rutaBuild._reordenManual = true;
   renderResumen();
 }
 
@@ -3642,8 +3648,7 @@ function reoptimizarResumen() {
   const ap = finTime.getHours() >= 12 ? 'PM' : 'AM';
   rutaBuild.horaFin   = `${hh}:${mm} ${ap}`;
   rutaBuild.tiempoHrs = Math.round(rutaBuild.tiempoMin / 6) / 10;
-  const btn = document.getElementById('btn-reopt-resumen');
-  if (btn) btn.style.display = 'none';
+  rutaBuild._reordenManual = false;
   renderResumen();
   showToast('⚡ Ruta re-optimizada');
 }
