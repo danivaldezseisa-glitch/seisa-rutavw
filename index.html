@@ -402,6 +402,9 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
       </div>
       <div id="res-orden-list" style="max-height:300px;overflow-y:auto;-webkit-overflow-scrolling:touch;"></div>
     </div>
+    <button id="btn-reopt-resumen" class="btn btn-accent" onclick="reoptimizarResumen()" style="display:none;font-size:15px;padding:14px;gap:8px;">
+      <span style="font-size:16px;">⚡</span> Re-optimizar ruta
+    </button>
     <button class="btn btn-green" onclick="iniciarRutaGoogleMaps()" style="font-size:17px;padding:18px;gap:10px;">
       <span style="font-size:20px;">🚀</span> Iniciar en Google Maps
     </button>
@@ -610,23 +613,43 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
 
 <!-- MODAL: EDITAR PARADA -->
 <div class="modal-overlay hidden" id="modal-editar-parada">
-  <div class="modal-sheet">
+  <div class="modal-sheet" style="max-height:90vh;overflow-y:auto;">
     <div class="modal-title">✏️ Editar parada</div>
     <input type="hidden" id="editar-parada-id">
     <div id="editar-parada-actual" style="font-size:12px;color:var(--text3);padding:8px 12px;background:var(--surface2);border-radius:8px;margin-bottom:4px;"></div>
-    <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">Plus Code</div>
-    <div style="display:flex;gap:8px;">
-      <input class="input" id="editar-pluscode-input" placeholder="Ej: GP3P+538 Naucalpan de Juárez" style="flex:1;font-size:13px;font-family:var(--mono);">
-      <button onclick="resolverPlusCodeEditar()" style="padding:8px 14px;border-radius:10px;border:1.5px solid var(--accent);background:rgba(0,212,255,.12);color:var(--accent);font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;">Buscar</button>
+
+    <!-- Tabs de método de búsqueda -->
+    <div style="display:flex;gap:0;border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:10px;flex-shrink:0;">
+      <button id="edit-tab-mapa" onclick="switchEditTab('mapa')"
+        style="flex:1;padding:9px 6px;border:none;background:var(--accent);color:#000;font-size:12px;font-weight:800;cursor:pointer;">🗺 Mapa</button>
+      <button id="edit-tab-buscar" onclick="switchEditTab('buscar')"
+        style="flex:1;padding:9px 6px;border:none;background:var(--surface2);color:var(--text2);font-size:12px;font-weight:700;cursor:pointer;">🔍 Buscar</button>
+      <button id="edit-tab-plus" onclick="switchEditTab('plus')"
+        style="flex:1;padding:9px 6px;border:none;background:var(--surface2);color:var(--text2);font-size:12px;font-weight:700;cursor:pointer;">📍 Plus Code</button>
     </div>
-    <div style="display:flex;align-items:center;gap:8px;margin:6px 0;">
-      <div style="flex:1;height:1px;background:var(--border);"></div>
-      <span style="font-size:11px;color:var(--text3);">o buscar dirección</span>
-      <div style="flex:1;height:1px;background:var(--border);"></div>
+
+    <!-- TAB: MAPA INTERACTIVO -->
+    <div id="edit-panel-mapa" style="display:flex;flex-direction:column;gap:8px;">
+      <div style="font-size:11px;color:var(--text3);text-align:center;">Toca el mapa para colocar la nueva ubicación</div>
+      <div id="edit-mapa-leaflet" style="height:230px;border-radius:12px;overflow:hidden;border:1.5px solid var(--border);flex-shrink:0;"></div>
+      <div id="edit-mapa-coords" style="display:none;font-size:11px;color:var(--accent);padding:6px 10px;background:rgba(0,212,255,.08);border-radius:8px;border:1px solid rgba(0,212,255,.2);font-family:var(--mono);text-align:center;"></div>
     </div>
-    <input class="input" id="editar-parada-input" placeholder="🔍 Escribir dirección..." style="font-size:14px;">
-    <button onclick="ejecutarBusquedaEditarParada()" class="btn btn-ghost" style="font-size:13px;padding:10px;">🔍 Buscar dirección</button>
-    <div id="editar-parada-resultados" style="display:none;max-height:150px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;background:var(--surface2);"></div>
+
+    <!-- TAB: BUSCAR DIRECCIÓN -->
+    <div id="edit-panel-buscar" style="display:none;flex-direction:column;gap:8px;">
+      <input class="input" id="editar-parada-input" placeholder="🔍 Escribir dirección..." style="font-size:14px;">
+      <button onclick="ejecutarBusquedaEditarParada()" class="btn btn-ghost" style="font-size:13px;padding:10px;">🔍 Buscar dirección</button>
+      <div id="editar-parada-resultados" style="display:none;max-height:150px;overflow-y:auto;border:1px solid var(--border);border-radius:10px;background:var(--surface2);"></div>
+    </div>
+
+    <!-- TAB: PLUS CODE -->
+    <div id="edit-panel-plus" style="display:none;flex-direction:column;gap:8px;">
+      <div style="display:flex;gap:8px;">
+        <input class="input" id="editar-pluscode-input" placeholder="Ej: GP3P+538 Naucalpan de Juárez" style="flex:1;font-size:13px;font-family:var(--mono);">
+        <button onclick="resolverPlusCodeEditar()" style="padding:8px 14px;border-radius:10px;border:1.5px solid var(--accent);background:rgba(0,212,255,.12);color:var(--accent);font-size:13px;font-weight:700;cursor:pointer;flex-shrink:0;">Buscar</button>
+      </div>
+    </div>
+
     <div id="editar-parada-preview" style="display:none;font-size:12px;color:var(--green);padding:8px 12px;background:rgba(0,230,118,.08);border-radius:8px;border:1px solid rgba(0,230,118,.2);"></div>
     <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-top:4px;margin-bottom:5px;">Nombre de la parada</div>
     <input class="input" id="editar-parada-nombre" placeholder="Ej: José Ma. Morelos 6" style="font-size:14px;">
@@ -1258,6 +1281,9 @@ function closeModal(id) {
       _pinActual = '';
       _pinUsuario = null;
       actualizarPinDots();
+    }
+    if (id === 'modal-editar-parada') {
+      _resetEditMapa();
     }
   }
 }
@@ -3144,6 +3170,75 @@ function confirmarAgregarParadaSeg(reoptimizar) {
   renderSeguimiento();
 }
 
+let _editMapaL    = null; // instancia Leaflet del mapa de edición
+let _editMapaMark = null; // marcador draggable
+
+function switchEditTab(tab) {
+  ['mapa','buscar','plus'].forEach(t => {
+    const panel = document.getElementById('edit-panel-' + t);
+    const btn   = document.getElementById('edit-tab-' + t);
+    const active = t === tab;
+    if (panel) panel.style.display = active ? 'flex' : 'none';
+    if (btn) {
+      btn.style.background = active ? 'var(--accent)' : 'var(--surface2)';
+      btn.style.color      = active ? '#000'          : 'var(--text2)';
+    }
+  });
+  if (tab === 'mapa') {
+    setTimeout(() => {
+      if (!_editMapaL) _initEditMapa();
+      else _editMapaL.invalidateSize();
+    }, 100);
+  }
+}
+
+function _initEditMapa() {
+  const el = document.getElementById('edit-mapa-leaflet');
+  if (!el || _editMapaL) return;
+
+  // Centro: coordenadas de la parada actual, o CDMX
+  let lat = 19.4326, lng = -99.1332;
+  const id = document.getElementById('editar-parada-id')?.value;
+  const p = (rutaBuild?.paradas?.find(x => x.id === id))
+         || state.rutaActual?.paradas.find(x => x.id === id);
+  if (p) { lat = p.lat; lng = p.lng; }
+
+  _editMapaL = L.map(el, { zoomControl: true, attributionControl: false, tap: false }).setView([lat, lng], 16);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom: 19 }).addTo(_editMapaL);
+
+  // Marcador draggable en la posición actual
+  _editMapaMark = L.marker([lat, lng], { draggable: true })
+    .addTo(_editMapaL)
+    .bindPopup('Arrastra para mover la parada')
+    .openPopup();
+
+  const onPos = (latlng) => {
+    editParadaData = { lat: latlng.lat, lng: latlng.lng, nombre: editParadaData?.nombre || '' };
+    const coordsEl = document.getElementById('edit-mapa-coords');
+    if (coordsEl) {
+      coordsEl.textContent = `📍 ${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}`;
+      coordsEl.style.display = 'block';
+    }
+    const prv = document.getElementById('editar-parada-preview');
+    if (prv) { prv.textContent = `📍 ${latlng.lat.toFixed(6)}, ${latlng.lng.toFixed(6)}`; prv.style.display = 'block'; }
+  };
+
+  _editMapaMark.on('dragend', e => onPos(e.target.getLatLng()));
+
+  _editMapaL.on('click', e => {
+    _editMapaMark.setLatLng(e.latlng);
+    onPos(e.latlng);
+  });
+}
+
+function _resetEditMapa() {
+  if (_editMapaL) {
+    _editMapaL.remove();
+    _editMapaL    = null;
+    _editMapaMark = null;
+  }
+}
+
 // ══════════════════════════════════════════════════════════════════
 //  EDITAR PARADA
 // ══════════════════════════════════════════════════════════════════
@@ -3151,20 +3246,29 @@ let editParadaData = null;
 
 window.abrirEditarParada = function(id) {
   editParadaData = null;
+  _resetEditMapa();
   document.getElementById('editar-parada-id').value = id;
-  document.getElementById('editar-parada-input').value = '';
-  document.getElementById('editar-pluscode-input').value = '';
+  const inputBuscar = document.getElementById('editar-parada-input');
+  const inputPlus   = document.getElementById('editar-pluscode-input');
+  if (inputBuscar) inputBuscar.value = '';
+  if (inputPlus)   inputPlus.value   = '';
   const prev = document.getElementById('editar-parada-preview');
   const res  = document.getElementById('editar-parada-resultados');
   if (prev) prev.style.display = 'none';
   if (res)  { res.style.display = 'none'; res.innerHTML = ''; }
+  const coordsEl = document.getElementById('edit-mapa-coords');
+  if (coordsEl) coordsEl.style.display = 'none';
   const p = (rutaBuild && rutaBuild.paradas && rutaBuild.paradas.find(x => x.id === id))
          || state.rutaActual?.paradas.find(x => x.id === id);
   const actualEl = document.getElementById('editar-parada-actual');
   if (actualEl && p) { actualEl.textContent = '📍 ' + p.nombre + ' · ' + p.lat.toFixed(5) + ', ' + p.lng.toFixed(5); }
   const nombreEl = document.getElementById('editar-parada-nombre');
   if (nombreEl) nombreEl.value = p ? p.nombre : '';
+  // Inicializar en tab mapa
+  switchEditTab('mapa');
   document.getElementById('modal-editar-parada').classList.remove('hidden');
+  // Inicializar mapa después de que el modal sea visible
+  setTimeout(() => _initEditMapa(), 200);
 };
 
 async function ejecutarBusquedaEditarParada() {
@@ -3200,6 +3304,13 @@ async function ejecutarBusquedaEditarParada() {
         const nom = document.getElementById('editar-parada-nombre');
         if (nom && !nom.value.trim()) nom.value = nombre;
         res.style.display = 'none';
+        // Actualizar marcador en el mapa si existe
+        if (_editMapaL && _editMapaMark) {
+          _editMapaMark.setLatLng([parseFloat(d.lat), parseFloat(d.lon)]);
+          _editMapaL.setView([parseFloat(d.lat), parseFloat(d.lon)], 16);
+          const coordsEl = document.getElementById('edit-mapa-coords');
+          if (coordsEl) { coordsEl.textContent = `📍 ${parseFloat(d.lat).toFixed(6)}, ${parseFloat(d.lon).toFixed(6)}`; coordsEl.style.display = 'block'; }
+        }
         showToast('📍 Ubicación seleccionada');
       });
       res.appendChild(el);
@@ -3254,14 +3365,20 @@ async function resolverPlusCodeEditar() {
 }
 
 function confirmarEditarParada() {
+  // Si el mapa está activo y tiene un marcador, usar esas coordenadas
+  if (!editParadaData && _editMapaMark) {
+    const ll = _editMapaMark.getLatLng();
+    editParadaData = { lat: ll.lat, lng: ll.lng, nombre: '' };
+  }
   if (!editParadaData) { showToast('Selecciona una nueva ubicación primero'); return; }
   const id = document.getElementById('editar-parada-id').value;
   const nombreCustom = (document.getElementById('editar-parada-nombre')?.value || '').trim();
-  const nombre = nombreCustom || editParadaData.nombre;
+  const nombre = nombreCustom || editParadaData.nombre || 'Parada editada';
   if (rutaBuild && rutaBuild.paradas) {
     const pb = rutaBuild.paradas.find(x => x.id === id);
     if (pb) {
       pb.lat = editParadaData.lat; pb.lng = editParadaData.lng; pb.nombre = nombre;
+      _resetEditMapa();
       closeModal('modal-editar-parada');
       actualizarMapaParadas();
       renderParadasList();
@@ -3274,6 +3391,7 @@ function confirmarEditarParada() {
     if (pa) {
       pa.lat = editParadaData.lat; pa.lng = editParadaData.lng; pa.nombre = nombre;
       saveState();
+      _resetEditMapa();
       closeModal('modal-editar-parada');
       renderSeguimiento();
       showToast('✅ Parada actualizada');
@@ -3430,16 +3548,40 @@ function renderResumen() {
     const minsConduccion = Math.round((distAcum * 1.3 / 30) * 60);
     const minsTotal = minsConduccion + i * MINS_POR_PARADA;
     const eta = new Date(ahora.getTime() + minsTotal * 60000);
+    const n = rutaBuild.paradas.length;
+    const esPrimera = i === 0;
+    const esUltima  = i === n - 1;
     const d = document.createElement('div');
     d.className = 'parada-item';
-    d.style.cssText = p.hecha ? 'opacity:.5;' : p.fallida ? 'opacity:.5;' : '';
-    d.innerHTML = `<div class="parada-num" style="background:rgba(0,212,255,.12);color:var(--accent);border:1px solid rgba(0,212,255,.25);">${idxToLetra(i)}</div>
+    d.style.cssText = (p.hecha ? 'opacity:.5;' : p.fallida ? 'opacity:.5;' : '') + 'flex-wrap:wrap;gap:6px;';
+    // Fila principal
+    const filaMain = document.createElement('div');
+    filaMain.style.cssText = 'display:flex;align-items:center;gap:10px;width:100%;';
+    filaMain.innerHTML = `<div class="parada-num" style="background:rgba(0,212,255,.12);color:var(--accent);border:1px solid rgba(0,212,255,.25);">${idxToLetra(i)}</div>
       <div class="parada-info" style="flex:1;min-width:0;">
-        <div class="parada-name"></div>
+        <div class="parada-name" style="font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${p.nombre.replace(/</g,'&lt;')}</div>
         <div class="parada-sub">~${MINS_POR_PARADA} min · ETA: ${fmtHora(eta)}</div>
       </div>
       <div style="font-size:12px;color:var(--accent);flex-shrink:0;font-family:var(--mono);font-weight:700;">${fmtHora(eta)}</div>`;
-    d.querySelector('.parada-name').textContent = p.nombre;
+    d.appendChild(filaMain);
+    // Fila de botones de reorden
+    const filaBtns = document.createElement('div');
+    filaBtns.style.cssText = 'display:flex;gap:6px;padding:0 0 4px 38px;width:100%;';
+    if (!esPrimera) {
+      const btnP = document.createElement('button');
+      btnP.textContent = '⬆ Primera';
+      btnP.style.cssText = 'padding:4px 10px;border-radius:8px;border:1px solid rgba(0,212,255,.4);background:rgba(0,212,255,.1);color:var(--accent);font-size:11px;font-weight:700;cursor:pointer;';
+      btnP.onclick = () => moverParadaResumen(i, 'primera');
+      filaBtns.appendChild(btnP);
+    }
+    if (!esUltima) {
+      const btnU = document.createElement('button');
+      btnU.textContent = '⬇ Última';
+      btnU.style.cssText = 'padding:4px 10px;border-radius:8px;border:1px solid rgba(255,145,0,.4);background:rgba(255,145,0,.1);color:var(--orange);font-size:11px;font-weight:700;cursor:pointer;';
+      btnU.onclick = () => moverParadaResumen(i, 'ultima');
+      filaBtns.appendChild(btnU);
+    }
+    if (!esPrimera || !esUltima) d.appendChild(filaBtns);
     lista.appendChild(d);
   });
 
@@ -3454,7 +3596,56 @@ function renderResumen() {
     lista.appendChild(d);
   }
 
+  // Mostrar/ocultar botón de re-optimizar según si hay paradas fijadas
+  const btnReoptRes = document.getElementById('btn-reopt-resumen');
+  if (btnReoptRes) {
+    const hayFijadas = rutaBuild.paradas.some(p => p._fijada);
+    btnReoptRes.style.display = hayFijadas ? 'flex' : 'none';
+  }
+
   setTimeout(()=>typeof _initMapaResumen==='function'&&_initMapaResumen(),300);
+}
+
+function moverParadaResumen(idx, destino) {
+  const paradas = rutaBuild.paradas;
+  if (!paradas || !paradas.length) return;
+  const [p] = paradas.splice(idx, 1);
+  if (destino === 'primera') {
+    paradas.unshift(p);
+    showToast('⬆ ' + p.nombre + ' → primera parada');
+  } else {
+    paradas.push(p);
+    showToast('⬇ ' + p.nombre + ' → última parada');
+  }
+  rutaBuild.paradas = paradas;
+  // Mostrar botón de re-optimizar
+  const btn = document.getElementById('btn-reopt-resumen');
+  if (btn) btn.style.display = 'flex';
+  renderResumen();
+}
+
+function reoptimizarResumen() {
+  if (!rutaBuild.paradas.length) return;
+  const inicio = rutaBuild.inicio || rutaBuild.paradas[0];
+  const fin    = rutaBuild.final  || rutaBuild.inicio || rutaBuild.paradas[0];
+  const ordenadas = optimizarPipeline(rutaBuild.paradas, inicio, fin);
+  rutaBuild.paradas = ordenadas;
+  let kmTotal = calcDistRuta(ordenadas, rutaBuild.inicio, rutaBuild.final) * 1.25;
+  rutaBuild.kmTotal = Math.round(kmTotal * 10) / 10;
+  const minManejo  = Math.round((kmTotal / 30) * 60);
+  const minParadas = ordenadas.length * 8;
+  rutaBuild.tiempoMin = minManejo + minParadas;
+  const ahora = new Date();
+  const finTime = new Date(ahora.getTime() + rutaBuild.tiempoMin * 60000);
+  const hh = finTime.getHours() % 12 || 12;
+  const mm = String(finTime.getMinutes()).padStart(2,'0');
+  const ap = finTime.getHours() >= 12 ? 'PM' : 'AM';
+  rutaBuild.horaFin   = `${hh}:${mm} ${ap}`;
+  rutaBuild.tiempoHrs = Math.round(rutaBuild.tiempoMin / 6) / 10;
+  const btn = document.getElementById('btn-reopt-resumen');
+  if (btn) btn.style.display = 'none';
+  renderResumen();
+  showToast('⚡ Ruta re-optimizada');
 }
 
 // ══════════════════════════════════════════════════════════════════
