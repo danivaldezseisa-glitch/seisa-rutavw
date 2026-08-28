@@ -560,6 +560,10 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
       <div style="margin-top:5px;font-size:11px;color:#4a6a8a;font-weight:600;">
         Siguiente: <span id="cond-siguiente" style="color:#8aabcc;">—</span>
       </div>
+      <!-- Distancia / tiempo estimado por carretera hasta la parada actual -->
+      <div id="cond-eta-wrap" style="margin-top:4px;font-size:12px;font-weight:800;color:#00e676;display:none;">
+        <span id="cond-eta-dist">—</span> · <span id="cond-eta-tiempo">—</span>
+      </div>
     </div>
 
   </div>
@@ -3830,13 +3834,18 @@ function mostrarAccionRapida(idxReal, letra, nombre) {
 // ══════════════════════════════════════════════════════════════════
 
 let mapCond        = null;   // instancia Leaflet del mapa de conducción
-let condLine        = null;  // polyline de la ruta completa
+let condLine        = null;  // polyline de la ruta completa (referencia, toda la ruta)
 let condMarkers      = [];   // marcadores de paradas
 let condUserMarker   = null; // marcador de "mi ubicación"
 let condWatchId       = null; // id de navigator.geolocation.watchPosition
 let condLastPos        = null; // última posición usada para redibujar (filtro de 3m)
 let condFollow           = true; // ¿el mapa sigue automáticamente al usuario?
 const COND_GPS_MIN_METROS = 3;   // distancia mínima entre actualizaciones del mapa
+
+// Ruta activa por carretera (tramo actual hacia la parada en curso)
+let condRutaActivaGroup    = null; // L.layerGroup con la línea de la ruta activa
+let condRutaActivaTargetId = null; // id de la parada para la que ya se calculó la ruta activa
+let condCalculandoRuta     = false;
 
 function initMapaConduccion() {
   const el = document.getElementById('cond-mapa');
@@ -3936,6 +3945,86 @@ function renderMapaConduccion() {
   if (!condUserMarker && condLine) {
     mapCond.fitBounds(condLine.getBounds(), { padding: [50, 50], maxZoom: 16 });
   }
+
+  // Calcular/actualizar la ruta por carretera hacia la parada actual (dentro de la app)
+  condActualizarRutaHaciaObjetivo();
+}
+
+// ── Ruta activa por carretera (tramo hacia la parada en curso) ─────
+// Usa el servicio público de ruteo OSRM; si falla, cae a línea recta.
+
+function condActualizarRutaHaciaObjetivo() {
+  const ruta = state.rutaActual;
+  if (!ruta || !condLastPos) return; // aún sin fix de GPS
+
+  const pendientes = ruta.paradas.filter(p => !p.hecha && !p.fallida);
+  let destino = null;
+  if (pendientes.length > 0) {
+    destino = { id: pendientes[0].id, lat: pendientes[0].lat, lng: pendientes[0].lng };
+  } else if (ruta.final) {
+    destino = { id: 'FIN', lat: ruta.final.lat, lng: ruta.final.lng };
+  }
+
+  if (!destino) { limpiarRutaActiva(); return; }
+  if (condRutaActivaTargetId === destino.id) return; // ya calculada para este destino
+
+  condRutaActivaTargetId = destino.id;
+  calcularRutaActiva(condLastPos.lat, condLastPos.lng, destino);
+}
+
+async function calcularRutaActiva(origenLat, origenLng, destino) {
+  if (condCalculandoRuta) return;
+  condCalculandoRuta = true;
+  try {
+    const url = `https://router.project-osrm.org/route/v1/driving/${origenLng},${origenLat};${destino.lng},${destino.lat}?overview=full&geometries=geojson`;
+    const res  = await fetch(url);
+    const data = await res.json();
+    if (data.code === 'Ok' && data.routes && data.routes[0]) {
+      const coords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
+      pintarRutaActiva(coords);
+      actualizarInfoRutaActiva(data.routes[0].distance / 1000, data.routes[0].duration / 60);
+    } else {
+      throw new Error('Sin ruta OSRM');
+    }
+  } catch (e) {
+    console.warn('Ruteo por carretera falló, usando línea recta:', e.message);
+    pintarRutaActiva([[origenLat, origenLng], [destino.lat, destino.lng]]);
+    actualizarInfoRutaActiva(distHaversine(origenLat, origenLng, destino.lat, destino.lng) * 1.3, null);
+  } finally {
+    condCalculandoRuta = false;
+  }
+}
+
+function pintarRutaActiva(coords) {
+  limpiarRutaActiva();
+  if (!mapCond || coords.length < 2) return;
+  condRutaActivaGroup = L.layerGroup([
+    // Halo oscuro de fondo para dar contraste sobre el mapa claro
+    L.polyline(coords, { color: '#001c3d', weight: 11, opacity: 0.35, lineCap: 'round', lineJoin: 'round' }),
+    // Línea principal de navegación, bien visible
+    L.polyline(coords, { color: '#0091ff', weight: 6, opacity: 0.95, lineCap: 'round', lineJoin: 'round' })
+  ]).addTo(mapCond);
+
+  // Mostrar el tramo completo hasta la parada en pantalla
+  condFollow = false;
+  mapCond.fitBounds(L.polyline(coords).getBounds(), { padding: [60, 200], maxZoom: 17 });
+}
+
+function limpiarRutaActiva() {
+  if (condRutaActivaGroup) { condRutaActivaGroup.remove(); condRutaActivaGroup = null; }
+  condRutaActivaTargetId = null;
+  const wrap = document.getElementById('cond-eta-wrap');
+  if (wrap) wrap.style.display = 'none';
+}
+
+function actualizarInfoRutaActiva(km, min) {
+  const wrap  = document.getElementById('cond-eta-wrap');
+  const dEl   = document.getElementById('cond-eta-dist');
+  const tEl   = document.getElementById('cond-eta-tiempo');
+  if (!wrap) return;
+  wrap.style.display = 'block';
+  if (dEl) dEl.textContent = km < 1 ? Math.round(km * 1000) + ' m' : km.toFixed(1) + ' km';
+  if (tEl) tEl.textContent = min == null ? '—' : (min < 1 ? '<1 min' : Math.round(min) + ' min');
 }
 
 // Ajusta el mapa para ver la ruta completa y desactiva el seguimiento automático
@@ -3981,10 +4070,13 @@ function detenerGPSConduccion() {
   }
   condLastPos = null;
   if (condUserMarker) { condUserMarker.remove(); condUserMarker = null; }
+  limpiarRutaActiva();
 }
 
 function actualizarUbicacionConduccion(lat, lng) {
   if (!mapCond) return;
+
+  const esPrimerFix = !condUserMarker;
 
   if (!condUserMarker) {
     condUserMarker = L.marker([lat, lng], {
@@ -3999,6 +4091,9 @@ function actualizarUbicacionConduccion(lat, lng) {
   }
 
   if (condFollow) mapCond.panTo([lat, lng], { animate: true });
+
+  // En el primer fix de GPS, calcular la ruta por carretera hacia la parada actual
+  if (esPrimerFix) condActualizarRutaHaciaObjetivo();
 }
 
 function mostrarPantallaConduccion() {
@@ -4300,13 +4395,13 @@ function _accionCond(esFallida){
   p.hecha=true;p.fallida=esFallida;p.horaAccion=fmtHora(new Date());
   saveState();
   if(navigator.vibrate)navigator.vibrate(esFallida?[100,50,100]:100);
+  // Forzar recálculo de la ruta por carretera hacia el siguiente punto (sin salir de la app)
+  condRutaActivaTargetId = null;
   const sig=ruta.paradas.filter(q=>!q.hecha&&!q.fallida);
   if(sig.length>0){
-    window.open(_urlMaps(sig[0].lat,sig[0].lng),'_blank');
     renderPantallaConduccion();
     setTimeout(()=>enviarNotificacionParada(),1500);
   }else{
-    if(ruta.final)window.open(_urlMaps(ruta.final.lat,ruta.final.lng),'_blank');
     renderPantallaConduccion();
     setTimeout(()=>_notifFinRuta(),1500);
   }
