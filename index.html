@@ -142,6 +142,10 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
 .nav-divider { width: 1px; height: 36px; background: var(--border); }
 #gmap-container { position:absolute;inset:0;z-index:1; }
 #nav-map-leaflet { position:absolute;inset:0;z-index:1;display:none; }
+/* Mapa de conducción: look oscuro tipo navegación nocturna sin depender de un
+   proveedor de teselas con API key — se invierten los colores de OpenStreetMap. */
+#cond-mapa .leaflet-tile-pane { filter: invert(1) hue-rotate(200deg) brightness(.95) contrast(.92) saturate(.7); }
+#cond-mapa .leaflet-control-attribution { display:none; }
 .gm-style .gm-style-iw-c { background:var(--bg2) !important; color:var(--text) !important; }
 .gmnoprint, .gm-style-cc { display:none !important; }
 #nav-lista-overlay { position: absolute; inset: 0; z-index: 200; background: var(--bg); display: flex; flex-direction: column; }
@@ -498,8 +502,13 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
      ════════════════════════════════════════════════════════════════ -->
 <div class="screen hidden" id="screen-conduccion" style="background:#060e1a;">
 
-  <!-- Mapa de fondo — a pantalla completa, estilo moderno -->
-  <div id="cond-mapa" style="position:absolute;inset:0;z-index:0;background:#0a1420;"></div>
+  <!-- Mapa de fondo — a pantalla completa. El rotor interno gira para que
+       el camino siempre se vea "de frente" (heading-up), como Waze. -->
+  <div id="cond-mapa-viewport" style="position:absolute;inset:0;z-index:0;overflow:hidden;background:#0a1420;">
+    <div id="cond-mapa-rotor" style="position:absolute;top:-50%;left:-50%;width:200%;height:200%;transition:transform .25s linear;">
+      <div id="cond-mapa" style="position:absolute;inset:0;"></div>
+    </div>
+  </div>
 
   <!-- Botones flotantes del mapa: ver ruta completa / centrar en mí -->
   <button id="cond-btn-verruta" onclick="condVerRutaCompleta()" title="Ver ruta completa"
@@ -538,8 +547,17 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
     </button>
   </div>
 
+  <!-- Banner de maniobra (próxima vuelta), tipo Waze -->
+  <div id="cond-maniobra-wrap" style="display:none;position:relative;z-index:2;margin:0 14px;padding:12px 16px;background:rgba(8,17,30,.92);border:1.5px solid rgba(0,212,255,.35);border-radius:18px 18px 4px 4px;backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);align-items:center;gap:12px;flex-shrink:0;box-shadow:0 6px 24px rgba(0,0,0,.45);">
+    <div id="cond-maniobra-icono" style="font-size:32px;line-height:1;flex-shrink:0;text-shadow:0 0 12px rgba(0,212,255,.6);">⬆</div>
+    <div style="flex:1;min-width:0;">
+      <div id="cond-maniobra-dist" style="font-size:19px;font-weight:900;color:#fff;line-height:1.15;">—</div>
+      <div id="cond-maniobra-texto" style="font-size:12px;font-weight:700;color:#8aabcc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px;">Calculando ruta…</div>
+    </div>
+  </div>
+
   <!-- Banner ETA flotante, tipo apps de navegación -->
-  <div id="cond-eta-banner" style="display:none;position:relative;z-index:2;margin:-8px 14px 0;padding:10px 16px;background:rgba(0,212,255,.14);border:1.5px solid rgba(0,212,255,.4);border-radius:16px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);align-items:center;justify-content:center;gap:10px;flex-shrink:0;box-shadow:0 4px 20px rgba(0,0,0,.35);">
+  <div id="cond-eta-banner" style="display:none;position:relative;z-index:2;margin:0 14px;padding:8px 16px;background:rgba(0,212,255,.14);border:1.5px solid rgba(0,212,255,.4);border-top:none;border-radius:0 0 16px 16px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);align-items:center;justify-content:center;gap:10px;flex-shrink:0;box-shadow:0 4px 20px rgba(0,0,0,.35);">
     <span style="font-size:15px;font-weight:900;color:#00e676;" id="cond-eta-tiempo">—</span>
     <span style="color:#2a4a6a;">·</span>
     <span style="font-size:13px;font-weight:700;color:#8aabcc;" id="cond-eta-dist">—</span>
@@ -3844,13 +3862,17 @@ let condMarkers      = [];   // marcadores de paradas
 let condUserMarker   = null; // marcador de "mi ubicación"
 let condWatchId       = null; // id de navigator.geolocation.watchPosition
 let condLastPos        = null; // última posición usada para redibujar (filtro de 3m)
-let condFollow           = true; // ¿el mapa sigue automáticamente al usuario?
+let condFollow           = true; // ¿el mapa sigue automáticamente al usuario (heading-up)?
+let condHeadingActual     = null; // último rumbo (heading) válido conocido, en grados
 const COND_GPS_MIN_METROS = 3;   // distancia mínima entre actualizaciones del mapa
 
 // Ruta activa por carretera (tramo actual hacia la parada en curso)
 let condRutaActivaGroup    = null; // L.layerGroup con la línea de la ruta activa
 let condRutaActivaTargetId = null; // id de la parada para la que ya se calculó la ruta activa
 let condCalculandoRuta     = false;
+let condRutaSteps          = null; // maniobras (steps) de la ruta activa, según OSRM
+let condRutaStepsCum       = null; // distancia acumulada al inicio de cada maniobra
+let condRutaCoordsAcum     = null; // geometría de la ruta con distancia acumulada por punto
 
 function initMapaConduccion() {
   const el = document.getElementById('cond-mapa');
@@ -3863,9 +3885,10 @@ function initMapaConduccion() {
   mapCond = L.map('cond-mapa', { zoomControl: false, attributionControl: false })
               .setView(centro, 13);
 
-  // Mapa oscuro de navegación — alto contraste, calles y etiquetas muy legibles de noche/día
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    maxZoom: 20, subdomains: 'abcd'
+  // Teselas estándar de OpenStreetMap — gratis, sin API key.
+  // El look oscuro de navegación se logra con el filtro CSS #cond-mapa .leaflet-tile-pane.
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, subdomains: 'abc'
   }).addTo(mapCond);
 }
 
@@ -3981,19 +4004,23 @@ async function calcularRutaActiva(origenLat, origenLng, destino) {
   if (condCalculandoRuta) return;
   condCalculandoRuta = true;
   try {
-    const url = `https://router.project-osrm.org/route/v1/driving/${origenLng},${origenLat};${destino.lng},${destino.lat}?overview=full&geometries=geojson`;
+    const url = `https://router.project-osrm.org/route/v1/driving/${origenLng},${origenLat};${destino.lng},${destino.lat}?overview=full&geometries=geojson&steps=true`;
     const res  = await fetch(url);
     const data = await res.json();
     if (data.code === 'Ok' && data.routes && data.routes[0]) {
       const coords = data.routes[0].geometry.coordinates.map(c => [c[1], c[0]]);
       pintarRutaActiva(coords);
+      prepararManiobras(data.routes[0], coords);
       actualizarInfoRutaActiva(data.routes[0].distance / 1000, data.routes[0].duration / 60);
+      if (condLastPos) condActualizarManiobra(condLastPos.lat, condLastPos.lng);
     } else {
       throw new Error('Sin ruta OSRM');
     }
   } catch (e) {
     console.warn('Ruteo por carretera falló, usando línea recta:', e.message);
     pintarRutaActiva([[origenLat, origenLng], [destino.lat, destino.lng]]);
+    condRutaSteps = null; condRutaStepsCum = null; condRutaCoordsAcum = null;
+    ocultarBannerManiobra();
     actualizarInfoRutaActiva(distHaversine(origenLat, origenLng, destino.lat, destino.lng) * 1.3, null);
   } finally {
     condCalculandoRuta = false;
@@ -4010,16 +4037,113 @@ function pintarRutaActiva(coords) {
     L.polyline(coords, { color: '#00d4ff', weight: 6, opacity: 0.95, lineCap: 'round', lineJoin: 'round' })
   ]).addTo(mapCond);
 
-  // Mostrar el tramo completo hasta la parada en pantalla
-  condFollow = false;
-  mapCond.fitBounds(L.polyline(coords).getBounds(), { padding: [60, 200], maxZoom: 17 });
+  // Sólo la primera vez (aún sin ubicación del usuario) mostramos el tramo completo;
+  // después dejamos que el modo "seguir de frente" mantenga la cámara sobre el conductor.
+  if (!condUserMarker) {
+    mapCond.fitBounds(L.polyline(coords).getBounds(), { padding: [60, 60], maxZoom: 17 });
+  }
 }
 
 function limpiarRutaActiva() {
   if (condRutaActivaGroup) { condRutaActivaGroup.remove(); condRutaActivaGroup = null; }
   condRutaActivaTargetId = null;
+  condRutaSteps = null; condRutaStepsCum = null; condRutaCoordsAcum = null;
   const banner = document.getElementById('cond-eta-banner');
   if (banner) banner.style.display = 'none';
+  ocultarBannerManiobra();
+}
+
+// ── Maniobras (vueltas) tipo Waze ───────────────────────────────────
+
+// Prepara la geometría (con distancia acumulada) y la lista de maniobras de OSRM
+function prepararManiobras(routeObj, coords) {
+  const acum = [{ lat: coords[0][0], lng: coords[0][1], dist: 0 }];
+  for (let i = 1; i < coords.length; i++) {
+    const d = acum[i-1].dist + distHaversine(coords[i-1][0], coords[i-1][1], coords[i][0], coords[i][1]) * 1000;
+    acum.push({ lat: coords[i][0], lng: coords[i][1], dist: d });
+  }
+  condRutaCoordsAcum = acum;
+
+  const steps = (routeObj.legs && routeObj.legs[0] && routeObj.legs[0].steps) || [];
+  condRutaSteps = steps;
+  const stepsCum = [0];
+  for (let i = 0; i < steps.length; i++) stepsCum.push(stepsCum[i] + steps[i].distance);
+  condRutaStepsCum = stepsCum;
+}
+
+// Calcula, a partir de la posición actual, cuánto falta para la siguiente vuelta y la muestra
+function condActualizarManiobra(lat, lng) {
+  if (!condRutaCoordsAcum || !condRutaSteps || !condRutaSteps.length) { ocultarBannerManiobra(); return; }
+
+  // Punto más cercano de la geometría de la ruta a la posición actual
+  let best = 0, bestD = Infinity;
+  for (let i = 0; i < condRutaCoordsAcum.length; i++) {
+    const d = distHaversine(lat, lng, condRutaCoordsAcum[i].lat, condRutaCoordsAcum[i].lng);
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  const userCum = condRutaCoordsAcum[best].dist;
+
+  // Encontrar en qué tramo (step) va el usuario ahora mismo
+  let idx = 0;
+  for (let i = 0; i < condRutaStepsCum.length - 1; i++) {
+    if (condRutaStepsCum[i] <= userCum) idx = i; else break;
+  }
+  const pasoSig  = condRutaSteps[idx + 1] || condRutaSteps[idx];
+  const finPaso  = (condRutaStepsCum[idx + 1] != null) ? condRutaStepsCum[idx + 1] : condRutaStepsCum[idx];
+  const restante = Math.max(0, finPaso - userCum);
+
+  if (!pasoSig) { ocultarBannerManiobra(); return; }
+  mostrarBannerManiobra(pasoSig.maneuver, pasoSig.name, restante);
+}
+
+function condInfoManiobra(maneuver, nombreCalle) {
+  const tipo = maneuver.type;
+  const mod  = maneuver.modifier;
+  const calleTxt = nombreCalle ? ` en ${nombreCalle}` : '';
+
+  if (tipo === 'arrive')  return { icono: '🏁', texto: 'Has llegado a tu destino' };
+  if (tipo === 'depart')  return { icono: '⬆',  texto: 'Continúa recto' + calleTxt };
+  if (tipo === 'roundabout' || tipo === 'rotary') {
+    const salida = maneuver.exit ? `, toma la salida ${maneuver.exit}` : '';
+    return { icono: '🔄', texto: `Entra a la glorieta${salida}` };
+  }
+
+  const mapaModificadores = {
+    'straight':     { icono: '⬆', texto: 'Continúa recto' },
+    'slight right': { icono: '↗', texto: 'Mantente a la derecha' },
+    'right':        { icono: '➡', texto: 'Gira a la derecha' },
+    'sharp right':  { icono: '↘', texto: 'Gira fuerte a la derecha' },
+    'slight left':  { icono: '↖', texto: 'Mantente a la izquierda' },
+    'left':         { icono: '⬅', texto: 'Gira a la izquierda' },
+    'sharp left':   { icono: '↙', texto: 'Gira fuerte a la izquierda' },
+    'uturn':        { icono: '↩', texto: 'Da vuelta en U' },
+  };
+  const base = mapaModificadores[mod] || { icono: '⬆', texto: 'Continúa recto' };
+  return { icono: base.icono, texto: base.texto + calleTxt };
+}
+
+function mostrarBannerManiobra(maneuver, nombreCalle, metrosRestantes) {
+  const wrap    = document.getElementById('cond-maniobra-wrap');
+  const iconoEl = document.getElementById('cond-maniobra-icono');
+  const distEl  = document.getElementById('cond-maniobra-dist');
+  const textoEl = document.getElementById('cond-maniobra-texto');
+  if (!wrap) return;
+
+  const { icono, texto } = condInfoManiobra(maneuver, nombreCalle);
+  wrap.style.display = 'flex';
+  if (iconoEl) iconoEl.textContent = icono;
+  if (textoEl) textoEl.textContent = texto;
+  if (distEl) {
+    if (maneuver.type === 'arrive') distEl.textContent = '¡Llegando!';
+    else if (metrosRestantes < 30)  distEl.textContent = 'Ahora';
+    else if (metrosRestantes < 1000) distEl.textContent = Math.round(metrosRestantes / 10) * 10 + ' m';
+    else distEl.textContent = (metrosRestantes / 1000).toFixed(1) + ' km';
+  }
+}
+
+function ocultarBannerManiobra() {
+  const wrap = document.getElementById('cond-maniobra-wrap');
+  if (wrap) wrap.style.display = 'none';
 }
 
 function actualizarInfoRutaActiva(km, min) {
@@ -4041,16 +4165,18 @@ function actualizarInfoRutaActiva(km, min) {
   }
 }
 
-// Ajusta el mapa para ver la ruta completa y desactiva el seguimiento automático
+// Ajusta el mapa para ver la ruta completa (norte arriba) y desactiva el seguimiento automático
 function condVerRutaCompleta() {
   if (!mapCond || !condLine) return;
   condFollow = false;
+  condAplicarRotacionMapa();
   mapCond.fitBounds(condLine.getBounds(), { padding: [50, 50], maxZoom: 16 });
 }
 
-// Centra el mapa en la ubicación actual y reactiva el seguimiento automático
+// Centra el mapa en la ubicación actual, reactiva el seguimiento y la vista "de frente"
 function condRecentrarUsuario() {
   condFollow = true;
+  condAplicarRotacionMapa();
   if (mapCond && condLastPos) {
     mapCond.setView([condLastPos.lat, condLastPos.lng], 17, { animate: true });
   }
@@ -4084,22 +4210,29 @@ function detenerGPSConduccion() {
     condWatchId = null;
   }
   condLastPos = null;
+  condHeadingActual = null;
   if (condUserMarker) { condUserMarker.remove(); condUserMarker = null; }
   limpiarRutaActiva();
+  const rotor = document.getElementById('cond-mapa-rotor');
+  if (rotor) rotor.style.transform = 'rotate(0deg)';
 }
 
 function actualizarUbicacionConduccion(lat, lng, heading) {
   if (!mapCond) return;
 
   const esPrimerFix = !condUserMarker;
-  const rot = (typeof heading === 'number') ? heading : 0;
+  if (typeof heading === 'number') condHeadingActual = heading;
+
+  // Si el mapa está rotando en modo "de frente" (heading-up), la flecha apunta
+  // siempre hacia arriba; si no, la flecha misma indica el rumbo.
+  const rotFlecha = (condFollow && condHeadingActual != null) ? 0 : (condHeadingActual || 0);
 
   if (!condUserMarker) {
     condUserMarker = L.marker([lat, lng], {
       icon: L.divIcon({
         html: `
           <div style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;">
-            <div id="cond-user-arrow" style="width:0;height:0;transform:rotate(${rot}deg);transition:transform .25s linear;
+            <div id="cond-user-arrow" style="width:0;height:0;transform:rotate(${rotFlecha}deg);transition:transform .25s linear;
                  border-left:10px solid transparent;border-right:10px solid transparent;border-bottom:22px solid #00d4ff;
                  filter:drop-shadow(0 0 6px rgba(0,212,255,.9)) drop-shadow(0 2px 4px rgba(0,0,0,.6));"></div>
           </div>`,
@@ -4110,13 +4243,29 @@ function actualizarUbicacionConduccion(lat, lng, heading) {
   } else {
     condUserMarker.setLatLng([lat, lng]);
     const arrowEl = document.getElementById('cond-user-arrow');
-    if (arrowEl && typeof heading === 'number') arrowEl.style.transform = `rotate(${rot}deg)`;
+    if (arrowEl) arrowEl.style.transform = `rotate(${rotFlecha}deg)`;
   }
 
+  condAplicarRotacionMapa();
   if (condFollow) mapCond.panTo([lat, lng], { animate: true });
 
   // En el primer fix de GPS, calcular la ruta por carretera hacia la parada actual
   if (esPrimerFix) condActualizarRutaHaciaObjetivo();
+
+  // Actualizar cuántos metros/km faltan para la siguiente vuelta (cálculo local, sin llamadas extra)
+  condActualizarManiobra(lat, lng);
+}
+
+// Gira el mapa para que el camino se vea siempre "de frente" (heading-up), como en Waze.
+// Si no se está siguiendo al usuario (modo overview) o no hay rumbo, se deja el mapa recto (norte arriba).
+function condAplicarRotacionMapa() {
+  const rotor = document.getElementById('cond-mapa-rotor');
+  if (!rotor) return;
+  if (condFollow && condHeadingActual != null) {
+    rotor.style.transform = `rotate(${-condHeadingActual}deg)`;
+  } else {
+    rotor.style.transform = 'rotate(0deg)';
+  }
 }
 
 function mostrarPantallaConduccion() {
