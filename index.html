@@ -531,11 +531,20 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
       </div>
     </div>
 
-    <!-- Botón Maps -->
-    <button onclick="abrirMapsDesdeConduccion()"
+    <!-- Botón: forzar recálculo de ruta (dentro de la app, no abre Maps) -->
+    <button onclick="condForzarRecalculo()" title="Recalcular ruta"
       style="height:44px;padding:0 14px;border-radius:12px;border:1.5px solid rgba(0,212,255,.35);background:rgba(0,212,255,.1);color:#00d4ff;font-size:14px;font-weight:800;cursor:pointer;flex-shrink:0;">
-      🗺
+      🔄
     </button>
+  </div>
+
+  <!-- Banner ETA flotante, tipo apps de navegación -->
+  <div id="cond-eta-banner" style="display:none;position:relative;z-index:2;margin:-8px 14px 0;padding:10px 16px;background:rgba(0,212,255,.14);border:1.5px solid rgba(0,212,255,.4);border-radius:16px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);align-items:center;justify-content:center;gap:10px;flex-shrink:0;box-shadow:0 4px 20px rgba(0,0,0,.35);">
+    <span style="font-size:15px;font-weight:900;color:#00e676;" id="cond-eta-tiempo">—</span>
+    <span style="color:#2a4a6a;">·</span>
+    <span style="font-size:13px;font-weight:700;color:#8aabcc;" id="cond-eta-dist">—</span>
+    <span style="color:#2a4a6a;">·</span>
+    <span style="font-size:12px;font-weight:600;color:#4a6a8a;">Llegas <span id="cond-eta-hora" style="color:#8aabcc;font-weight:800;">—</span></span>
   </div>
 
   <!-- Zona central: aquí se ve el mapa (deja pasar los toques al mapa de fondo) -->
@@ -559,10 +568,6 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
       <!-- Siguiente (referencia discreta) -->
       <div style="margin-top:5px;font-size:11px;color:#4a6a8a;font-weight:600;">
         Siguiente: <span id="cond-siguiente" style="color:#8aabcc;">—</span>
-      </div>
-      <!-- Distancia / tiempo estimado por carretera hasta la parada actual -->
-      <div id="cond-eta-wrap" style="margin-top:4px;font-size:12px;font-weight:800;color:#00e676;display:none;">
-        <span id="cond-eta-dist">—</span> · <span id="cond-eta-tiempo">—</span>
       </div>
     </div>
 
@@ -3858,8 +3863,8 @@ function initMapaConduccion() {
   mapCond = L.map('cond-mapa', { zoomControl: false, attributionControl: false })
               .setView(centro, 13);
 
-  // Mapa moderno tipo "Voyager" (claro, con carreteras y etiquetas muy legibles)
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+  // Mapa oscuro de navegación — alto contraste, calles y etiquetas muy legibles de noche/día
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
     maxZoom: 20, subdomains: 'abcd'
   }).addTo(mapCond);
 }
@@ -3999,10 +4004,10 @@ function pintarRutaActiva(coords) {
   limpiarRutaActiva();
   if (!mapCond || coords.length < 2) return;
   condRutaActivaGroup = L.layerGroup([
-    // Halo oscuro de fondo para dar contraste sobre el mapa claro
-    L.polyline(coords, { color: '#001c3d', weight: 11, opacity: 0.35, lineCap: 'round', lineJoin: 'round' }),
-    // Línea principal de navegación, bien visible
-    L.polyline(coords, { color: '#0091ff', weight: 6, opacity: 0.95, lineCap: 'round', lineJoin: 'round' })
+    // Halo brillante de fondo para que la ruta "brille" sobre el mapa oscuro
+    L.polyline(coords, { color: '#ffffff', weight: 12, opacity: 0.18, lineCap: 'round', lineJoin: 'round' }),
+    // Línea principal de navegación, bien visible tipo nav nocturna
+    L.polyline(coords, { color: '#00d4ff', weight: 6, opacity: 0.95, lineCap: 'round', lineJoin: 'round' })
   ]).addTo(mapCond);
 
   // Mostrar el tramo completo hasta la parada en pantalla
@@ -4013,18 +4018,27 @@ function pintarRutaActiva(coords) {
 function limpiarRutaActiva() {
   if (condRutaActivaGroup) { condRutaActivaGroup.remove(); condRutaActivaGroup = null; }
   condRutaActivaTargetId = null;
-  const wrap = document.getElementById('cond-eta-wrap');
-  if (wrap) wrap.style.display = 'none';
+  const banner = document.getElementById('cond-eta-banner');
+  if (banner) banner.style.display = 'none';
 }
 
 function actualizarInfoRutaActiva(km, min) {
-  const wrap  = document.getElementById('cond-eta-wrap');
-  const dEl   = document.getElementById('cond-eta-dist');
-  const tEl   = document.getElementById('cond-eta-tiempo');
-  if (!wrap) return;
-  wrap.style.display = 'block';
+  const banner = document.getElementById('cond-eta-banner');
+  const dEl    = document.getElementById('cond-eta-dist');
+  const tEl    = document.getElementById('cond-eta-tiempo');
+  const hEl    = document.getElementById('cond-eta-hora');
+  if (!banner) return;
+  banner.style.display = 'flex';
   if (dEl) dEl.textContent = km < 1 ? Math.round(km * 1000) + ' m' : km.toFixed(1) + ' km';
   if (tEl) tEl.textContent = min == null ? '—' : (min < 1 ? '<1 min' : Math.round(min) + ' min');
+  if (hEl) {
+    if (min == null) {
+      hEl.textContent = '—';
+    } else {
+      const llegada = new Date(Date.now() + min * 60000);
+      hEl.textContent = llegada.toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' });
+    }
+  }
 }
 
 // Ajusta el mapa para ver la ruta completa y desactiva el seguimiento automático
@@ -4048,15 +4062,16 @@ function iniciarGPSConduccion() {
 
   condWatchId = navigator.geolocation.watchPosition(
     pos => {
-      const lat = pos.coords.latitude;
-      const lng = pos.coords.longitude;
+      const lat     = pos.coords.latitude;
+      const lng     = pos.coords.longitude;
+      const heading = (pos.coords.heading !== null && !isNaN(pos.coords.heading)) ? pos.coords.heading : null;
 
       // Filtro: sólo actualizar el mapa cuando el usuario se movió 3 metros o más
       if (condLastPos && distHaversine(condLastPos.lat, condLastPos.lng, lat, lng) * 1000 < COND_GPS_MIN_METROS) {
         return;
       }
       condLastPos = { lat, lng };
-      actualizarUbicacionConduccion(lat, lng);
+      actualizarUbicacionConduccion(lat, lng, heading);
     },
     err => console.warn('GPS conducción:', err.message),
     { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 }
@@ -4073,21 +4088,29 @@ function detenerGPSConduccion() {
   limpiarRutaActiva();
 }
 
-function actualizarUbicacionConduccion(lat, lng) {
+function actualizarUbicacionConduccion(lat, lng, heading) {
   if (!mapCond) return;
 
   const esPrimerFix = !condUserMarker;
+  const rot = (typeof heading === 'number') ? heading : 0;
 
   if (!condUserMarker) {
     condUserMarker = L.marker([lat, lng], {
       icon: L.divIcon({
-        html: `<div style="width:20px;height:20px;border-radius:50%;background:#0064ff;border:3px solid #fff;box-shadow:0 0 0 7px rgba(0,100,255,.25),0 2px 10px rgba(0,0,0,.5);"></div>`,
-        className: '', iconSize: [20,20], iconAnchor: [10,10]
+        html: `
+          <div style="width:40px;height:40px;display:flex;align-items:center;justify-content:center;">
+            <div id="cond-user-arrow" style="width:0;height:0;transform:rotate(${rot}deg);transition:transform .25s linear;
+                 border-left:10px solid transparent;border-right:10px solid transparent;border-bottom:22px solid #00d4ff;
+                 filter:drop-shadow(0 0 6px rgba(0,212,255,.9)) drop-shadow(0 2px 4px rgba(0,0,0,.6));"></div>
+          </div>`,
+        className: '', iconSize: [40,40], iconAnchor: [20,20]
       }),
       zIndexOffset: 1000
     }).addTo(mapCond);
   } else {
     condUserMarker.setLatLng([lat, lng]);
+    const arrowEl = document.getElementById('cond-user-arrow');
+    if (arrowEl && typeof heading === 'number') arrowEl.style.transform = `rotate(${rot}deg)`;
   }
 
   if (condFollow) mapCond.panTo([lat, lng], { animate: true });
@@ -4178,21 +4201,11 @@ function renderPantallaConduccion() {
   if (mapCond) renderMapaConduccion();
 }
 
-// Abrir Maps desde la pantalla de conducción
-function abrirMapsDesdeConduccion() {
-  const ruta = state.rutaActual;
-  if (!ruta) return;
-  const pendientes = ruta.paradas.filter(p => !p.hecha && !p.fallida);
-  if (!pendientes.length) {
-    if (ruta.final) {
-      saveStateLocal();
-      window.open(_urlMaps(ruta.final.lat, ruta.final.lng), '_blank');
-    }
-    return;
-  }
-  const siguiente = pendientes[0];
-  saveStateLocal();
-  window.open(_urlMaps(siguiente.lat, siguiente.lng), '_blank');
+// Fuerza un recálculo de la ruta activa (por si el GPS se movió mucho o hubo un error)
+function condForzarRecalculo() {
+  condRutaActivaTargetId = null;
+  condActualizarRutaHaciaObjetivo();
+  showToast('🔄 Recalculando ruta...');
 }
 
 // Botón ✓ Entregada en modo conducción
