@@ -69,6 +69,7 @@
 <title>SEISA Rutas</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Sortable/1.15.2/Sortable.min.js"></script>
 <!-- Google Maps quitado: la llave estaba restringida y disparaba el error
      "API key required" en varios mapas. Toda la app usa Leaflet + OpenStreetMap
      (teselas) y Nominatim/OSRM (búsqueda de direcciones y rutas), sin API key. -->
@@ -125,6 +126,9 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
 .badge-orange { background: rgba(255,145,0,.15);  color: var(--orange); border: 1px solid rgba(255,145,0,.3); }
 .badge-red    { background: rgba(255,82,82,.15);   color: var(--red);   border: 1px solid rgba(255,82,82,.3); }
 .parada-item { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid var(--border); flex-wrap: wrap; }
+.sortable-ghost { opacity: .35; }
+.sortable-drag  { box-shadow: 0 10px 28px rgba(0,0,0,.55) !important; }
+.parada-drag-handle:active { cursor: grabbing; }
 .parada-num { width: 28px; height: 28px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; flex-shrink: 0; }
 .parada-info { flex: 1; min-width: 0; }
 .parada-name { font-size: 13px; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -423,6 +427,25 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
     <button onclick="mostrarPantallaConduccion()" style="width:auto;padding:6px 12px;font-size:13px;font-weight:800;background:rgba(255,215,0,.15);border:1.5px solid rgba(255,215,0,.5);border-radius:8px;color:#ffd740;cursor:pointer;" title="Modo conducción">🚗 Conducir</button>
     <button id="btn-notif" onclick="activarNotificaciones()" style="width:auto;padding:6px 10px;font-size:12px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text3);cursor:pointer;font-weight:700;" title="Activar notificaciones">🔔</button>
   </div>
+
+  <!-- RESUMEN DE RUTA — estilo Circuit: paradas, km totales, hora de fin -->
+  <div id="seg-resumen-ruta" style="display:flex;background:linear-gradient(135deg, rgba(0,212,255,.14), rgba(0,230,118,.08));border-bottom:1px solid var(--border);padding:12px 10px;flex-shrink:0;">
+    <div style="flex:1;text-align:center;">
+      <div id="seg-resumen-total" style="font-size:19px;font-weight:900;color:#fff;font-family:var(--mono);">0/0</div>
+      <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-top:2px;">Paradas</div>
+    </div>
+    <div style="width:1px;background:var(--border);"></div>
+    <div style="flex:1;text-align:center;">
+      <div id="seg-resumen-km" style="font-size:19px;font-weight:900;color:var(--accent);font-family:var(--mono);">—</div>
+      <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-top:2px;">Km totales</div>
+    </div>
+    <div style="width:1px;background:var(--border);"></div>
+    <div style="flex:1;text-align:center;">
+      <div id="seg-resumen-fin" style="font-size:19px;font-weight:900;color:var(--yellow);font-family:var(--mono);">—</div>
+      <div style="font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;margin-top:2px;">Fin estimado</div>
+    </div>
+  </div>
+
   <div style="background:var(--bg2);border-bottom:1px solid var(--border);padding:10px 16px;flex-shrink:0;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px;">
       <div style="display:flex;gap:10px;flex-wrap:wrap;">
@@ -463,7 +486,7 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
     </div>
 
     <div style="padding:8px 16px;background:var(--surface);border-bottom:1px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
-      <span style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;">Orden de paradas</span>
+      <span style="font-size:11px;font-weight:700;color:var(--text3);text-transform:uppercase;letter-spacing:.06em;">⠿ Arrastra para reordenar</span>
       <div style="display:flex;align-items:center;gap:8px;">
         <span id="seg-fecha-ruta" style="font-size:11px;color:var(--text3);">—</span>
         <button onclick="toggleMapaSeg()" id="btn-toggle-mapa"
@@ -697,6 +720,41 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
     <input class="input" id="editar-parada-nombre" placeholder="Ej: José Ma. Morelos 6" style="font-size:14px;">
     <button class="btn btn-green" onclick="confirmarEditarParada()" style="margin-top:4px;">✓ Confirmar cambios</button>
     <button class="btn btn-ghost" onclick="closeModal('modal-editar-parada')">Cancelar</button>
+  </div>
+</div>
+
+<!-- MODAL: PRUEBA DE ENTREGA (foto + nota), estilo Circuit -->
+<div class="modal-overlay hidden" id="modal-pod">
+  <div class="modal-sheet">
+    <div class="modal-title" id="pod-titulo">✓ Marcar como entregada</div>
+    <div style="font-size:12px;color:var(--text3);margin-bottom:6px;" id="pod-parada-nombre">—</div>
+
+    <div id="pod-preview-wrap" style="display:none;margin-bottom:8px;">
+      <img id="pod-preview-img" style="width:100%;max-height:220px;object-fit:cover;border-radius:10px;border:1px solid var(--border);display:block;">
+      <button class="btn btn-ghost" onclick="podQuitarFoto()" style="margin-top:6px;font-size:12px;padding:7px;">🗑️ Quitar foto</button>
+    </div>
+
+    <label class="btn btn-ghost" style="display:flex;align-items:center;justify-content:center;gap:6px;font-size:13px;padding:12px;cursor:pointer;margin-bottom:0;">
+      📷 Tomar / adjuntar foto (opcional)
+      <input type="file" accept="image/*" capture="environment" style="display:none;" onchange="podFotoSeleccionada(this)">
+    </label>
+
+    <div style="font-size:11px;color:var(--text3);text-transform:uppercase;letter-spacing:.07em;margin-top:8px;margin-bottom:5px;">Nota (opcional)</div>
+    <textarea id="pod-nota" class="input" style="height:64px;resize:none;font-size:13px;" placeholder="Ej: Se dejó con el vecino, portón cerrado..."></textarea>
+
+    <button class="btn" id="pod-btn-confirmar" onclick="confirmarPOD()" style="margin-top:6px;font-size:14px;font-weight:800;padding:12px;background:#00c853;color:#000;">✓ Confirmar entrega</button>
+    <button class="btn btn-ghost" onclick="cerrarModalPOD()">Cancelar</button>
+  </div>
+</div>
+
+<!-- MODAL: VER PRUEBA DE ENTREGA -->
+<div class="modal-overlay hidden" id="modal-ver-pod">
+  <div class="modal-sheet">
+    <div class="modal-title">📷 Prueba de entrega</div>
+    <div id="verpod-nombre" style="font-size:12px;color:var(--text3);margin-bottom:8px;">—</div>
+    <img id="verpod-img" style="width:100%;border-radius:10px;border:1px solid var(--border);display:none;margin-bottom:8px;">
+    <div id="verpod-nota" style="font-size:13px;color:var(--text2);white-space:pre-wrap;"></div>
+    <button class="btn btn-ghost" onclick="closeModal('modal-ver-pod')" style="margin-top:10px;">Cerrar</button>
   </div>
 </div>
 
@@ -2559,6 +2617,15 @@ function renderSeguimiento() {
   if (kmEl)  kmEl.textContent  = kmRest > 0 ? kmRest + ' km' : '—';
   if (etaEl) etaEl.textContent = etaHora || (pendientes === 0 ? '✓ Listo' : '—');
 
+  // Resumen de ruta (paradas / km totales planeados / hora estimada de fin)
+  const kmTotal = total ? Math.round(calcDistRuta(ruta.paradas, ruta.inicio, ruta.final) * 1.35 * 10) / 10 : 0;
+  const resTotalEl = document.getElementById('seg-resumen-total');
+  const resKmEl     = document.getElementById('seg-resumen-km');
+  const resFinEl    = document.getElementById('seg-resumen-fin');
+  if (resTotalEl) resTotalEl.textContent = (entregadas + fallidas) + '/' + total;
+  if (resKmEl)     resKmEl.textContent    = kmTotal > 0 ? kmTotal + ' km' : '—';
+  if (resFinEl)    resFinEl.textContent   = etaHora || (total > 0 && pendientes === 0 ? '✓' : '—');
+
   const lista = document.getElementById('seg-paradas-list');
   if (!lista) return;
   lista.innerHTML = '';
@@ -2572,11 +2639,12 @@ function renderSeguimiento() {
   ruta.paradas.forEach((p, i) => {
     const entregada = p.hecha && !p.fallida;
     const fallida   = p.fallida;
+    const pendiente = !entregada && !fallida;
     const color = entregada ? 'var(--green)' : fallida ? 'var(--red)' : 'var(--accent)';
     const icono = entregada ? '✓' : fallida ? '✗' : idxToLetra(i);
 
     let etaStr = '';
-    if (!entregada && !fallida) {
+    if (pendiente) {
       const prev = pendIdx === 0 ? puntoActual : ruta.paradas.filter(q => !q.hecha && !q.fallida)[pendIdx - 1];
       if (prev) distAcumPend += distHaversine(prev.lat, prev.lng, p.lat, p.lng) * 1.35;
       const minsConduccion = Math.round((distAcumPend / 35) * 60);
@@ -2589,12 +2657,26 @@ function renderSeguimiento() {
       pendIdx++;
     }
 
+    // Tarjeta (estilo Circuit) — sólo las pendientes se pueden arrastrar
     const div = document.createElement('div');
-    div.style.cssText = 'padding:11px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px;' +
-      (entregada ? 'background:rgba(0,230,118,.04);' : fallida ? 'background:rgba(255,82,82,.04);' : '');
+    div.className = 'parada-card ' + (pendiente ? 'parada-pendiente-drag' : 'parada-fija-drag');
+    div.style.cssText =
+      'display:flex;align-items:center;gap:6px;margin:0 10px 8px;padding:11px 12px;border-radius:14px;' +
+      'border:1px solid var(--border);border-left:4px solid ' + color + ';box-shadow:0 2px 8px rgba(0,0,0,.18);' +
+      'background:' + (entregada ? 'rgba(0,230,118,.06)' : fallida ? 'rgba(255,82,82,.06)' : 'var(--surface)') + ';';
     div.dataset.paradaIdx    = i;
+    div.dataset.paradaId     = p.id;
     div.dataset.paradaNombre = p.nombre;
     div.dataset.paradaLetra  = idxToLetra(i).toLowerCase();
+
+    const handle = document.createElement('div');
+    if (pendiente) {
+      handle.className   = 'parada-drag-handle';
+      handle.textContent = '⠿';
+      handle.style.cssText = 'flex-shrink:0;color:var(--text3);font-size:17px;cursor:grab;padding:6px 3px;touch-action:none;';
+    } else {
+      handle.style.cssText = 'flex-shrink:0;width:12px;';
+    }
 
     const badge = document.createElement('div');
     badge.style.cssText = 'width:28px;height:28px;border-radius:50%;border:2px solid ' + color + ';color:' + color + ';display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:800;flex-shrink:0;';
@@ -2606,11 +2688,22 @@ function renderSeguimiento() {
     nameEl2.style.cssText = 'font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;';
     nameEl2.textContent = p.nombre;
     const subEl2 = document.createElement('div');
-    subEl2.style.cssText = 'font-size:11px;margin-top:2px;color:' + (p.horaAccion ? color : (etaStr ? 'var(--text2)' : 'var(--text3)')) + ';';
-    subEl2.textContent = p.horaAccion ? (entregada ? '✓ ' : '✗ ') + p.horaAccion : (etaStr || '');
+    subEl2.style.cssText = 'font-size:11px;margin-top:2px;color:' + (p.horaAccion ? color : (etaStr ? 'var(--text2)' : 'var(--text3)')) + ';display:flex;align-items:center;gap:7px;flex-wrap:wrap;';
+    const subTxt = document.createElement('span');
+    subTxt.textContent = p.horaAccion ? (entregada ? '✓ ' : '✗ ') + p.horaAccion : (etaStr || '');
+    subEl2.appendChild(subTxt);
+    if (p.foto || p.nota) {
+      const podLink = document.createElement('span');
+      podLink.textContent = p.foto ? '📷 Ver prueba' : '📝 Ver nota';
+      podLink.style.cssText = 'color:var(--accent);font-weight:700;cursor:pointer;text-decoration:underline;';
+      podLink.onclick = (ev) => { ev.stopPropagation(); verProbadaPOD(p.id); };
+      subEl2.appendChild(podLink);
+    }
     info.appendChild(nameEl2); info.appendChild(subEl2);
 
-    if (!entregada && !fallida) {
+    div.appendChild(handle);
+
+    if (pendiente) {
       const btnWrap = document.createElement('div');
       btnWrap.style.cssText = 'display:flex;flex-direction:column;gap:4px;flex-shrink:0;align-items:flex-end;';
       const actionRow = document.createElement('div');
@@ -2647,6 +2740,9 @@ function renderSeguimiento() {
     lista.appendChild(div);
   });
 
+  // Habilitar arrastrar-y-soltar para reordenar las paradas pendientes a mano
+  inicializarDragParadasSeg();
+
   // Actualizar estado del botón de navegación automática
   actualizarBtnNavAuto();
 
@@ -2661,13 +2757,148 @@ function renderSeguimiento() {
   }
 }
 
+// ── Arrastrar y soltar para reordenar paradas a mano (estilo Circuit) ──
+let _sortableSeg = null;
+function inicializarDragParadasSeg() {
+  const lista = document.getElementById('seg-paradas-list');
+  if (!lista || typeof Sortable === 'undefined') return;
+  if (_sortableSeg) { _sortableSeg.destroy(); _sortableSeg = null; }
+  _sortableSeg = new Sortable(lista, {
+    handle: '.parada-drag-handle',
+    filter: '.parada-fija-drag',
+    preventOnFilter: false,
+    animation: 180,
+    onEnd: function() {
+      const ruta = state.rutaActual;
+      if (!ruta) return;
+      const idsEnOrden = Array.from(lista.children).map(el => el.dataset.paradaId);
+      const nuevoOrden = idsEnOrden.map(id => ruta.paradas.find(p => p.id === id)).filter(Boolean);
+      ruta.paradas.forEach(p => { if (!nuevoOrden.includes(p)) nuevoOrden.push(p); }); // por seguridad
+      ruta.paradas = nuevoOrden;
+      saveState();
+      renderSeguimiento();
+      showToast('↕️ Orden actualizado');
+    }
+  });
+}
+
+// ── Prueba de entrega: foto + nota (estilo Circuit) ─────────────────
+let _podCtx = null; // { origen:'seg'|'cond', idx, esFallida, foto }
+
+function abrirModalPOD({ origen, idx, esFallida }) {
+  const ruta = state.rutaActual;
+  const p = ruta?.paradas?.[idx];
+  if (!p) return;
+  _podCtx = { origen, idx, esFallida, foto: null };
+
+  const tituloEl   = document.getElementById('pod-titulo');
+  const nombreEl   = document.getElementById('pod-parada-nombre');
+  const notaEl     = document.getElementById('pod-nota');
+  const prevWrap   = document.getElementById('pod-preview-wrap');
+  const btnConfirm = document.getElementById('pod-btn-confirmar');
+
+  if (tituloEl) tituloEl.textContent = esFallida ? '✗ Marcar como fallida' : '✓ Marcar como entregada';
+  if (nombreEl) nombreEl.textContent = idxToLetra(idx) + '. ' + p.nombre;
+  if (notaEl)   notaEl.value = '';
+  if (prevWrap) prevWrap.style.display = 'none';
+  if (btnConfirm) {
+    btnConfirm.textContent = esFallida ? '✗ Confirmar fallida' : '✓ Confirmar entrega';
+    btnConfirm.style.background = esFallida ? '#c0392b' : '#00c853';
+    btnConfirm.style.color = esFallida ? '#fff' : '#000';
+  }
+  document.getElementById('modal-pod').classList.remove('hidden');
+}
+
+// Comprime la foto en el navegador antes de guardarla (máx. ~640px, JPEG) para
+// no inflar el estado que se sincroniza (localStorage + push a GitHub).
+function podFotoSeleccionada(inputEl) {
+  const file = inputEl.files && inputEl.files[0];
+  if (!file || !_podCtx) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    const img = new Image();
+    img.onload = () => {
+      const maxW = 640;
+      const scale = Math.min(1, maxW / img.width);
+      const w = Math.max(1, Math.round(img.width * scale));
+      const h = Math.max(1, Math.round(img.height * scale));
+      const canvas = document.createElement('canvas');
+      canvas.width = w; canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      _podCtx.foto = canvas.toDataURL('image/jpeg', 0.55);
+      const prevImg  = document.getElementById('pod-preview-img');
+      const prevWrap = document.getElementById('pod-preview-wrap');
+      if (prevImg)  prevImg.src = _podCtx.foto;
+      if (prevWrap) prevWrap.style.display = 'block';
+    };
+    img.src = e.target.result;
+  };
+  reader.readAsDataURL(file);
+  inputEl.value = ''; // permite volver a elegir la misma foto si hace falta
+}
+
+function podQuitarFoto() {
+  if (_podCtx) _podCtx.foto = null;
+  const prevWrap = document.getElementById('pod-preview-wrap');
+  if (prevWrap) prevWrap.style.display = 'none';
+}
+
+function cerrarModalPOD() {
+  document.getElementById('modal-pod').classList.add('hidden');
+  _podCtx = null;
+}
+
+function confirmarPOD() {
+  if (!_podCtx) return;
+  const notaEl = document.getElementById('pod-nota');
+  const nota   = notaEl ? notaEl.value.trim() : '';
+  const { origen, idx, esFallida, foto } = _podCtx;
+
+  document.getElementById('modal-pod').classList.add('hidden');
+  _podCtx = null;
+
+  if (origen === 'seg') {
+    if (esFallida) _finalizarFallidaSeg(idx, foto, nota);
+    else           _finalizarEntregaSeg(idx, foto, nota);
+  } else {
+    _accionCond(idx, esFallida, foto, nota);
+  }
+}
+
+// Ver la foto/nota ya guardada de una parada
+function verProbadaPOD(paradaId) {
+  const ruta = state.rutaActual;
+  const p = ruta?.paradas?.find(x => x.id === paradaId);
+  if (!p) return;
+  const nombreEl = document.getElementById('verpod-nombre');
+  const imgEl    = document.getElementById('verpod-img');
+  const notaEl   = document.getElementById('verpod-nota');
+  if (nombreEl) nombreEl.textContent = p.nombre;
+  if (imgEl) {
+    if (p.foto) { imgEl.src = p.foto; imgEl.style.display = 'block'; }
+    else imgEl.style.display = 'none';
+  }
+  if (notaEl) notaEl.textContent = p.nota || (p.foto ? '' : 'Sin nota');
+  document.getElementById('modal-ver-pod').classList.remove('hidden');
+}
+
 function marcarEntregadaSeg(idx) {
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+  const p = ruta.paradas[idx];
+  if (!p || p.hecha) return;
+  abrirModalPOD({ origen: 'seg', idx, esFallida: false });
+}
+
+function _finalizarEntregaSeg(idx, foto, nota) {
   const ruta = state.rutaActual;
   if (!ruta) return;
   const p = ruta.paradas[idx];
   if (!p || p.hecha) return;
 
   p.hecha = true; p.fallida = false; p.horaAccion = fmtHora(new Date());
+  if (foto) p.foto = foto;
+  if (nota) p.nota = nota;
 
   const pendientes = ruta.paradas.filter((q, i) => i !== idx && !q.hecha && !q.fallida);
 
@@ -2699,8 +2930,18 @@ function marcarFallidaSeg(idx) {
   if (!ruta) return;
   const p = ruta.paradas[idx];
   if (!p || p.hecha) return;
+  abrirModalPOD({ origen: 'seg', idx, esFallida: true });
+}
+
+function _finalizarFallidaSeg(idx, foto, nota) {
+  const ruta = state.rutaActual;
+  if (!ruta) return;
+  const p = ruta.paradas[idx];
+  if (!p || p.hecha) return;
 
   p.hecha = true; p.fallida = true; p.horaAccion = fmtHora(new Date());
+  if (foto) p.foto = foto;
+  if (nota) p.nota = nota;
 
   const pendientes = ruta.paradas.filter((q, i) => i !== idx && !q.hecha && !q.fallida);
 
@@ -2726,6 +2967,7 @@ function deshacerSeg(idx) {
   const p = ruta.paradas[idx];
   if (!p) return;
   p.hecha = false; p.fallida = false; p.horaAccion = null;
+  delete p.foto; delete p.nota;
   saveState();
   renderSeguimiento();
   showToast('↩ Deshecho · parada ' + idxToLetra(idx));
@@ -4549,11 +4791,12 @@ async function _notifFinRuta(){
     }
   }catch(e){}
 }
-function _accionCond(esFallida){
+function _accionCond(idx, esFallida, foto, nota){
   const ruta=state.rutaActual;if(!ruta)return;
-  const pend=ruta.paradas.filter(p=>!p.hecha&&!p.fallida);if(!pend.length)return;
-  const p=pend[0];
+  const p=ruta.paradas[idx];if(!p)return;
   p.hecha=true;p.fallida=esFallida;p.horaAccion=fmtHora(new Date());
+  if (foto) p.foto = foto;
+  if (nota) p.nota = nota;
   saveState();
   if(navigator.vibrate)navigator.vibrate(esFallida?[100,50,100]:100);
   // Forzar recálculo de la ruta por carretera hacia el siguiente punto (sin salir de la app)
@@ -4567,8 +4810,14 @@ function _accionCond(esFallida){
     setTimeout(()=>_notifFinRuta(),1500);
   }
 }
-function condEntregada(){_accionCond(false);}
-function condFallida(){_accionCond(true);}
+function condEntregada(){ _abrirPODdesdeCond(false); }
+function condFallida(){ _abrirPODdesdeCond(true); }
+function _abrirPODdesdeCond(esFallida){
+  const ruta=state.rutaActual;if(!ruta)return;
+  const pend=ruta.paradas.filter(p=>!p.hecha&&!p.fallida);if(!pend.length)return;
+  const idx=ruta.paradas.indexOf(pend[0]);
+  abrirModalPOD({ origen:'cond', idx, esFallida });
+}
 function mostrarPantallaFin(){
   const ruta=state.rutaActual;if(!ruta)return;
   let modal=document.getElementById('pantalla-fin-ruta');
