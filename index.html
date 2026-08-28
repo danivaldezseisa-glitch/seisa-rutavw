@@ -69,15 +69,12 @@
 <title>SEISA Rutas</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
-<script>
-window.GOOGLE_API_KEY = "AIzaSyAGsOfVDl73CXEVPSb1UUXbreVJC-GmBcY";
-window.gm_authFailure = function() {
-  console.warn('[SEISA] Google Maps key restringida — geocoding desactivado, usando Nominatim.');
-  window.googleMapsReady = false;
-};
-</script>
-<script src="https://maps.googleapis.com/maps/api/js?key=AIzaSyAGsOfVDl73CXEVPSb1UUXbreVJC-GmBcY&libraries=places&language=es&region=MX&callback=initGoogleMaps" async defer></script>
+<!-- Google Maps quitado: la llave estaba restringida y disparaba el error
+     "API key required" en varios mapas. Toda la app usa Leaflet + OpenStreetMap
+     (teselas) y Nominatim/OSRM (búsqueda de direcciones y rutas), sin API key. -->
+<script>window.googleMapsReady = false;</script>
 <style>
+
 :root {
   --bg:      #0a1628;
   --bg2:     #0d1b2a;
@@ -144,7 +141,9 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
 #nav-map-leaflet { position:absolute;inset:0;z-index:1;display:none; }
 /* Mapa de conducción: look oscuro tipo navegación nocturna sin depender de un
    proveedor de teselas con API key — se invierten los colores de OpenStreetMap. */
-#cond-mapa .leaflet-tile-pane { filter: invert(1) hue-rotate(200deg) brightness(.95) contrast(.92) saturate(.7); }
+#cond-mapa .leaflet-tile-pane,
+#paradas-map .leaflet-tile-pane,
+#seg-mapa .leaflet-tile-pane { filter: invert(1) hue-rotate(200deg) brightness(.95) contrast(.92) saturate(.7); }
 #cond-mapa .leaflet-control-attribution { display:none; }
 .gm-style .gm-style-iw-c { background:var(--bg2) !important; color:var(--text) !important; }
 .gmnoprint, .gm-style-cc { display:none !important; }
@@ -1797,8 +1796,8 @@ function initMapaParadas() {
     ? [rutaBuild.inicio.lat, rutaBuild.inicio.lng]
     : [19.4326, -99.1332];
   mapParadas = L.map('paradas-map', { zoomControl: false }).setView(centro, 12);
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    attribution: '© OpenStreetMap © CARTO', maxZoom: 19, subdomains: 'abcd'
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '© OpenStreetMap', maxZoom: 19, subdomains: 'abc'
   }).addTo(mapParadas);
   if (rutaBuild.inicio) {
     L.marker([rutaBuild.inicio.lat, rutaBuild.inicio.lng], { icon: crearIcono('🏠', '#00e676') })
@@ -2414,8 +2413,8 @@ function initMapaSeg() {
   mapSeg = L.map('seg-mapa', { zoomControl: false, attributionControl: false })
              .setView(centro, 12);
 
-  L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
-    maxZoom: 19, subdomains: 'abcd'
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    maxZoom: 19, subdomains: 'abc'
   }).addTo(mapSeg);
 
   // Control de zoom compacto arriba-derecha
