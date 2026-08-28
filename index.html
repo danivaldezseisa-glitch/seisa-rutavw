@@ -6,10 +6,10 @@
 <meta name="theme-color" content="#0a1628">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Rutas Locas">
+<meta name="apple-mobile-web-app-title" content="SEISA Rutas">
 <meta name="mobile-web-app-capable" content="yes">
-<meta name="application-name" content="Rutas Locas">
-<meta name="description" content="Sistema de rutas y entregas LOCASS Logística">
+<meta name="application-name" content="SEISA Rutas">
+<meta name="description" content="Sistema de rutas y entregas SEISA Logística">
 <!-- Permitir que la PWA abra ventanas externas (Google Maps) -->
 <meta http-equiv="Cross-Origin-Opener-Policy" content="unsafe-none">
 
@@ -20,9 +20,9 @@
 <script>
 (function() {
   const manifest = {
-    name:             'Rutas Locas',
-    short_name:       'LOKiss',
-    description:      'Sistema de rutas y entregas LOCASS Logística',
+    name:             'SEISA Rutas',
+    short_name:       'SEISA',
+    description:      'Sistema de rutas y entregas SEISA Logística',
     start_url:        './',
     display:          'standalone',
     orientation:      'portrait',
@@ -66,7 +66,7 @@
 })();
 </script>
 
-<title>Rutas LocASS</title>
+<title>SEISA Rutas</title>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
 <script>
@@ -175,7 +175,7 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
   <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px 24px;gap:24px;">
     <div style="text-align:center;">
       <div style="font-size:52px;margin-bottom:8px;">🚛</div>
-      <div style="font-size:28px;font-weight:900;color:var(--accent);letter-spacing:2px;">LOKIS</div>
+      <div style="font-size:28px;font-weight:900;color:var(--accent);letter-spacing:2px;">SEISA</div>
       <div style="font-size:13px;color:var(--text3);margin-top:4px;">Sistema de Rutas</div>
     </div>
     <div id="login-usuarios-list" style="width:100%;display:flex;flex-direction:column;gap:8px;"></div>
@@ -248,7 +248,7 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
 <div class="screen hidden" id="screen-home">
   <div class="topbar">
     <div style="flex:1;min-width:0;">
-      <div style="font-size:16px;font-weight:800;">🚛 Rutas LocASS</div>
+      <div style="font-size:16px;font-weight:800;">🚛 SEISA Rutas</div>
       <div id="home-usuario-label" style="font-size:11px;color:var(--accent);margin-top:1px;"></div>
     </div>
     <div style="display:flex;gap:6px;">
@@ -498,8 +498,21 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
      ════════════════════════════════════════════════════════════════ -->
 <div class="screen hidden" id="screen-conduccion" style="background:#060e1a;">
 
-  <!-- Topbar mínima: solo progreso y acciones críticas -->
-  <div style="display:flex;align-items:center;gap:10px;padding:max(14px,env(safe-area-inset-top)) 14px 8px;background:#060e1a;flex-shrink:0;">
+  <!-- Mapa de fondo — a pantalla completa, estilo moderno -->
+  <div id="cond-mapa" style="position:absolute;inset:0;z-index:0;background:#0a1420;"></div>
+
+  <!-- Botones flotantes del mapa: ver ruta completa / centrar en mí -->
+  <button id="cond-btn-verruta" onclick="condVerRutaCompleta()" title="Ver ruta completa"
+    style="position:absolute;right:14px;bottom:246px;z-index:3;width:46px;height:46px;border-radius:50%;border:1.5px solid rgba(255,255,255,.15);background:rgba(8,17,30,.85);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);color:#8aabcc;font-size:19px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(0,0,0,.4);cursor:pointer;">
+    🗺
+  </button>
+  <button id="cond-btn-recentrar" onclick="condRecentrarUsuario()" title="Centrar en mi ubicación"
+    style="position:absolute;right:14px;bottom:194px;z-index:3;width:46px;height:46px;border-radius:50%;border:1.5px solid rgba(0,212,255,.45);background:rgba(8,17,30,.85);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);color:#00d4ff;font-size:20px;display:flex;align-items:center;justify-content:center;box-shadow:0 4px 16px rgba(0,0,0,.4);cursor:pointer;">
+    🎯
+  </button>
+
+  <!-- Topbar flotante: progreso y acciones críticas -->
+  <div style="position:relative;z-index:2;display:flex;align-items:center;gap:10px;padding:max(14px,env(safe-area-inset-top)) 14px 20px;background:linear-gradient(180deg,rgba(6,14,26,.95) 0%,rgba(6,14,26,.65) 65%,transparent 100%);flex-shrink:0;">
 
     <!-- Botón lista paradas (lleva a seguimiento para seleccionar) -->
     <button onclick="ocultarPantallaConduccion()"
@@ -509,11 +522,11 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
 
     <!-- Barra de progreso -->
     <div style="flex:1;display:flex;flex-direction:column;gap:3px;">
-      <div style="height:7px;background:rgba(255,255,255,.08);border-radius:6px;overflow:hidden;">
+      <div style="height:7px;background:rgba(255,255,255,.12);border-radius:6px;overflow:hidden;">
         <div id="cond-bar" style="height:100%;background:linear-gradient(90deg,#00d4ff,#00e676);border-radius:6px;width:0%;transition:width .5s;"></div>
       </div>
       <div style="display:flex;justify-content:space-between;font-size:10px;">
-        <span id="cond-contadores" style="color:#4a6a8a;">— / —</span>
+        <span id="cond-contadores" style="color:#8aabcc;">— / —</span>
         <span id="cond-pct" style="color:#00d4ff;font-weight:800;">0%</span>
       </div>
     </div>
@@ -525,31 +538,34 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
     </button>
   </div>
 
-  <!-- Zona central: parada actual — ocupa todo el espacio -->
-  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;padding:8px 16px;gap:8px;overflow:hidden;">
+  <!-- Zona central: aquí se ve el mapa (deja pasar los toques al mapa de fondo) -->
+  <div style="flex:1;position:relative;z-index:1;pointer-events:none;"></div>
+
+  <!-- Tarjeta flotante: parada actual -->
+  <div style="position:relative;z-index:2;margin:0 12px 8px;padding:14px 16px;background:rgba(8,17,30,.88);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1.5px solid rgba(255,255,255,.1);border-radius:22px;box-shadow:0 8px 32px rgba(0,0,0,.5);display:flex;align-items:center;gap:14px;flex-shrink:0;">
 
     <!-- Letra grande -->
     <div id="cond-letra"
-      style="font-size:80px;font-weight:900;color:#00d4ff;line-height:1;font-family:'SF Mono','Fira Code',monospace;text-shadow:0 0 40px rgba(0,212,255,.4);">
+      style="font-size:42px;font-weight:900;color:#00d4ff;line-height:1;font-family:'SF Mono','Fira Code',monospace;text-shadow:0 0 30px rgba(0,212,255,.4);flex-shrink:0;">
       A
     </div>
 
-    <!-- Nombre de la parada -->
-    <div id="cond-nombre"
-      style="font-size:24px;font-weight:800;color:#ffffff;text-align:center;line-height:1.25;max-width:100%;padding:0 4px;word-break:break-word;">
-      —
-    </div>
-
-    <!-- Siguiente (referencia discreta) -->
-    <div style="margin-top:4px;padding:8px 14px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07);border-radius:10px;text-align:center;width:100%;max-width:320px;">
-      <div style="font-size:9px;color:#2a4a6a;text-transform:uppercase;letter-spacing:.1em;margin-bottom:3px;">Siguiente</div>
-      <div id="cond-siguiente" style="font-size:13px;color:#4a6a8a;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">—</div>
+    <div style="flex:1;min-width:0;">
+      <!-- Nombre de la parada -->
+      <div id="cond-nombre"
+        style="font-size:17px;font-weight:800;color:#ffffff;line-height:1.25;word-break:break-word;">
+        —
+      </div>
+      <!-- Siguiente (referencia discreta) -->
+      <div style="margin-top:5px;font-size:11px;color:#4a6a8a;font-weight:600;">
+        Siguiente: <span id="cond-siguiente" style="color:#8aabcc;">—</span>
+      </div>
     </div>
 
   </div>
 
   <!-- Botones de acción — ENORMES, fáciles de tocar manejando -->
-  <div style="padding:8px 12px calc(env(safe-area-inset-bottom,0px)+12px);flex-shrink:0;display:flex;flex-direction:column;gap:8px;">
+  <div style="position:relative;z-index:2;padding:8px 12px calc(env(safe-area-inset-bottom,0px)+12px);flex-shrink:0;display:flex;flex-direction:column;gap:8px;">
 
     <div style="display:flex;gap:10px;">
       <!-- Fallida -->
@@ -680,7 +696,7 @@ input:checked + .toggle-slider:before { transform: translateX(18px); }
   <div style="display:flex;align-items:center;gap:12px;">
     <div style="font-size:36px;flex-shrink:0;">🚛</div>
     <div style="flex:1;min-width:0;">
-      <div style="font-size:13px;font-weight:700;color:var(--text);">Instalar Rutas LocASS</div>
+      <div style="font-size:13px;font-weight:700;color:var(--text);">Instalar SEISA Rutas</div>
       <div style="font-size:11px;color:var(--text3);margin-top:2px;">Agrega la app a tu pantalla de inicio — funciona sin internet</div>
     </div>
     <div style="display:flex;flex-direction:column;gap:6px;flex-shrink:0;">
@@ -780,7 +796,7 @@ async function ghWriteShared(data) {
     }
     const encoded = btoa(unescape(encodeURIComponent(JSON.stringify(data, null, 2))));
     const body = {
-      message: `[LocASS] Sync ${new Date().toISOString()}`,
+      message: `[SEISA] Sync ${new Date().toISOString()}`,
       content: encoded,
       ...(_ghSHA ? { sha: _ghSHA } : {})
     };
@@ -1343,7 +1359,7 @@ function confirmarSalirApp() {
     overlay.innerHTML = `
       <div style="width:100%;background:var(--bg2);border-radius:20px 20px 0 0;padding:24px 20px calc(env(safe-area-inset-bottom,20px)+20px);display:flex;flex-direction:column;gap:10px;">
         <div style="text-align:center;font-size:28px;margin-bottom:4px;">🚛</div>
-        <div style="font-size:16px;font-weight:800;text-align:center;color:var(--text);">¿Salir de Rutas LocASS?</div>
+        <div style="font-size:16px;font-weight:800;text-align:center;color:var(--text);">¿Salir de SEISA Rutas?</div>
         <div style="font-size:12px;color:var(--text3);text-align:center;margin-bottom:4px;">Los datos guardados permanecen seguros.</div>
         <button onclick="window.close()||history.go(-(history.length-1))"
           style="padding:15px;border-radius:14px;border:none;background:var(--red);color:#fff;font-size:15px;font-weight:800;cursor:pointer;">
@@ -2954,7 +2970,7 @@ async function activarNotificaciones() {
       showToast('🔔 Notificaciones activas — modo básico');
       if (navigator.vibrate) navigator.vibrate([300, 150, 300]);
       try {
-        const n = new Notification('🔔 Rutas Lokis — Notificaciones activas', {
+        const n = new Notification('🔔 SEISA Rutas — Notificaciones activas', {
           body: 'Al llegar a cada parada verás este aviso',
           tag: 'seisa-test', requireInteraction: false,
         });
@@ -3810,8 +3826,180 @@ function mostrarAccionRapida(idxReal, letra, nombre) {
 }
 
 // ══════════════════════════════════════════════════════════════════
-//  PANTALLA DE CONDUCCIÓN — Minimalista
+//  PANTALLA DE CONDUCCIÓN — Mapa en vivo + minimalista
 // ══════════════════════════════════════════════════════════════════
+
+let mapCond        = null;   // instancia Leaflet del mapa de conducción
+let condLine        = null;  // polyline de la ruta completa
+let condMarkers      = [];   // marcadores de paradas
+let condUserMarker   = null; // marcador de "mi ubicación"
+let condWatchId       = null; // id de navigator.geolocation.watchPosition
+let condLastPos        = null; // última posición usada para redibujar (filtro de 3m)
+let condFollow           = true; // ¿el mapa sigue automáticamente al usuario?
+const COND_GPS_MIN_METROS = 3;   // distancia mínima entre actualizaciones del mapa
+
+function initMapaConduccion() {
+  const el = document.getElementById('cond-mapa');
+  if (!el) return;
+  if (mapCond) { mapCond.invalidateSize(); return; }
+
+  const ruta   = state.rutaActual;
+  const centro = ruta?.inicio ? [ruta.inicio.lat, ruta.inicio.lng] : [19.4326, -99.1332];
+
+  mapCond = L.map('cond-mapa', { zoomControl: false, attributionControl: false })
+              .setView(centro, 13);
+
+  // Mapa moderno tipo "Voyager" (claro, con carreteras y etiquetas muy legibles)
+  L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+    maxZoom: 20, subdomains: 'abcd'
+  }).addTo(mapCond);
+}
+
+function renderMapaConduccion() {
+  const ruta = state.rutaActual;
+  if (!mapCond || !ruta) return;
+
+  // Limpiar marcadores y línea anteriores
+  condMarkers.forEach(m => m.remove());
+  condMarkers = [];
+  if (condLine) { condLine.remove(); condLine = null; }
+
+  const paradas     = ruta.paradas || [];
+  const inicio      = ruta.inicio;
+  const fin         = ruta.final;
+  const pendientes  = paradas.filter(p => !p.hecha && !p.fallida);
+  const actual      = pendientes[0] || null;
+  const allPoints   = [];
+
+  if (inicio) {
+    allPoints.push([inicio.lat, inicio.lng]);
+    const m = L.marker([inicio.lat, inicio.lng], {
+      icon: L.divIcon({
+        html: `<div style="width:28px;height:28px;border-radius:50%;background:#00e676;border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.5);">🏠</div>`,
+        className: '', iconSize: [28,28], iconAnchor: [14,14]
+      })
+    }).addTo(mapCond);
+    condMarkers.push(m);
+  }
+
+  paradas.forEach((p, i) => {
+    const letra     = idxToLetra(i);
+    const entregada = p.hecha && !p.fallida;
+    const fallida   = p.fallida;
+    const esActual  = p === actual;
+
+    const color   = entregada ? '#00e676' : fallida ? '#ff5252' : esActual ? '#ffd740' : '#00d4ff';
+    const size    = esActual ? 34 : 24;
+    const opacidad = (entregada || fallida) ? '0.5' : '1';
+    const texto   = entregada ? '✓' : fallida ? '✗' : letra;
+    const fontSize = letra.length > 1 ? '10px' : (esActual ? '15px' : '11px');
+
+    allPoints.push([p.lat, p.lng]);
+
+    const m = L.marker([p.lat, p.lng], {
+      icon: L.divIcon({
+        html: `<div style="width:${size}px;height:${size}px;border-radius:50%;background:${color};border:${esActual?3:2}px solid #fff;display:flex;align-items:center;justify-content:center;font-size:${fontSize};font-weight:800;color:#000;box-shadow:0 2px ${esActual?12:6}px rgba(0,0,0,.55);opacity:${opacidad};">${texto}</div>`,
+        className: '', iconSize: [size,size], iconAnchor: [size/2,size/2]
+      }),
+      zIndexOffset: esActual ? 500 : 0
+    }).addTo(mapCond).bindPopup(`<b>${letra}. ${p.nombre}</b>`);
+    condMarkers.push(m);
+  });
+
+  if (fin) {
+    allPoints.push([fin.lat, fin.lng]);
+    const m = L.marker([fin.lat, fin.lng], {
+      icon: L.divIcon({
+        html: `<div style="width:28px;height:28px;border-radius:50%;background:#ff9100;border:2.5px solid #fff;display:flex;align-items:center;justify-content:center;font-size:13px;box-shadow:0 2px 8px rgba(0,0,0,.5);">🏁</div>`,
+        className: '', iconSize: [28,28], iconAnchor: [14,14]
+      })
+    }).addTo(mapCond);
+    condMarkers.push(m);
+  }
+
+  // Línea de la ruta completa y optimizada
+  if (allPoints.length > 1) {
+    condLine = L.polyline(allPoints, {
+      color: '#0064ff', weight: 5, opacity: 0.85, lineCap: 'round', lineJoin: 'round'
+    }).addTo(mapCond);
+
+    // Tramo ya recorrido, en verde
+    const completadas = [];
+    if (inicio) completadas.push([inicio.lat, inicio.lng]);
+    paradas.forEach(p => { if (p.hecha || p.fallida) completadas.push([p.lat, p.lng]); });
+    if (completadas.length > 1) {
+      L.polyline(completadas, { color: '#00e676', weight: 5, opacity: 0.8 }).addTo(mapCond);
+    }
+  }
+
+  // Al renderizar por primera vez (o al pedirlo), mostrar toda la ruta
+  if (!condUserMarker && condLine) {
+    mapCond.fitBounds(condLine.getBounds(), { padding: [50, 50], maxZoom: 16 });
+  }
+}
+
+// Ajusta el mapa para ver la ruta completa y desactiva el seguimiento automático
+function condVerRutaCompleta() {
+  if (!mapCond || !condLine) return;
+  condFollow = false;
+  mapCond.fitBounds(condLine.getBounds(), { padding: [50, 50], maxZoom: 16 });
+}
+
+// Centra el mapa en la ubicación actual y reactiva el seguimiento automático
+function condRecentrarUsuario() {
+  condFollow = true;
+  if (mapCond && condLastPos) {
+    mapCond.setView([condLastPos.lat, condLastPos.lng], 17, { animate: true });
+  }
+}
+
+function iniciarGPSConduccion() {
+  if (!navigator.geolocation) return;
+  if (condWatchId !== null) return; // ya está activo
+
+  condWatchId = navigator.geolocation.watchPosition(
+    pos => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+
+      // Filtro: sólo actualizar el mapa cuando el usuario se movió 3 metros o más
+      if (condLastPos && distHaversine(condLastPos.lat, condLastPos.lng, lat, lng) * 1000 < COND_GPS_MIN_METROS) {
+        return;
+      }
+      condLastPos = { lat, lng };
+      actualizarUbicacionConduccion(lat, lng);
+    },
+    err => console.warn('GPS conducción:', err.message),
+    { enableHighAccuracy: true, maximumAge: 1000, timeout: 15000 }
+  );
+}
+
+function detenerGPSConduccion() {
+  if (condWatchId !== null) {
+    navigator.geolocation.clearWatch(condWatchId);
+    condWatchId = null;
+  }
+  condLastPos = null;
+  if (condUserMarker) { condUserMarker.remove(); condUserMarker = null; }
+}
+
+function actualizarUbicacionConduccion(lat, lng) {
+  if (!mapCond) return;
+
+  if (!condUserMarker) {
+    condUserMarker = L.marker([lat, lng], {
+      icon: L.divIcon({
+        html: `<div style="width:20px;height:20px;border-radius:50%;background:#0064ff;border:3px solid #fff;box-shadow:0 0 0 7px rgba(0,100,255,.25),0 2px 10px rgba(0,0,0,.5);"></div>`,
+        className: '', iconSize: [20,20], iconAnchor: [10,10]
+      }),
+      zIndexOffset: 1000
+    }).addTo(mapCond);
+  } else {
+    condUserMarker.setLatLng([lat, lng]);
+  }
+
+  if (condFollow) mapCond.panTo([lat, lng], { animate: true });
+}
 
 function mostrarPantallaConduccion() {
   const ruta = state.rutaActual;
@@ -3820,9 +4008,18 @@ function mostrarPantallaConduccion() {
   // Ocultar todas las screens y mostrar conducción
   document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
   document.getElementById('screen-conduccion').classList.remove('hidden');
+
+  condFollow = true;
+  // Esperar a que termine la transición/render antes de medir el contenedor del mapa
+  setTimeout(() => {
+    initMapaConduccion();
+    renderMapaConduccion();
+    iniciarGPSConduccion();
+  }, 60);
 }
 
 function ocultarPantallaConduccion() {
+  detenerGPSConduccion();
   document.querySelectorAll('.screen').forEach(s => s.classList.add('hidden'));
   document.getElementById('screen-seguimiento').classList.remove('hidden');
   renderSeguimiento();
@@ -3858,6 +4055,7 @@ function renderPantallaConduccion() {
     if (sigEl)   sigEl.textContent   = 'Regresa a la base 🏁';
     if (bOk)     bOk.style.display   = 'none';
     if (bFall)   bFall.style.display = 'none';
+    if (mapCond) renderMapaConduccion();
     return;
   }
 
@@ -3880,6 +4078,9 @@ function renderPantallaConduccion() {
     : '(última parada)';
   if (bOk)   bOk.style.display   = '';
   if (bFall) bFall.style.display = '';
+
+  // Refrescar marcadores del mapa (parada actual resaltada, entregadas/fallidas en color)
+  if (mapCond) renderMapaConduccion();
 }
 
 // Abrir Maps desde la pantalla de conducción
@@ -4014,7 +4215,7 @@ window.addEventListener('beforeinstallprompt', (e) => {
 window.addEventListener('appinstalled', () => {
   ocultarBannerPWA();
   _pwaPrompt = null;
-  showToast('✅ Rutas LocASS instalada correctamente');
+  showToast('✅ SEISA Rutas instalada correctamente');
 });
 
 function mostrarBannerPWA() {
@@ -4039,7 +4240,7 @@ async function instalarPWA() {
   _pwaPrompt.prompt();
   const { outcome } = await _pwaPrompt.userChoice;
   if (outcome === 'accepted') {
-    showToast('✅ Instalando Rutas LocASS...');
+    showToast('✅ Instalando SEISA Rutas...');
   }
   _pwaPrompt = null;
 }
